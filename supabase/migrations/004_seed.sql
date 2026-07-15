@@ -1,10 +1,11 @@
 -- ============================================================
 -- 004 — Données initiales : Groupe Triple A (sites + employés)
--- Transcrit depuis les pages 1, 2, 3 et 5 du registre « Total Salariers ».
+-- Transcrit depuis les pages 1, 2, 3, 5, 6 et 7 du registre « Total Salariers ».
 -- ⚠️  Données saisies à partir de photos : merci de vérifier les
 --     CIN / CNSS / dates et de corriger directement dans Supabase
 --     (Table Editor → employees) si besoin.
--- Les pages restantes seront ajoutées dans 005_seed_2.sql.
+-- ⚠️  La PAGE 4 du registre manque encore (le registre annonce 145
+--     salariés, 121 sont saisis ici) : elle sera ajoutée dès réception.
 -- ============================================================
 
 insert into public.companies (name)
@@ -35,7 +36,12 @@ from public.companies c,
     ('PARKING LA COMMUNE'),
     ('DPM LARACHE'),
     ('LOYER'),
-    ('ATLAS BERRY AGADIR')
+    ('ATLAS BERRY AGADIR'),
+    ('JOKER ATLAS BERRY AGADIR'),
+    ('BLOC SANITAIRE PLAYA'),
+    ('UNIQUE FRUIT-PRO'),
+    ('AGENCE URBAINE TANGER'),
+    ('SUPERVISEUR')
   ) as s(name)
 where c.name = 'Groupe Triple A'
 on conflict (company_id, name) do nothing;
@@ -185,7 +191,42 @@ from (values
   ('ATLAS BERRY AGADIR', '1222', 'EL MADKOURY ABDERRAHIM', 'I492465',  null,        date '2004-07-13', date '2026-06-17', 'AGENT DE SECURITE', 'DOUAR GHZALA AIT AMIRA',       'CHTOUKA', 'Virement'),
   ('ATLAS BERRY AGADIR', '1273', 'KRIMCH HAMZA',           'JH89592',  '162743276', date '1984-03-30', date '2026-04-09', 'AGENT DE SECURITE', 'DOUAR OUKHRIB BELFAA',         'CHTOUKA', 'Virement'),
   ('ATLAS BERRY AGADIR', '1249', 'FATIHI MUSTAPHA',        'JB307619', null,        date '1994-01-02', date '2025-10-01', 'AGENT DE SECURITE', 'DOUAR TIN TALEB SALEM AIT',    'CHTOUKA', 'Virement'),
-  ('ATLAS BERRY AGADIR', '1141', 'EL BAZ HICHAM',          'JH14172',  '179554989', date '1994-01-02', date '2025-10-01', 'AGENT DE SECURITE', 'DOUAR TIN TALEB SALEM AIT',    'CHTOUKA', 'Virement')
+  ('ATLAS BERRY AGADIR', '1141', 'EL BAZ HICHAM',          'JH14172',  '179554989', date '1994-01-02', date '2025-10-01', 'AGENT DE SECURITE', 'DOUAR TIN TALEB SALEM AIT',    'CHTOUKA', 'Virement'),
+
+  -- ================= JOKER ATLAS BERRY AGADIR =================
+  ('JOKER ATLAS BERRY AGADIR', '1202', 'ELHAMDAOUI ABDELMOULA',  'JH17834',  '154107092', date '1994-09-25', date '2026-01-01', 'AGENT DE SECURITE', 'DR AHMER AIT AMIRA CHTOUKA',   'AIT BAHA',  'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1137', 'DAIF BRAHIM',            'JB187978', '159775969', date '1977-01-01', date '2025-10-01', 'AGENT DE SECURITE', 'DOUAR TIN TALEB SALEM AIT',    'CHTOUKA',   'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1143', 'BOUYA LAHOUCINE',        'JE163381', '139270286', date '1978-01-18', date '2025-10-01', 'AGENT DE SECURITE', 'HAY ELAAHD ELJADID TAZNAKHT',  'OUARZAZATE', 'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1142', 'IBIDARNE MOHAMED',       'JB336747', '168468969', date '1984-08-10', date '2025-10-01', 'AGENT DE SECURITE', 'DOUAR IBIDARNE AIT AMIRA',     'CHTOUKA',   'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1233', 'OUHMOU ABDALLAH',        'JH48201',  '174241007', date '1999-03-30', date '2026-03-09', 'AGENT DE SECURITE', 'DR AIT MOUSSA BELFAA CHT',     'AIT BAHA',  'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1138', 'OUBRIK LAHOUCINE',       'JB293814', '182481869', date '1982-01-01', date '2025-10-01', 'AGENT DE SECURITE', 'DR TIN CHAOUI BELFAA',         'CHTOUKA',   'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1139', 'EL BAZ MUSTAPHA',        'JB398231', '199655668', date '1989-04-01', date '2025-10-01', 'AGENT DE SECURITE', 'DOUAR TIN TALEB SALEM AIT',    'CHTOUKA',   'Virement'),
+  ('JOKER ATLAS BERRY AGADIR', '1275', 'BOUZOUAI ABDELLATIF',    'JH64229',  null,        date '2001-04-06', date '2026-06-25', 'AGENT DE SECURITE', 'DOUAR AIT TOUIER BELFAA',      'CHTOUKA',   'Versement'),
+  ('JOKER ATLAS BERRY AGADIR', '1248', 'EL MOURABIT ABDELKEBIR', 'MC23393',  null,        date '1959-01-01', date '2026-04-01', 'AGENT DE SECURITE', 'DOUAR GHZALA AIT AMIRA',       'CHTOUKA',   'Versement'),
+  ('JOKER ATLAS BERRY AGADIR', '1243', 'HAYYA ABDELLAH',         'JH66745',  null,        date '2001-06-28', date '2026-03-24', 'AGENT DE SECURITE', 'DOUAR BEN AOUAIS BELFAA',      'CHTOUKA',   'Versement'),
+  ('JOKER ATLAS BERRY AGADIR', '1247', 'OULMAADER MUSTAPHA',     'JH63170',  null,        date '2001-08-28', date '2026-04-01', 'AGENT DE SECURITE', 'DOUAR BNI OUISS BELFAA',       'CHTOUKA',   'Versement'),
+
+  -- ================= BLOC SANITAIRE PLAYA =================
+  ('BLOC SANITAIRE PLAYA', '1179', 'MARZAK MOHAMED', 'GM1109587', null, date '1987-01-01', date '2025-11-15', 'AGENT DE SECURITE', 'HAY BNI MAKADA LAKDIMA RUE 15', 'TANGER', 'Espece'),
+  ('BLOC SANITAIRE PLAYA', '1270', 'TOUITI SIHAM',   'CD86088',   null, date '1986-01-01', date '2026-06-01', 'AGENT DE SECURITE', 'HAY EL JADID RUE 9 NR 13',      'TANGER', 'Espece'),
+
+  -- ================= UNIQUE FRUIT-PRO =================
+  ('UNIQUE FRUIT-PRO', '1277', 'MIHBAR FAYSAL',     null,       null, null,              date '2026-07-01', 'AGENT DE SECURITE', null,                             null,            'Espece'),
+  ('UNIQUE FRUIT-PRO', '1276', 'EL BAHRAWI HAMZA',  'LB232230', null, date '1996-07-10', date '2026-06-25', 'AGENT DE SECURITE', 'DR MJAHDINE CR ZOUADA CT SIDI',  'KSAR EL KEBIR', 'Versement'),
+  ('UNIQUE FRUIT-PRO', '1269', 'OUSSAMA MARIER',    'LB215714', null, date '1996-12-30', date '2026-06-13', 'AGENT DE SECURITE', 'DR MJAHDDINE CR ZOUADA CT SIDI', 'KSAR EL KEBIR', 'Virement'),
+  ('UNIQUE FRUIT-PRO', '1268', 'GUERRAB MOURAD',    'LB240908', null, date '1996-04-13', date '2026-07-10', 'AGENT DE SECURITE', 'DR OLD EL MAMOUNE CR ZOUADA',    'KSAR EL KEBIR', 'Versement'),
+  ('UNIQUE FRUIT-PRO', '1267', 'EL KEHILA SELLAM',  'LB136508', null, date '1988-10-01', date '2026-06-08', 'AGENT DE SECURITE', 'LAOUAMRA CENTRE CR ET CT',       'KSAR EL KEBIR', 'Virement'),
+  ('UNIQUE FRUIT-PRO', '1278', 'MAZOUZ IMAD',       'LB176950', null, date '1993-07-27', date '2026-07-07', 'AGENT DE SECURITE', 'HAY BRANES LAKDIMA HAOUMAT',     'TANGER',        'Espece'),
+
+  -- ================= AGENCE URBAINE TANGER (ACCUEIL) =================
+  ('AGENCE URBAINE TANGER', '1198', 'BEL MEJDOUB OUMAIMA', 'K582620',  '180761526', date '2000-06-21', date '2026-01-01', 'AGENT', 'PLACE PARIENTE RUE 87 NO 3', 'TANGER', 'Virement'),
+  ('AGENCE URBAINE TANGER', '1061', 'EL ACHIRI SAIDA',     'KB229372', '114561267', date '2002-04-30', date '2025-11-01', 'AGENT', 'LOTS MERIEM RUE 17 NO 11',   'TANGER', 'Virement'),
+
+  -- ================= SUPERVISEUR (ADMINISTRATIF) =================
+  ('SUPERVISEUR', '1060', 'OUAFI IMAD',              'M444879',  null,        date '1987-01-19', date '2021-10-01', 'AGENT', 'HAY MESNANA SECTEUR AL',           'TANGER',  'Virement'),
+  ('SUPERVISEUR', '446',  'EL ABIAD MOHAMED',        'GM41976',  '148291950', date '1975-04-19', date '2019-01-01', 'AGENT', 'HAY MOUJAHIDINE TR 2 N° 252',      'TANGER',  'Virement'),
+  ('SUPERVISEUR', '1210', 'AMINE HASSANE',           'LA113695', '123727491', date '1988-08-02', date '2026-01-13', 'AGENT', 'LOT CHAABAN 1 RES ENNASR NR 25',   'LARACHE', 'Virement'),
+  ('SUPERVISEUR', '1254', 'EL RHALLAT MOHAMED TAHA', 'KB199222', null,        date '2000-06-15', date '2026-04-01', 'AGENT', 'HAY BENI OUARIAGHEL 01 ETAGE 03',  'TANGER',  'Espece')
 ) as e(site_name, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement)
 join public.companies c on c.name = 'Groupe Triple A'
 join public.sites s on s.company_id = c.id and s.name = e.site_name;

@@ -10,19 +10,15 @@ on conflict (id) do nothing;
 
 -- Chemin des fichiers : <company_id>/<employee_id>/<fichier>.jpg
 
--- Upload : agents uniquement, dans les dossiers de leurs entreprises
+-- Upload : agents uniquement
 create policy pointages_storage_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'pointages'
     and public.current_user_role() = 'agent'
-    and public.user_has_company(((storage.foldername(name))[1])::uuid)
   );
 
--- Lecture : toute personne ayant accès à l'entreprise (agents + validateurs)
+-- Lecture : tout utilisateur connecté (agents + validateurs)
 create policy pointages_storage_select on storage.objects
   for select to authenticated
-  using (
-    bucket_id = 'pointages'
-    and public.user_has_company(((storage.foldername(name))[1])::uuid)
-  );
+  using (bucket_id = 'pointages');

@@ -66,16 +66,6 @@ create table public.profiles (
   created_at timestamptz not null default now()
 );
 
--- Accès entreprise par utilisateur ---------------------------------
-
-create table public.user_companies (
-  user_id uuid not null references auth.users(id) on delete cascade,
-  company_id uuid not null references public.companies(id) on delete cascade,
-  primary key (user_id, company_id)
-);
-
-create index user_companies_company_idx on public.user_companies (company_id);
-
 -- Pointages ---------------------------------------------------------
 
 create table public.pointages (
@@ -140,7 +130,6 @@ as $$
 declare
   v_role public.user_role;
   v_employee uuid;
-  v_company uuid;
   v_old_status public.pointage_status;
 begin
   if p_decision not in ('validated', 'refused') then
@@ -152,21 +141,14 @@ begin
     raise exception 'Réservé aux validateurs';
   end if;
 
-  select employee_id, company_id, status
-    into v_employee, v_company, v_old_status
+  select employee_id, status
+    into v_employee, v_old_status
     from public.pointages
     where id = p_pointage_id
     for update;
 
   if v_employee is null then
     raise exception 'Pointage introuvable';
-  end if;
-
-  if not exists (
-    select 1 from public.user_companies
-    where user_id = auth.uid() and company_id = v_company
-  ) then
-    raise exception 'Accès refusé à cette entreprise';
   end if;
 
   if v_old_status <> 'pending' then
