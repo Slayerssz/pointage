@@ -1,0 +1,151 @@
+import { NavLink, Outlet, useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+
+const ICONS = {
+  pointage: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M12 8v4l2.5 2.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  ),
+  employes: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M17 20h5v-1a4 4 0 0 0-4-4h-1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 0a3 3 0 1 0-2-5.2M2 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1H2Z" />
+    </svg>
+  ),
+  validation: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="m9 12 2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  ),
+}
+
+export default function Layout() {
+  const { companyId } = useParams()
+  const { profile, signOut } = useAuth()
+
+  const { data: company } = useQuery({
+    queryKey: ['company', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('id', companyId!)
+        .single()
+      if (error) throw error
+      return data
+    },
+  })
+
+  const tabs =
+    profile?.role === 'validator'
+      ? [
+          { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+          { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+        ]
+      : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
+
+  const navItem = (tab: (typeof tabs)[number]) => (
+    <NavLink
+      key={tab.to}
+      to={tab.to}
+      className={({ isActive }) =>
+        `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+          isActive
+            ? 'bg-emerald-600 text-white'
+            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+        }`
+      }
+    >
+      {tab.icon}
+      <span>{tab.label}</span>
+    </NavLink>
+  )
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Sidebar (desktop) */}
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col bg-slate-900 p-4 md:flex">
+        <Link to="/" className="mb-8 flex items-center gap-3 px-1">
+          <svg viewBox="0 0 64 64" className="h-8 w-8 shrink-0">
+            <rect width="64" height="64" rx="14" fill="#1e293b" />
+            <path
+              d="M18 34 L28 44 L47 22"
+              fill="none"
+              stroke="#34d399"
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{company?.name ?? '…'}</p>
+            <p className="text-xs text-slate-400">Pointage</p>
+          </div>
+        </Link>
+        <nav className="flex flex-1 flex-col gap-1">{tabs.map(navItem)}</nav>
+        <div className="border-t border-slate-800 pt-3">
+          <p className="truncate px-1 text-xs text-slate-400">
+            {profile?.full_name || profile?.username}
+            <span className="ml-1 text-slate-500">
+              ({profile?.role === 'validator' ? 'validateur' : 'agent'})
+            </span>
+          </p>
+          <button
+            onClick={signOut}
+            className="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+          >
+            Déconnexion
+          </button>
+        </div>
+      </aside>
+
+      {/* Top bar (mobile) */}
+      <header className="fixed inset-x-0 top-0 z-20 flex h-14 items-center justify-between bg-slate-900 px-4 md:hidden">
+        <Link to="/" className="flex items-center gap-2">
+          <svg viewBox="0 0 64 64" className="h-7 w-7">
+            <rect width="64" height="64" rx="14" fill="#1e293b" />
+            <path
+              d="M18 34 L28 44 L47 22"
+              fill="none"
+              stroke="#34d399"
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="max-w-[50vw] truncate text-sm font-semibold text-white">
+            {company?.name ?? 'Pointage'}
+          </span>
+        </Link>
+        <button onClick={signOut} className="text-sm font-medium text-slate-300">
+          Déconnexion
+        </button>
+      </header>
+
+      {/* Bottom nav (mobile) */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] md:hidden">
+        {tabs.map((tab) => (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            className={({ isActive }) =>
+              `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium ${
+                isActive ? 'text-emerald-400' : 'text-slate-400'
+              }`
+            }
+          >
+            {tab.icon}
+            {tab.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <main className="min-w-0 flex-1 px-4 pb-24 pt-18 md:ml-60 md:px-8 md:pb-10 md:pt-8">
+        <Outlet />
+      </main>
+    </div>
+  )
+}
