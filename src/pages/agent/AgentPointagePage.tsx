@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { compressImage } from '../../lib/image'
+import { compressImage, randomId } from '../../lib/image'
 import { isoDayOfWeek, jourDeReposLabel, todayIso } from '../../lib/dates'
 import {
   useSiteEmployees,
@@ -29,7 +29,7 @@ export default function AgentPointagePage() {
   const submitPointage = async (photo: Blob) => {
     if (!target || !companyId) return
     const compressed = await compressImage(photo)
-    const path = `${companyId}/${target.employee.id}/${todayIso()}_${crypto.randomUUID()}.jpg`
+    const path = `${companyId}/${target.employee.id}/${todayIso()}_${randomId()}.jpg`
 
     const { error: uploadError } = await supabase.storage
       .from('pointages')

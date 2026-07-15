@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import type { Company } from '../lib/types'
@@ -17,10 +17,6 @@ export default function CompanySelectPage() {
       return data
     },
   })
-
-  if (companies && companies.length === 1) {
-    return <Navigate to={`/c/${companies[0].id}`} replace />
-  }
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl px-4 py-10">
@@ -62,6 +58,17 @@ export default function CompanySelectPage() {
             <p className="mt-0.5 text-xs text-slate-500">Accéder au tableau de bord →</p>
           </button>
         ))}
+        {companies && companies.length > 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                <path d="M12 5v14m-7-7h14" />
+              </svg>
+            </div>
+            <p className="font-semibold text-slate-400">D'autres entreprises</p>
+            <p className="mt-0.5 text-xs text-slate-400">Bientôt disponible</p>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -21,8 +21,12 @@ Supabase, c'est la base de données en ligne : c'est là que vivent les employé
 4. Faites exactement pareil, dans l'ordre, avec :
    - `002_rls.sql`
    - `003_storage.sql`
-   - `004_seed.sql` ← c'est lui qui remplit les 26 sites et les 121 employés
+   - `004_seed.sql` ← remplit les sites et les employés (pages 1-3 et 5-7 du registre)
    - `005_utilisateurs.sql`
+   - `006_seed_page4.sql` ← la page 4 du registre (total : 31 sites, 145 employés ✅)
+
+> Vous avez déjà exécuté les fichiers 001 à 005 ? Il ne vous reste qu'à
+> exécuter `006_seed_page4.sql` pour compléter les 145 employés.
 
 Si un « Success » s'affiche à chaque fois, c'est bon. ✅
 
@@ -102,4 +106,4 @@ Donnez cette adresse aux agents. Sur leur téléphone, ils peuvent aussi **insta
 - **Retraite** : à 65 ans la ligne de l'employé devient rouge (« Âge de retraite atteint ») ; un compte à rebours s'affiche à partir de 30 jours avant
 - **Jours travaillés** : chaque validation ajoute +1 au compteur de l'employé (pour la paie plus tard)
 - ⚠️ Les employés ont été recopiés depuis des photos du registre : vérifiez les CIN/CNSS/dates dans Supabase (**Table Editor → employees**) et corrigez si besoin
-- ⚠️ **Il manque la page 4/7 du registre** (121 employés saisis sur les 145 annoncés) — envoyez-la pour compléter
+- **Application de bureau / mobile** : une fois en ligne (Vercel), l'app s'installe déjà comme une application — sur PC : icône « Installer » dans la barre d'adresse de Chrome/Edge ; sur téléphone : « Ajouter à l'écran d'accueil ». De vraies applis pour App Store / Play Store pourront être ajoutées plus tard.
