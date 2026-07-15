@@ -17,13 +17,14 @@ export interface Site {
   id: string
   company_id: string
   name: string
+  pointage_actif: boolean
 }
 
 export interface Employee {
   id: string
   company_id: string
   site_id: string
-  matricule: string | null
+  matricule: number | null
   nom_prenom: string
   cin: string | null
   cnss: string | null
@@ -45,7 +46,7 @@ export interface Pointage {
   site_id: string
   employee_id: string
   agent_id: string
-  photo_path: string
+  photo_path: string | null
   pointed_at: string
   pointed_on: string
   status: PointageStatus

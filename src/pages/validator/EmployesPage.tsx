@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -8,20 +8,28 @@ import {
   jourDeReposLabel,
   retirementStatus,
 } from '../../lib/dates'
-import { useSites } from '../../lib/queries'
+import { useEmployeFiltres, useSites } from '../../lib/queries'
 import type { Employee } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 
 const PAGE_SIZE = 50
 
+const MODES_REGLEMENT = ['Virement', 'Versement', 'Espece']
+const QUALIFICATIONS = ['AGENT DE SECURITE', 'AGENT', 'SUPERVISEUR']
+
 export default function EmployesPage() {
   const { companyId } = useParams()
   const { data: sites } = useSites(companyId)
+  const { data: filtres } = useEmployeFiltres(companyId)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [siteFilter, setSiteFilter] = useState('')
+  const [villeFilter, setVilleFilter] = useState('')
+  const [modeFilter, setModeFilter] = useState('')
+  const [qualifFilter, setQualifFilter] = useState('')
   const [editing, setEditing] = useState<Employee | null>(null)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -32,7 +40,10 @@ export default function EmployesPage() {
   }, [search])
 
   const { data, isLoading, error, isPlaceholderData } = useQuery({
-    queryKey: ['employees', companyId, page, debouncedSearch, siteFilter],
+    queryKey: [
+      'employees', companyId, page, debouncedSearch,
+      siteFilter, villeFilter, modeFilter, qualifFilter,
+    ],
     enabled: Boolean(companyId),
     placeholderData: keepPreviousData,
     queryFn: async () => {
@@ -43,14 +54,17 @@ export default function EmployesPage() {
           { count: 'exact' },
         )
         .eq('company_id', companyId!)
-        .order('nom_prenom')
+        .order('matricule', { ascending: true, nullsFirst: false })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
       if (siteFilter) query = query.eq('site_id', siteFilter)
+      if (villeFilter) query = query.eq('ville', villeFilter)
+      if (modeFilter) query = query.eq('mode_reglement', modeFilter)
+      if (qualifFilter) query = query.eq('qualification', qualifFilter)
       if (debouncedSearch) {
         const term = debouncedSearch.replaceAll('%', '\\%').replaceAll(',', ' ')
-        query = query.or(
-          `nom_prenom.ilike.%${term}%,matricule.ilike.%${term}%,cin.ilike.%${term}%`,
-        )
+        const clauses = [`nom_prenom.ilike.%${term}%`, `cin.ilike.%${term}%`]
+        if (/^\d+$/.test(term)) clauses.push(`matricule.eq.${term}`)
+        query = query.or(clauses.join(','))
       }
       const { data, error, count } = await query
       if (error) throw error
@@ -61,39 +75,64 @@ export default function EmployesPage() {
   const pageCount = Math.max(1, Math.ceil((data?.count ?? 0) / PAGE_SIZE))
   const siteName = (id: string) => sites?.find((s) => s.id === id)?.name ?? '—'
 
+  const resetPage = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v)
+    setPage(1)
+  }
+
+  const filterSelect = (
+    value: string,
+    onChange: (v: string) => void,
+    allLabel: string,
+    options: { value: string; label: string }[],
+  ) => (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+    >
+      <option value="">{allLabel}</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="mb-1 text-xl font-semibold text-slate-900">Employés</h1>
           <p className="text-sm text-slate-500">
             {data ? `${data.count} employé(s)` : 'Liste du personnel de l’entreprise'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher (nom, matricule, CIN)…"
-            className="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-          />
-          <select
-            value={siteFilter}
-            onChange={(e) => {
-              setSiteFilter(e.target.value)
-              setPage(1)
-            }}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">Tous les sites</option>
-            {sites?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <button
+          onClick={() => setAdding(true)}
+          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+        >
+          + Ajouter un employé
+        </button>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher (nom, matricule, CIN)…"
+          className="w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+        />
+        {filterSelect(siteFilter, resetPage(setSiteFilter), 'Tous les sites',
+          (sites ?? []).map((s) => ({ value: s.id, label: s.name })))}
+        {filterSelect(villeFilter, resetPage(setVilleFilter), 'Toutes les villes',
+          (filtres?.villes ?? []).map((v) => ({ value: v, label: v })))}
+        {filterSelect(modeFilter, resetPage(setModeFilter), 'Tous les règlements',
+          (filtres?.modes_reglement ?? []).map((v) => ({ value: v, label: v })))}
+        {filterSelect(qualifFilter, resetPage(setQualifFilter), 'Toutes les qualifications',
+          (filtres?.qualifications ?? []).map((v) => ({ value: v, label: v })))}
       </div>
 
       {isLoading && <Spinner label="Chargement des employés…" />}
@@ -106,10 +145,10 @@ export default function EmployesPage() {
             isPlaceholderData ? 'opacity-60' : ''
           }`}
         >
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1400px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3 font-medium">Matricule</th>
+                <th className="px-4 py-3 font-medium">N°</th>
                 <th className="px-4 py-3 font-medium">Nom & Prénom</th>
                 <th className="px-4 py-3 font-medium">Site</th>
                 <th className="px-4 py-3 font-medium">Âge</th>
@@ -118,6 +157,8 @@ export default function EmployesPage() {
                 <th className="px-4 py-3 font-medium">CIN</th>
                 <th className="px-4 py-3 font-medium">CNSS</th>
                 <th className="px-4 py-3 font-medium">Téléphone</th>
+                <th className="px-4 py-3 font-medium">Adresse</th>
+                <th className="px-4 py-3 font-medium">Ville</th>
                 <th className="px-4 py-3 font-medium">Repos</th>
                 <th className="px-4 py-3 font-medium">Règlement</th>
                 <th className="px-4 py-3 text-right font-medium">Jours travaillés</th>
@@ -130,7 +171,7 @@ export default function EmployesPage() {
                 const isRetired = retirement?.kind === 'retired'
                 return (
                   <tr key={emp.id} className={isRetired ? 'bg-red-50/80' : undefined}>
-                    <td className="px-4 py-3 text-slate-500">{emp.matricule ?? '—'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-700">{emp.matricule ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className={`font-medium ${isRetired ? 'text-red-700' : 'text-slate-900'}`}>
@@ -165,6 +206,10 @@ export default function EmployesPage() {
                     <td className="px-4 py-3 text-slate-600">{emp.cin ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.cnss ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.telephone ?? '—'}</td>
+                    <td className="max-w-56 truncate px-4 py-3 text-slate-600" title={emp.adresse ?? undefined}>
+                      {emp.adresse ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{emp.ville ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{jourDeReposLabel(emp.jour_de_repos)}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.mode_reglement ?? '—'}</td>
                     <td className="px-4 py-3 text-right font-medium text-slate-900">
@@ -188,73 +233,189 @@ export default function EmployesPage() {
 
       <Pagination page={page} pageCount={pageCount} onPage={setPage} />
 
-      {editing && <EditEmployeeModal employee={editing} onClose={() => setEditing(null)} />}
+      {(editing || adding) && companyId && (
+        <EmployeeFormModal
+          companyId={companyId}
+          employee={editing}
+          onClose={() => {
+            setEditing(null)
+            setAdding(false)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function EditEmployeeModal({ employee, onClose }: { employee: Employee; onClose: () => void }) {
-  const [telephone, setTelephone] = useState(employee.telephone ?? '')
-  const [jourDeRepos, setJourDeRepos] = useState(employee.jour_de_repos?.toString() ?? '')
+/** Formulaire complet — création (employee=null) ou modification. */
+function EmployeeFormModal({
+  companyId,
+  employee,
+  onClose,
+}: {
+  companyId: string
+  employee: Employee | null
+  onClose: () => void
+}) {
+  const { data: sites } = useSites(companyId)
   const queryClient = useQueryClient()
+
+  const [form, setForm] = useState({
+    site_id: employee?.site_id ?? '',
+    matricule: employee?.matricule?.toString() ?? '',
+    nom_prenom: employee?.nom_prenom ?? '',
+    cin: employee?.cin ?? '',
+    cnss: employee?.cnss ?? '',
+    date_naissance: employee?.date_naissance ?? '',
+    date_embauche: employee?.date_embauche ?? '',
+    qualification: employee?.qualification ?? 'AGENT DE SECURITE',
+    telephone: employee?.telephone ?? '',
+    adresse: employee?.adresse ?? '',
+    ville: employee?.ville ?? '',
+    mode_reglement: employee?.mode_reglement ?? 'Virement',
+    jour_de_repos: employee?.jour_de_repos?.toString() ?? '',
+    jours_travailles: employee?.jours_travailles?.toString() ?? '0',
+  })
+
+  const set = (key: keyof typeof form) => (value: string) =>
+    setForm((f) => ({ ...f, [key]: value }))
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from('employees')
-        .update({
-          telephone: telephone.trim() || null,
-          jour_de_repos: jourDeRepos ? Number(jourDeRepos) : null,
-        })
-        .eq('id', employee.id)
-      if (error) throw error
+      if (!form.nom_prenom.trim()) throw new Error('Le nom est obligatoire.')
+      if (!form.site_id) throw new Error('Choisissez un site.')
+      const payload = {
+        site_id: form.site_id,
+        // Vide à la création → matricule attribué automatiquement (dernier + 1)
+        matricule: form.matricule.trim() ? Number(form.matricule) : null,
+        nom_prenom: form.nom_prenom.trim().toUpperCase(),
+        cin: form.cin.trim() || null,
+        cnss: form.cnss.trim() || null,
+        date_naissance: form.date_naissance || null,
+        date_embauche: form.date_embauche || null,
+        qualification: form.qualification.trim() || null,
+        telephone: form.telephone.trim() || null,
+        adresse: form.adresse.trim() || null,
+        ville: form.ville.trim().toUpperCase() || null,
+        mode_reglement: form.mode_reglement || null,
+        jour_de_repos: form.jour_de_repos ? Number(form.jour_de_repos) : null,
+        jours_travailles: Math.max(0, Number(form.jours_travailles) || 0),
+      }
+      if (employee) {
+        const { error } = await supabase.from('employees').update(payload).eq('id', employee.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('employees')
+          .insert({ ...payload, company_id: companyId })
+        if (error) throw error
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
-      queryClient.invalidateQueries({ queryKey: ['site-employees', employee.site_id] })
+      queryClient.invalidateQueries({ queryKey: ['site-employees'] })
+      queryClient.invalidateQueries({ queryKey: ['employe-filtres'] })
       onClose()
     },
   })
 
+  const field = (label: string, input: ReactNode) => (
+    <label className="block text-sm">
+      <span className="mb-1 block font-medium text-slate-700">{label}</span>
+      {input}
+    </label>
+  )
+
+  const inputCls =
+    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-1 text-lg font-semibold text-slate-900">{employee.nom_prenom}</h2>
-        <p className="mb-4 text-sm text-slate-500">Modifier les coordonnées</p>
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">
+          {employee ? `Modifier — ${employee.nom_prenom}` : 'Ajouter un employé'}
+        </h2>
+        <p className="mb-5 text-sm text-slate-500">
+          {employee
+            ? 'Tous les champs sont modifiables.'
+            : 'Laissez le matricule vide : le prochain numéro disponible sera attribué automatiquement.'}
+        </p>
 
-        <label className="mb-1 block text-sm font-medium text-slate-700">Téléphone</label>
-        <input
-          type="tel"
-          value={telephone}
-          onChange={(e) => setTelephone(e.target.value)}
-          placeholder="06 00 00 00 00"
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-        />
-
-        <label className="mb-1 block text-sm font-medium text-slate-700">Jour de repos</label>
-        <select
-          value={jourDeRepos}
-          onChange={(e) => setJourDeRepos(e.target.value)}
-          className="mb-5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">Aucun</option>
-          {JOURS_SEMAINE.map((jour, i) => (
-            <option key={jour} value={i + 1}>
-              {jour}
-            </option>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {field('Nom & Prénom *', (
+            <input type="text" value={form.nom_prenom} onChange={(e) => set('nom_prenom')(e.target.value)} className={inputCls} />
           ))}
-        </select>
+          {field('Site *', (
+            <select value={form.site_id} onChange={(e) => set('site_id')(e.target.value)} className={inputCls}>
+              <option value="">— Choisir un site —</option>
+              {sites?.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          ))}
+          {field(employee ? 'Matricule' : 'Matricule (vide = automatique)', (
+            <input type="number" value={form.matricule} onChange={(e) => set('matricule')(e.target.value)} className={inputCls} placeholder="automatique" />
+          ))}
+          {field('Qualification', (
+            <select value={form.qualification} onChange={(e) => set('qualification')(e.target.value)} className={inputCls}>
+              {[...new Set([...QUALIFICATIONS, form.qualification].filter(Boolean))].map((q) => (
+                <option key={q} value={q}>{q}</option>
+              ))}
+            </select>
+          ))}
+          {field('CIN', (
+            <input type="text" value={form.cin} onChange={(e) => set('cin')(e.target.value)} className={inputCls} />
+          ))}
+          {field('CNSS', (
+            <input type="text" value={form.cnss} onChange={(e) => set('cnss')(e.target.value)} className={inputCls} />
+          ))}
+          {field('Date de naissance', (
+            <input type="date" value={form.date_naissance} onChange={(e) => set('date_naissance')(e.target.value)} className={inputCls} />
+          ))}
+          {field("Date d'embauche", (
+            <input type="date" value={form.date_embauche} onChange={(e) => set('date_embauche')(e.target.value)} className={inputCls} />
+          ))}
+          {field('Téléphone', (
+            <input type="tel" value={form.telephone} onChange={(e) => set('telephone')(e.target.value)} className={inputCls} placeholder="06 00 00 00 00" />
+          ))}
+          {field('Ville', (
+            <input type="text" value={form.ville} onChange={(e) => set('ville')(e.target.value)} className={inputCls} />
+          ))}
+          <div className="sm:col-span-2">
+            {field('Adresse', (
+              <input type="text" value={form.adresse} onChange={(e) => set('adresse')(e.target.value)} className={inputCls} />
+            ))}
+          </div>
+          {field('Mode de règlement', (
+            <select value={form.mode_reglement} onChange={(e) => set('mode_reglement')(e.target.value)} className={inputCls}>
+              {[...new Set([...MODES_REGLEMENT, form.mode_reglement].filter(Boolean))].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          ))}
+          {field('Jour de repos', (
+            <select value={form.jour_de_repos} onChange={(e) => set('jour_de_repos')(e.target.value)} className={inputCls}>
+              <option value="">Aucun</option>
+              {JOURS_SEMAINE.map((jour, i) => (
+                <option key={jour} value={i + 1}>{jour}</option>
+              ))}
+            </select>
+          ))}
+          {field('Jours travaillés', (
+            <input type="number" min="0" value={form.jours_travailles} onChange={(e) => set('jours_travailles')(e.target.value)} className={inputCls} />
+          ))}
+        </div>
 
         {save.error && (
-          <div className="mb-4">
+          <div className="mt-4">
             <ErrorNote>Enregistrement impossible : {save.error.message}</ErrorNote>
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
+        <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={onClose}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
@@ -266,7 +427,7 @@ function EditEmployeeModal({ employee, onClose }: { employee: Employee; onClose:
             disabled={save.isPending}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
+            {save.isPending ? 'Enregistrement…' : employee ? 'Enregistrer' : 'Ajouter'}
           </button>
         </div>
       </div>

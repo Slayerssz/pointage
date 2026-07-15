@@ -3,46 +3,96 @@ import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import {
+  JOURS_COURTS,
+  addDays,
+  dateToIso,
+  formatDateFr,
   formatTimeFr,
-  isoDayOfWeek,
   jourDeReposLabel,
+  mondayOf,
   todayIso,
+  weekDates,
 } from '../../lib/dates'
 import {
   useSiteEmployees,
-  useSitePointages,
+  useSiteWeekPointages,
   useSites,
   type DayPointage,
+  type SiteEmployee,
 } from '../../lib/queries'
 import type { Site } from '../../lib/types'
 import SiteAccordion from '../../components/SiteAccordion'
-import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
+
+/** Cellule sélectionnée dans la grille (pour le détail / les actions). */
+interface CellSelection {
+  employee: SiteEmployee
+  site: Site
+  date: string
+  pointage: DayPointage | null
+}
 
 export default function ValidationPage() {
   const { companyId } = useParams()
-  const [date, setDate] = useState(todayIso())
-  const { data: sites, isLoading, error } = useSites(companyId)
-  const [zoomUrl, setZoomUrl] = useState<string | null>(null)
+  const [monday, setMonday] = useState(() => mondayOf(new Date()))
+  const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
+  const [selection, setSelection] = useState<CellSelection | null>(null)
+
+  const mondayIso = dateToIso(monday)
+  const sundayIso = dateToIso(addDays(monday, 6))
+  const isCurrentWeek = mondayIso === dateToIso(mondayOf(new Date()))
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="mb-1 text-xl font-semibold text-slate-900">Validation du pointage</h1>
+          <h1 className="mb-1 text-xl font-semibold text-slate-900">Pointage de la semaine</h1>
           <p className="text-sm text-slate-500">
-            Vérifiez la photo de chaque pointage puis validez ou refusez.
+            Cliquez sur une case : voir la photo, valider, refuser ou marquer présent.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          Date
-          <input
-            type="date"
-            value={date}
-            max={todayIso()}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm"
-          />
-        </label>
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            onClick={() => setMonday((m) => addDays(m, -7))}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+          >
+            ← Semaine préc.
+          </button>
+          <span className="min-w-40 text-center font-medium text-slate-700">
+            {formatDateFr(mondayIso)} — {formatDateFr(sundayIso)}
+          </span>
+          <button
+            onClick={() => setMonday((m) => addDays(m, 7))}
+            disabled={isCurrentWeek}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Semaine suiv. →
+          </button>
+        </div>
+      </div>
+
+      {/* Légende */}
+      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+        <span className="flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-emerald-500 text-[10px] font-bold text-white">✓</span>
+          Présent (validé)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-amber-400 text-[10px] font-bold text-white">!</span>
+          Photo à valider
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-red-500 text-[10px] font-bold text-white">✕</span>
+          Refusé
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-blue-400 text-[10px] font-bold text-white">R</span>
+          Jour de repos
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-slate-200 text-[10px] font-bold text-slate-500">–</span>
+          Absent
+        </span>
       </div>
 
       {isLoading && <Spinner label="Chargement des sites…" />}
@@ -53,59 +103,43 @@ export default function ValidationPage() {
         <SiteAccordion
           sites={sites}
           renderSite={(site, expanded) => (
-            <SiteValidationList site={site} date={date} enabled={expanded} onZoom={setZoomUrl} />
+            <SiteWeekGrid
+              site={site}
+              mondayIso={mondayIso}
+              sundayIso={sundayIso}
+              enabled={expanded}
+              onSelect={setSelection}
+            />
           )}
         />
       )}
 
-      {zoomUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setZoomUrl(null)}
-        >
-          <img src={zoomUrl} alt="Photo de pointage" className="max-h-full max-w-full rounded-lg object-contain" />
-          <button className="absolute right-4 top-4 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-white">
-            Fermer
-          </button>
-        </div>
+      {selection && (
+        <CellModal selection={selection} onClose={() => setSelection(null)} />
       )}
     </div>
   )
 }
 
-function SiteValidationList({
+function SiteWeekGrid({
   site,
-  date,
+  mondayIso,
+  sundayIso,
   enabled,
-  onZoom,
+  onSelect,
 }: {
   site: Site
-  date: string
+  mondayIso: string
+  sundayIso: string
   enabled: boolean
-  onZoom: (url: string) => void
+  onSelect: (sel: CellSelection) => void
 }) {
   const employees = useSiteEmployees(site.id, enabled)
-  const pointages = useSitePointages(site.id, date, enabled)
-  const queryClient = useQueryClient()
-  const isToday = date === todayIso()
-  const dow = isoDayOfWeek(new Date(date + 'T00:00:00'))
+  const pointages = useSiteWeekPointages(site.id, mondayIso, sundayIso, enabled)
+  const dates = weekDates(new Date(mondayIso + 'T00:00:00'))
+  const today = todayIso()
 
-  const decide = useMutation({
-    mutationFn: async ({ id, decision }: { id: string; decision: 'validated' | 'refused' }) => {
-      const { error } = await supabase.rpc('validate_pointage', {
-        p_pointage_id: id,
-        p_decision: decision,
-      })
-      if (error) throw error
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['site-pointages', site.id] })
-    },
-  })
-
-  if (employees.isLoading || pointages.isLoading) {
-    return <Spinner label="Chargement…" />
-  }
+  if (employees.isLoading || pointages.isLoading) return <Spinner label="Chargement…" />
   if (employees.error || pointages.error) {
     return (
       <div className="p-4">
@@ -117,107 +151,261 @@ function SiteValidationList({
   const rows = employees.data?.pages.flat() ?? []
   if (rows.length === 0) return <EmptyState>Aucun employé affecté à ce site.</EmptyState>
 
-  const stats = { pointes: 0, valides: 0, repos: 0, absents: 0 }
-  const items = rows.map((emp) => {
-    const pointage = pointages.data?.get(emp.id)
-    const isRepos = emp.jour_de_repos === dow
-    if (pointage) {
-      stats.pointes++
-      if (pointage.status === 'validated') stats.valides++
-    } else if (isRepos) {
-      stats.repos++
-    } else {
-      stats.absents++
-    }
-    return { emp, pointage, isRepos }
-  })
-
   return (
-    <div>
-      <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-2.5 text-xs text-slate-500">
-        <span>{stats.pointes} pointé(s)</span>
-        <span>· {stats.valides} validé(s)</span>
-        <span>· {stats.repos} en repos</span>
-        <span>· {stats.absents} absent(s)</span>
-      </div>
-      <ul className="divide-y divide-slate-100">
-        {items.map(({ emp, pointage, isRepos }) => (
-          <li key={emp.id} className="flex items-center gap-3 px-4 py-3">
-            {pointage ? (
-              <PointagePhoto pointage={pointage} onZoom={onZoom} />
-            ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-300">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6">
-                  <path d="M15 8h.01M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm18 10-5-5L5 22" />
-                </svg>
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-900">{emp.nom_prenom}</p>
-              <p className="truncate text-xs text-slate-500">
-                {emp.matricule && <>Mat. {emp.matricule} · </>}
-                {pointage ? `Pointé à ${formatTimeFr(pointage.pointed_at)}` : isToday ? '' : ''}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {!pointage && isRepos && (
-                <Chip tone="slate" title={`Jour de repos : ${jourDeReposLabel(emp.jour_de_repos)}`}>
-                  Jour de repos
-                </Chip>
-              )}
-              {!pointage && !isRepos && <Chip tone="amber">Absent</Chip>}
-              {pointage?.status === 'validated' && <Chip tone="green">Validé</Chip>}
-              {pointage?.status === 'refused' && <Chip tone="red">Refusé</Chip>}
-              {pointage?.status === 'pending' && (
-                <>
-                  <button
-                    onClick={() => decide.mutate({ id: pointage.id, decision: 'validated' })}
-                    disabled={decide.isPending}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    Valider
-                  </button>
-                  <button
-                    onClick={() => decide.mutate({ id: pointage.id, decision: 'refused' })}
-                    disabled={decide.isPending}
-                    className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    Refuser
-                  </button>
-                </>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {decide.error && (
-        <div className="p-3">
-          <ErrorNote>Action impossible : {decide.error.message}</ErrorNote>
-        </div>
-      )}
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead>
+          <tr className="border-b border-slate-100 text-xs text-slate-500">
+            <th className="px-4 py-2 text-left font-medium">Employé</th>
+            {dates.map((d, i) => (
+              <th
+                key={d}
+                className={`px-1 py-2 text-center font-medium ${d === today ? 'text-emerald-600' : ''}`}
+              >
+                {JOURS_COURTS[i]}
+                <br />
+                {d.slice(8, 10)}/{d.slice(5, 7)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {rows.map((emp) => {
+            const empDays = pointages.data?.get(emp.id)
+            return (
+              <tr key={emp.id}>
+                <td className="max-w-48 px-4 py-2">
+                  <p className="truncate font-medium text-slate-900">{emp.nom_prenom}</p>
+                  <p className="text-xs text-slate-400">
+                    {emp.matricule != null ? `Mat. ${emp.matricule}` : ''}
+                  </p>
+                </td>
+                {dates.map((d, i) => (
+                  <td key={d} className="px-1 py-2 text-center">
+                    <DayCell
+                      pointage={empDays?.get(d) ?? null}
+                      isRepos={emp.jour_de_repos === i + 1}
+                      isFuture={d > today}
+                      onClick={() =>
+                        onSelect({ employee: emp, site, date: d, pointage: empDays?.get(d) ?? null })
+                      }
+                    />
+                  </td>
+                ))}
+              </tr>
+            )
+          })}
+          {employees.hasNextPage && (
+            <tr>
+              <td colSpan={8} className="p-3 text-center">
+                <button
+                  onClick={() => employees.fetchNextPage()}
+                  disabled={employees.isFetchingNextPage}
+                  className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-600 disabled:opacity-50"
+                >
+                  {employees.isFetchingNextPage ? 'Chargement…' : 'Afficher plus'}
+                </button>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function PointagePhoto({ pointage, onZoom }: { pointage: DayPointage; onZoom: (url: string) => void }) {
-  const { data: url } = useQuery({
-    queryKey: ['photo-url', pointage.photo_path],
+function DayCell({
+  pointage,
+  isRepos,
+  isFuture,
+  onClick,
+}: {
+  pointage: DayPointage | null
+  isRepos: boolean
+  isFuture: boolean
+  onClick: () => void
+}) {
+  let cls = 'bg-slate-100 text-slate-400'
+  let label = '–'
+  let title = 'Absent — cliquer pour marquer présent'
+
+  if (pointage?.status === 'validated') {
+    cls = 'bg-emerald-500 text-white'
+    label = '✓'
+    title = 'Présent (validé)'
+  } else if (pointage?.status === 'pending') {
+    cls = 'bg-amber-400 text-white animate-pulse'
+    label = '!'
+    title = 'Photo en attente de validation'
+  } else if (pointage?.status === 'refused') {
+    cls = 'bg-red-500 text-white'
+    label = '✕'
+    title = 'Refusé'
+  } else if (isRepos) {
+    cls = 'bg-blue-400 text-white'
+    label = 'R'
+    title = 'Jour de repos'
+  } else if (isFuture) {
+    return <span className="inline-block h-7 w-7 rounded-lg bg-slate-50" />
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold transition hover:scale-110 ${cls}`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function CellModal({ selection, onClose }: { selection: CellSelection; onClose: () => void }) {
+  const { employee, site, date, pointage } = selection
+  const queryClient = useQueryClient()
+  const [zoom, setZoom] = useState(false)
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['site-week-pointages', site.id] })
+    queryClient.invalidateQueries({ queryKey: ['site-pointages', site.id] })
+  }
+
+  const decide = useMutation({
+    mutationFn: async (decision: 'validated' | 'refused') => {
+      const { error } = await supabase.rpc('validate_pointage', {
+        p_pointage_id: pointage!.id,
+        p_decision: decision,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidate()
+      onClose()
+    },
+  })
+
+  const marquerPresent = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('marquer_present', {
+        p_employee_id: employee.id,
+        p_date: date,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidate()
+      onClose()
+    },
+  })
+
+  const { data: photoUrl } = useQuery({
+    queryKey: ['photo-url', pointage?.photo_path],
+    enabled: Boolean(pointage?.photo_path),
     staleTime: 55 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.storage
         .from('pointages')
-        .createSignedUrl(pointage.photo_path, 3600)
+        .createSignedUrl(pointage!.photo_path!, 3600)
       if (error) throw error
       return data.signedUrl
     },
   })
 
-  if (!url) {
-    return <div className="h-14 w-14 shrink-0 animate-pulse rounded-xl bg-slate-200" />
-  }
+  const mutationError = decide.error ?? marquerPresent.error
+
   return (
-    <button onClick={() => onZoom(url)} className="shrink-0" aria-label="Agrandir la photo">
-      <img src={url} alt="Photo de pointage" className="h-14 w-14 rounded-xl object-cover ring-1 ring-slate-200" />
-    </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold text-slate-900">{employee.nom_prenom}</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          {site.name} · {formatDateFr(date)}
+          {pointage && (
+            <>
+              {' '}
+              ·{' '}
+              {pointage.photo_path
+                ? `Pointé à ${formatTimeFr(pointage.pointed_at)}`
+                : 'Présence marquée par le bureau'}
+            </>
+          )}
+        </p>
+
+        {pointage?.photo_path && photoUrl && (
+          <button onClick={() => setZoom(true)} className="mb-4 block w-full">
+            <img
+              src={photoUrl}
+              alt="Photo de pointage"
+              className="max-h-64 w-full rounded-xl object-cover ring-1 ring-slate-200"
+            />
+          </button>
+        )}
+        {pointage?.photo_path && !photoUrl && (
+          <div className="mb-4 h-40 w-full animate-pulse rounded-xl bg-slate-200" />
+        )}
+
+        {!pointage && employee.jour_de_repos != null && (
+          <p className="mb-3 text-sm text-blue-600">
+            Jour de repos de cet employé : {jourDeReposLabel(employee.jour_de_repos)}
+          </p>
+        )}
+
+        {mutationError && (
+          <div className="mb-3">
+            <ErrorNote>{mutationError.message}</ErrorNote>
+          </div>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+          >
+            Fermer
+          </button>
+          {pointage?.status === 'pending' && (
+            <>
+              <button
+                onClick={() => decide.mutate('refused')}
+                disabled={decide.isPending}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Refuser
+              </button>
+              <button
+                onClick={() => decide.mutate('validated')}
+                disabled={decide.isPending}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Valider
+              </button>
+            </>
+          )}
+          {(!pointage || pointage.status === 'refused') && (
+            <button
+              onClick={() => marquerPresent.mutate()}
+              disabled={marquerPresent.isPending}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {marquerPresent.isPending ? '…' : 'Marquer présent'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {zoom && photoUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          onClick={(e) => {
+            e.stopPropagation()
+            setZoom(false)
+          }}
+        >
+          <img src={photoUrl} alt="Photo de pointage" className="max-h-full max-w-full rounded-lg object-contain" />
+        </div>
+      )}
+    </div>
   )
 }

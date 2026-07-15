@@ -24,9 +24,11 @@ Supabase, c'est la base de données en ligne : c'est là que vivent les employé
    - `004_seed.sql` ← remplit les sites et les employés (pages 1-3 et 5-7 du registre)
    - `005_utilisateurs.sql`
    - `006_seed_page4.sql` ← la page 4 du registre (total : 31 sites, 145 employés ✅)
+   - `007_ameliorations.sql` ← matricules numériques + auto, présence manuelle,
+     ajout d'employés, corrections de sites/dates/règlements
 
-> Vous avez déjà exécuté les fichiers 001 à 005 ? Il ne vous reste qu'à
-> exécuter `006_seed_page4.sql` pour compléter les 145 employés.
+> Vous avez déjà exécuté certains fichiers ? Exécutez seulement ceux qui
+> vous manquent, dans l'ordre.
 
 Si un « Success » s'affiche à chaque fois, c'est bon. ✅
 
@@ -58,14 +60,8 @@ Créez autant de comptes que nécessaire. C'est tout pour Supabase.
 1. **Installer Node.js** (si ce n'est pas déjà fait) : [nodejs.org](https://nodejs.org) → bouton vert « LTS » → installez comme n'importe quel logiciel
 2. **Télécharger ce projet** : sur la page GitHub du projet, bouton vert **« Code »** → **« Download ZIP »** → décompressez le dossier où vous voulez
    *(ou, si vous avez git : `git clone <adresse du dépôt>`)*
-3. **Connecter l'app à votre Supabase** :
-   - Dans le dossier du projet, faites une copie du fichier `.env.example` et renommez-la `.env`
-   - Ouvrez `.env` avec le Bloc-notes
-   - Sur supabase.com : **Settings → API**. Copiez **Project URL** et **anon public key** dans les deux lignes du fichier, par exemple :
-     ```
-     VITE_SUPABASE_URL=https://abcdefgh.supabase.co
-     VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-     ```
+3. **Connexion à Supabase** : rien à faire — le fichier `.env` est déjà inclus
+   avec les bonnes valeurs du projet Groupe Triple A.
 4. **Lancer** : ouvrez un terminal (cmd) dans le dossier du projet, puis :
    ```
    npm install
@@ -101,6 +97,9 @@ Donnez cette adresse aux agents. Sur leur téléphone, ils peuvent aussi **insta
 
 ## Bon à savoir
 
+- **Onglet Pointage (bureau)** : grille de la semaine (Lun → Dim). Vert ✓ = présent validé, orange ! = photo à valider, rouge ✕ = refusé, bleu R = jour de repos, gris – = absent. Cliquer sur une case pour voir la photo, valider/refuser ou **marquer présent** manuellement (pour les employés injoignables sur le terrain)
+- **Matricules** : numériques et triés ; un nouvel employé sans matricule reçoit automatiquement le dernier numéro + 1
+- **Ajout d'employés** : bouton « + Ajouter un employé » dans l'onglet Employés (validateurs) ; la suppression n'est pas ouverte pour l'instant
 - **Un seul pointage par employé et par jour** (si un pointage est refusé, l'agent peut recommencer)
 - **Jour de repos** : réglable pour chaque employé dans l'onglet Employés ; ce jour-là, l'employé non pointé n'est **pas** compté absent
 - **Retraite** : à 65 ans la ligne de l'employé devient rouge (« Âge de retraite atteint ») ; un compte à rebours s'affiche à partir de 30 jours avant

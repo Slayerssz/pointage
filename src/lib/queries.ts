@@ -4,16 +4,21 @@ import type { Employee, Pointage, Site } from './types'
 
 export const SITE_EMPLOYEES_PAGE = 100
 
-export function useSites(companyId: string | undefined) {
+/** Sites d'une entreprise. `pointageOnly` : uniquement ceux qui se pointent
+ *  (exclut par exemple SUPERVISEUR). */
+export function useSites(companyId: string | undefined, opts?: { pointageOnly?: boolean }) {
+  const pointageOnly = opts?.pointageOnly ?? false
   return useQuery({
-    queryKey: ['sites', companyId],
+    queryKey: ['sites', companyId, pointageOnly],
     enabled: Boolean(companyId),
     queryFn: async (): Promise<Site[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('sites')
-        .select('id, company_id, name')
+        .select('id, company_id, name, pointage_actif')
         .eq('company_id', companyId!)
         .order('name')
+      if (pointageOnly) query = query.eq('pointage_actif', true)
+      const { data, error } = await query
       if (error) throw error
       return data
     },
@@ -38,7 +43,7 @@ export function useSiteEmployees(siteId: string, enabled: boolean) {
         .select('id, nom_prenom, matricule, qualification, jour_de_repos')
         .eq('site_id', siteId)
         .eq('actif', true)
-        .order('nom_prenom')
+        .order('matricule', { ascending: true, nullsFirst: false })
         .range(from, from + SITE_EMPLOYEES_PAGE - 1)
       if (error) throw error
       return data
@@ -50,7 +55,7 @@ export function useSiteEmployees(siteId: string, enabled: boolean) {
 
 export type DayPointage = Pick<
   Pointage,
-  'id' | 'employee_id' | 'status' | 'photo_path' | 'pointed_at'
+  'id' | 'employee_id' | 'status' | 'photo_path' | 'pointed_at' | 'pointed_on'
 >
 
 /** Pointages d'un site pour une date donnée (yyyy-mm-dd). */
@@ -61,7 +66,7 @@ export function useSitePointages(siteId: string, date: string, enabled: boolean)
     queryFn: async (): Promise<Map<string, DayPointage>> => {
       const { data, error } = await supabase
         .from('pointages')
-        .select('id, employee_id, status, photo_path, pointed_at')
+        .select('id, employee_id, status, photo_path, pointed_at, pointed_on')
         .eq('site_id', siteId)
         .eq('pointed_on', date)
         .order('pointed_at', { ascending: false })
@@ -70,6 +75,63 @@ export function useSitePointages(siteId: string, date: string, enabled: boolean)
       // Trié du plus récent au plus ancien : on garde le plus récent par employé.
       for (const p of data) if (!map.has(p.employee_id)) map.set(p.employee_id, p)
       return map
+    },
+  })
+}
+
+/** Pointages d'un site pour une semaine (lundi → dimanche).
+ *  Retour : employee_id → (date iso → pointage). */
+export function useSiteWeekPointages(
+  siteId: string,
+  monday: string,
+  sunday: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['site-week-pointages', siteId, monday],
+    enabled,
+    queryFn: async (): Promise<Map<string, Map<string, DayPointage>>> => {
+      const { data, error } = await supabase
+        .from('pointages')
+        .select('id, employee_id, status, photo_path, pointed_at, pointed_on')
+        .eq('site_id', siteId)
+        .gte('pointed_on', monday)
+        .lte('pointed_on', sunday)
+        .order('pointed_at', { ascending: false })
+      if (error) throw error
+      const map = new Map<string, Map<string, DayPointage>>()
+      for (const p of data) {
+        let days = map.get(p.employee_id)
+        if (!days) {
+          days = new Map()
+          map.set(p.employee_id, days)
+        }
+        // Le plus récent par employé et par jour
+        if (!days.has(p.pointed_on)) days.set(p.pointed_on, p)
+      }
+      return map
+    },
+  })
+}
+
+export interface EmployeFiltres {
+  villes: string[]
+  qualifications: string[]
+  modes_reglement: string[]
+}
+
+/** Valeurs distinctes (ville, qualification, mode de règlement) pour les filtres. */
+export function useEmployeFiltres(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['employe-filtres', companyId],
+    enabled: Boolean(companyId),
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<EmployeFiltres> => {
+      const { data, error } = await supabase.rpc('filtres_employes', {
+        p_company: companyId!,
+      })
+      if (error) throw error
+      return data as EmployeFiltres
     },
   })
 }

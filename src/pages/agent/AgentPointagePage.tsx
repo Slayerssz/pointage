@@ -22,7 +22,7 @@ interface CaptureTarget {
 
 export default function AgentPointagePage() {
   const { companyId } = useParams()
-  const { data: sites, isLoading, error } = useSites(companyId)
+  const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
   const [target, setTarget] = useState<CaptureTarget | null>(null)
   const queryClient = useQueryClient()
 

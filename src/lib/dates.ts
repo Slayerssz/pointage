@@ -13,6 +13,8 @@ export const JOURS_SEMAINE = [
   'Dimanche',
 ] as const
 
+export const JOURS_COURTS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'] as const
+
 /** Jour ISO (1=lundi … 7=dimanche) du jour courant. */
 export function isoDayOfWeek(d: Date = new Date()): number {
   const day = d.getDay() // 0=dimanche
@@ -74,9 +76,30 @@ export function formatTimeFr(timestamptz: string): string {
   })
 }
 
-/** Date locale (yyyy-mm-dd) du jour, fuseau du navigateur. */
-export function todayIso(): string {
-  const d = new Date()
+export function dateToIso(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** Date locale (yyyy-mm-dd) du jour, fuseau du navigateur. */
+export function todayIso(): string {
+  return dateToIso(new Date())
+}
+
+/** Lundi de la semaine contenant `d`. */
+export function mondayOf(d: Date): Date {
+  const out = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  out.setDate(out.getDate() - (isoDayOfWeek(out) - 1))
+  return out
+}
+
+export function addDays(d: Date, n: number): Date {
+  const out = new Date(d)
+  out.setDate(out.getDate() + n)
+  return out
+}
+
+/** Les 7 dates (iso) de la semaine commençant le lundi `monday`. */
+export function weekDates(monday: Date): string[] {
+  return Array.from({ length: 7 }, (_, i) => dateToIso(addDays(monday, i)))
 }
