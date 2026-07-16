@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 export function Spinner({ label }: { label?: string }) {
   return (
@@ -46,6 +46,90 @@ export function ErrorNote({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       {children}
+    </div>
+  )
+}
+
+/** Convertit jj/mm/aaaa → yyyy-mm-dd ; null si invalide. */
+function parseFrDate(text: string): string | null {
+  const m = text.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!m) return null
+  const [, d, mo, y] = m
+  const day = Number(d)
+  const month = Number(mo)
+  const year = Number(y)
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null
+  }
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${year}-${p(month)}-${p(day)}`
+}
+
+function isoToFr(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+/**
+ * Champ de date au format français jj/mm/aaaa, quel que soit le réglage
+ * du navigateur (les <input type="date"> s'affichent dans la langue du
+ * navigateur, souvent mm/dd/yyyy).
+ * `value` reste au format ISO (yyyy-mm-dd) ou '' si vide.
+ */
+export function DateInputFr({
+  value,
+  onChange,
+  className,
+}: {
+  value: string
+  onChange: (iso: string) => void
+  className?: string
+}) {
+  const [text, setText] = useState(value ? isoToFr(value) : '')
+  const [invalid, setInvalid] = useState(false)
+
+  useEffect(() => {
+    setText(value ? isoToFr(value) : '')
+    setInvalid(false)
+  }, [value])
+
+  const handleChange = (raw: string) => {
+    // N'accepter que chiffres et /, et insérer les / automatiquement
+    let t = raw.replace(/[^\d/]/g, '')
+    if (/^\d{2}$/.test(t) && text.length < t.length) t = t + '/'
+    else if (/^\d{2}\/\d{2}$/.test(t) && text.length < t.length) t = t + '/'
+    t = t.slice(0, 10)
+    setText(t)
+
+    if (t === '') {
+      setInvalid(false)
+      onChange('')
+      return
+    }
+    const iso = parseFrDate(t)
+    if (iso) {
+      setInvalid(false)
+      onChange(iso)
+    }
+  }
+
+  const handleBlur = () => {
+    setInvalid(text !== '' && parseFrDate(text) === null)
+  }
+
+  return (
+    <div>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="jj/mm/aaaa"
+        value={text}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={handleBlur}
+        className={`${className ?? ''} ${invalid ? '!border-red-400' : ''}`}
+      />
+      {invalid && <p className="mt-1 text-xs text-red-600">Date invalide — format jj/mm/aaaa</p>}
     </div>
   )
 }

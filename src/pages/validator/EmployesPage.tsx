@@ -10,7 +10,7 @@ import {
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites } from '../../lib/queries'
 import type { Employee } from '../../lib/types'
-import { Chip, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
+import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 
 const PAGE_SIZE = 50
 
@@ -373,10 +373,10 @@ function EmployeeFormModal({
             <input type="text" value={form.cnss} onChange={(e) => set('cnss')(e.target.value)} className={inputCls} />
           ))}
           {field('Date de naissance', (
-            <input type="date" value={form.date_naissance} onChange={(e) => set('date_naissance')(e.target.value)} className={inputCls} />
+            <DateInputFr value={form.date_naissance} onChange={set('date_naissance')} className={inputCls} />
           ))}
           {field("Date d'embauche", (
-            <input type="date" value={form.date_embauche} onChange={(e) => set('date_embauche')(e.target.value)} className={inputCls} />
+            <DateInputFr value={form.date_embauche} onChange={set('date_embauche')} className={inputCls} />
           ))}
           {field('Téléphone', (
             <input type="tel" value={form.telephone} onChange={(e) => set('telephone')(e.target.value)} className={inputCls} placeholder="06 00 00 00 00" />
