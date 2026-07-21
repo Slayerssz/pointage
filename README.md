@@ -29,9 +29,11 @@ Supabase, c'est la base de données en ligne : c'est là que vivent les employé
    - `008_details_paie.sql` ← champs RIB, banque, salaire, date de sortie
    - `009_nouvelles_entreprises.sql` ← 4 nouvelles entreprises (import Excel)
    - `010_maj_triple_a.sql` ← complète les infos de Groupe Triple A depuis l'Excel
+   - `011_nouvelles_entreprises_2.sql` ← 5 entreprises de plus (MEGANTER, NORD
+     PLANET, SERCLEAN, TRIMAX, VIGILMA) → 10 entreprises, 494 employés au total
 
 > Vous avez déjà exécuté certains fichiers ? Exécutez seulement ceux qui
-> vous manquent, dans l'ordre (008, 009, 010 pour cette mise à jour).
+> vous manquent, dans l'ordre (008 à 011 pour cette mise à jour).
 
 Si un « Success » s'affiche à chaque fois, c'est bon. ✅
 

@@ -22,3 +22,4 @@ select public.creer_utilisateur('bureau1', 'MotDePasse123', 'Nom complet', 'vali
 | `008_details_paie.sql` | Champs RIB, banque, salaire, date de sortie |
 | `009_nouvelles_entreprises.sql` | AL SAFAE EL MAGHREB, BO, DUO MULTI SERVICE, EDEN VERT SERVICE |
 | `010_maj_triple_a.sql` | Mise à jour Groupe Triple A depuis l'Excel (adresses, etc.) |
+| `011_nouvelles_entreprises_2.sql` | MEGANTER, NORD PLANET, SERCLEAN, TRIMAX, VIGILMA |
