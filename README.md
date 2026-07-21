@@ -26,9 +26,12 @@ Supabase, c'est la base de données en ligne : c'est là que vivent les employé
    - `006_seed_page4.sql` ← la page 4 du registre (total : 31 sites, 145 employés ✅)
    - `007_ameliorations.sql` ← matricules numériques + auto, présence manuelle,
      ajout d'employés, corrections de sites/dates/règlements
+   - `008_details_paie.sql` ← champs RIB, banque, salaire, date de sortie
+   - `009_nouvelles_entreprises.sql` ← 4 nouvelles entreprises (import Excel)
+   - `010_maj_triple_a.sql` ← complète les infos de Groupe Triple A depuis l'Excel
 
 > Vous avez déjà exécuté certains fichiers ? Exécutez seulement ceux qui
-> vous manquent, dans l'ordre.
+> vous manquent, dans l'ordre (008, 009, 010 pour cette mise à jour).
 
 Si un « Success » s'affiche à chaque fois, c'est bon. ✅
 

@@ -7,6 +7,7 @@ import {
   formatDateFr,
   jourDeReposLabel,
   retirementStatus,
+  todayIso,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites } from '../../lib/queries'
 import type { Employee } from '../../lib/types'
@@ -15,7 +16,15 @@ import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '.
 const PAGE_SIZE = 50
 
 const MODES_REGLEMENT = ['Virement', 'Versement', 'Espece']
-const QUALIFICATIONS = ['AGENT DE SECURITE', 'AGENT', 'SUPERVISEUR']
+const QUALIFICATIONS = [
+  'AGENT DE SECURITE',
+  'AGENT DE NETTOYAGE',
+  'AGENT DE JARDINAGE',
+  "AGENT D'ACCUEIL",
+  'AGENT ADMINISTRATIF',
+  'AGENT',
+  'SUPERVISEUR',
+]
 
 export default function EmployesPage() {
   const { companyId } = useParams()
@@ -28,6 +37,7 @@ export default function EmployesPage() {
   const [villeFilter, setVilleFilter] = useState('')
   const [modeFilter, setModeFilter] = useState('')
   const [qualifFilter, setQualifFilter] = useState('')
+  const [statutFilter, setStatutFilter] = useState('actif')
   const [editing, setEditing] = useState<Employee | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -42,7 +52,7 @@ export default function EmployesPage() {
   const { data, isLoading, error, isPlaceholderData } = useQuery({
     queryKey: [
       'employees', companyId, page, debouncedSearch,
-      siteFilter, villeFilter, modeFilter, qualifFilter,
+      siteFilter, villeFilter, modeFilter, qualifFilter, statutFilter,
     ],
     enabled: Boolean(companyId),
     placeholderData: keepPreviousData,
@@ -50,7 +60,7 @@ export default function EmployesPage() {
       let query = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, date_sortie',
           { count: 'exact' },
         )
         .eq('company_id', companyId!)
@@ -60,6 +70,8 @@ export default function EmployesPage() {
       if (villeFilter) query = query.eq('ville', villeFilter)
       if (modeFilter) query = query.eq('mode_reglement', modeFilter)
       if (qualifFilter) query = query.eq('qualification', qualifFilter)
+      if (statutFilter === 'actif') query = query.eq('actif', true)
+      else if (statutFilter === 'sorti') query = query.eq('actif', false)
       if (debouncedSearch) {
         const term = debouncedSearch.replaceAll('%', '\\%').replaceAll(',', ' ')
         const clauses = [`nom_prenom.ilike.%${term}%`, `cin.ilike.%${term}%`]
@@ -133,6 +145,10 @@ export default function EmployesPage() {
           (filtres?.modes_reglement ?? []).map((v) => ({ value: v, label: v })))}
         {filterSelect(qualifFilter, resetPage(setQualifFilter), 'Toutes les qualifications',
           (filtres?.qualifications ?? []).map((v) => ({ value: v, label: v })))}
+        {filterSelect(statutFilter, resetPage(setStatutFilter), 'Tous les statuts', [
+          { value: 'actif', label: 'En poste' },
+          { value: 'sorti', label: 'Sortis' },
+        ])}
       </div>
 
       {isLoading && <Spinner label="Chargement des employés…" />}
@@ -145,7 +161,7 @@ export default function EmployesPage() {
             isPlaceholderData ? 'opacity-60' : ''
           }`}
         >
-          <table className="w-full min-w-[1400px] text-left text-sm">
+          <table className="w-full min-w-[1700px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-medium">N°</th>
@@ -161,6 +177,9 @@ export default function EmployesPage() {
                 <th className="px-4 py-3 font-medium">Ville</th>
                 <th className="px-4 py-3 font-medium">Repos</th>
                 <th className="px-4 py-3 font-medium">Règlement</th>
+                <th className="px-4 py-3 font-medium">RIB</th>
+                <th className="px-4 py-3 font-medium">Banque</th>
+                <th className="px-4 py-3 text-right font-medium">Salaire</th>
                 <th className="px-4 py-3 text-right font-medium">Jours travaillés</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -169,14 +188,20 @@ export default function EmployesPage() {
               {data.rows.map((emp) => {
                 const retirement = retirementStatus(emp.date_naissance)
                 const isRetired = retirement?.kind === 'retired'
+                const isGone = !emp.actif
                 return (
-                  <tr key={emp.id} className={isRetired ? 'bg-red-50/80' : undefined}>
+                  <tr key={emp.id} className={isGone ? 'bg-slate-50 text-slate-400' : isRetired ? 'bg-red-50/80' : undefined}>
                     <td className="px-4 py-3 font-medium text-slate-700">{emp.matricule ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className={`font-medium ${isRetired ? 'text-red-700' : 'text-slate-900'}`}>
+                        <span className={`font-medium ${isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'}`}>
                           {emp.nom_prenom}
                         </span>
+                        {isGone && (
+                          <Chip tone="slate" title={emp.date_sortie ? `Sorti le ${formatDateFr(emp.date_sortie)}` : 'Sorti'}>
+                            Sorti{emp.date_sortie ? ` — ${formatDateFr(emp.date_sortie)}` : ''}
+                          </Chip>
+                        )}
                         {retirement?.kind === 'retired' && (
                           <Chip tone="red" title={`Né(e) le ${formatDateFr(emp.date_naissance)} — ${retirement.age} ans`}>
                             Âge de retraite atteint
@@ -212,6 +237,11 @@ export default function EmployesPage() {
                     <td className="px-4 py-3 text-slate-600">{emp.ville ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{jourDeReposLabel(emp.jour_de_repos)}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.mode_reglement ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{emp.rib ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{emp.banque ?? '—'}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">
+                      {emp.salaire != null ? `${emp.salaire.toLocaleString('fr-FR')} DH` : '—'}
+                    </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-900">
                       {emp.jours_travailles}
                     </td>
@@ -275,6 +305,11 @@ function EmployeeFormModal({
     mode_reglement: employee?.mode_reglement ?? 'Virement',
     jour_de_repos: employee?.jour_de_repos?.toString() ?? '',
     jours_travailles: employee?.jours_travailles?.toString() ?? '0',
+    rib: employee?.rib ?? '',
+    banque: employee?.banque ?? '',
+    salaire: employee?.salaire?.toString() ?? '',
+    statut: employee && !employee.actif ? 'sorti' : 'actif',
+    date_sortie: employee?.date_sortie ?? '',
   })
 
   const set = (key: keyof typeof form) => (value: string) =>
@@ -300,6 +335,13 @@ function EmployeeFormModal({
         mode_reglement: form.mode_reglement || null,
         jour_de_repos: form.jour_de_repos ? Number(form.jour_de_repos) : null,
         jours_travailles: Math.max(0, Number(form.jours_travailles) || 0),
+        rib: form.rib.trim() || null,
+        banque: form.banque.trim() || null,
+        salaire: form.salaire.trim() ? Number(form.salaire) : null,
+        // « actif » est dérivé automatiquement de la date de sortie côté base.
+        // Statut « sorti » sans date → date du jour.
+        date_sortie:
+          form.statut === 'sorti' ? form.date_sortie || todayIso() : null,
       }
       if (employee) {
         const { error } = await supabase.from('employees').update(payload).eq('id', employee.id)
@@ -407,6 +449,35 @@ function EmployeeFormModal({
           {field('Jours travaillés', (
             <input type="number" min="0" value={form.jours_travailles} onChange={(e) => set('jours_travailles')(e.target.value)} className={inputCls} />
           ))}
+
+          <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-700">Paie & banque</p>
+          </div>
+          {field('Salaire (DH)', (
+            <input type="number" min="0" step="0.01" value={form.salaire} onChange={(e) => set('salaire')(e.target.value)} className={inputCls} placeholder="ex. 3000" />
+          ))}
+          {field('Banque', (
+            <input type="text" value={form.banque} onChange={(e) => set('banque')(e.target.value)} className={inputCls} placeholder="ex. Attijariwafa Bank" />
+          ))}
+          <div className="sm:col-span-2">
+            {field('RIB', (
+              <input type="text" value={form.rib} onChange={(e) => set('rib')(e.target.value)} className={inputCls} placeholder="24 chiffres" />
+            ))}
+          </div>
+
+          <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-700">Statut</p>
+          </div>
+          {field('Statut', (
+            <select value={form.statut} onChange={(e) => set('statut')(e.target.value)} className={inputCls}>
+              <option value="actif">En poste</option>
+              <option value="sorti">Sorti</option>
+            </select>
+          ))}
+          {form.statut === 'sorti' &&
+            field('Date de sortie', (
+              <DateInputFr value={form.date_sortie} onChange={set('date_sortie')} className={inputCls} />
+            ))}
         </div>
 
         {save.error && (

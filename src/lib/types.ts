@@ -38,6 +38,10 @@ export interface Employee {
   jour_de_repos: number | null
   jours_travailles: number
   actif: boolean
+  rib: string | null
+  banque: string | null
+  salaire: number | null
+  date_sortie: string | null
 }
 
 export interface Pointage {
