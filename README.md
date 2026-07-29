@@ -103,7 +103,7 @@ Donnez cette adresse aux agents. Sur leur téléphone, ils peuvent aussi **insta
 
 ## Bon à savoir
 
-- **Onglet Pointage (bureau)** : grille de la semaine (Lun → Dim). Vert ✓ = présent validé, orange ! = photo à valider, rouge ✕ = refusé, bleu R = jour de repos, gris – = absent. Cliquer sur une case pour voir la photo, valider/refuser ou **marquer présent** manuellement (pour les employés injoignables sur le terrain)
+- **Onglet Pointage (bureau)** : grille de la semaine (Lun → Dim). À la validation, le bureau choisit le **type de garde** : `X` une garde, `X̸` une garde et demi, `XX` deux gardes, `RT` repos travaillé (par défaut `X`). `–` absent et `R` repos sont automatiques. Orange `!` = photo à valider. La case validée affiche le symbole choisi ; cliquer dessus permet de changer le type. Le compteur « Gardes » de l'employé est ajusté automatiquement (1 / 1,5 / 2).
 - **Matricules** : numériques et triés ; un nouvel employé sans matricule reçoit automatiquement le dernier numéro + 1
 - **Ajout d'employés** : bouton « + Ajouter un employé » dans l'onglet Employés (validateurs) ; la suppression n'est pas ouverte pour l'instant
 - **Un seul pointage par employé et par jour** (si un pointage est refusé, l'agent peut recommencer)

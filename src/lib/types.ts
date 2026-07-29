@@ -54,6 +54,7 @@ export interface Pointage {
   pointed_at: string
   pointed_on: string
   status: PointageStatus
+  type_garde: string | null
   validated_by: string | null
   validated_at: string | null
 }

@@ -55,7 +55,7 @@ export function useSiteEmployees(siteId: string, enabled: boolean) {
 
 export type DayPointage = Pick<
   Pointage,
-  'id' | 'employee_id' | 'status' | 'photo_path' | 'pointed_at' | 'pointed_on'
+  'id' | 'employee_id' | 'status' | 'photo_path' | 'pointed_at' | 'pointed_on' | 'type_garde'
 >
 
 /** Pointages d'un site pour une date donnée (yyyy-mm-dd). */
@@ -66,7 +66,7 @@ export function useSitePointages(siteId: string, date: string, enabled: boolean)
     queryFn: async (): Promise<Map<string, DayPointage>> => {
       const { data, error } = await supabase
         .from('pointages')
-        .select('id, employee_id, status, photo_path, pointed_at, pointed_on')
+        .select('id, employee_id, status, photo_path, pointed_at, pointed_on, type_garde')
         .eq('site_id', siteId)
         .eq('pointed_on', date)
         .order('pointed_at', { ascending: false })
@@ -93,7 +93,7 @@ export function useSiteWeekPointages(
     queryFn: async (): Promise<Map<string, Map<string, DayPointage>>> => {
       const { data, error } = await supabase
         .from('pointages')
-        .select('id, employee_id, status, photo_path, pointed_at, pointed_on')
+        .select('id, employee_id, status, photo_path, pointed_at, pointed_on, type_garde')
         .eq('site_id', siteId)
         .gte('pointed_on', monday)
         .lte('pointed_on', sunday)

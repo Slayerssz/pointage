@@ -10,6 +10,7 @@ import {
   todayIso,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites } from '../../lib/queries'
+import { formatGardes } from '../../lib/gardes'
 import type { Employee } from '../../lib/types'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 
@@ -180,7 +181,7 @@ export default function EmployesPage() {
                 <th className="px-4 py-3 font-medium">RIB</th>
                 <th className="px-4 py-3 font-medium">Banque</th>
                 <th className="px-4 py-3 text-right font-medium">Salaire</th>
-                <th className="px-4 py-3 text-right font-medium">Jours travaillés</th>
+                <th className="px-4 py-3 text-right font-medium">Gardes</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -242,8 +243,8 @@ export default function EmployesPage() {
                     <td className="px-4 py-3 text-right text-slate-600">
                       {emp.salaire != null ? `${emp.salaire.toLocaleString('fr-FR')} DH` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-900">
-                      {emp.jours_travailles}
+                    <td className="px-4 py-3 text-right font-medium text-slate-900 tabular-nums">
+                      {formatGardes(emp.jours_travailles)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -446,8 +447,8 @@ function EmployeeFormModal({
               ))}
             </select>
           ))}
-          {field('Jours travaillés', (
-            <input type="number" min="0" value={form.jours_travailles} onChange={(e) => set('jours_travailles')(e.target.value)} className={inputCls} />
+          {field('Gardes travaillées', (
+            <input type="number" min="0" step="0.5" value={form.jours_travailles} onChange={(e) => set('jours_travailles')(e.target.value)} className={inputCls} />
           ))}
 
           <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">

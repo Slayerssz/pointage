@@ -25,6 +25,7 @@ select public.creer_utilisateur('bureau1', 'MotDePasse123', 'Nom complet', 'vali
 | `011_nouvelles_entreprises_2.sql` | MEGANTER, NORD PLANET, SERCLEAN, TRIMAX, VIGILMA |
 | `012_role_admin.sql` | Ajoute le rôle admin — **à exécuter SEUL, avant 013** |
 | `013_admin_fonctions.sql` | Onglets Utilisateurs & Analytics pour l'admin |
+| `014_types_garde.sql` | Types de garde (X, X̸, XX, RT) choisis à la validation |
 
 ### Créer le premier administrateur
 
