@@ -1,4 +1,4 @@
-export type UserRole = 'agent' | 'validator'
+export type UserRole = 'agent' | 'validator' | 'admin'
 export type PointageStatus = 'pending' | 'validated' | 'refused'
 
 export interface Profile {

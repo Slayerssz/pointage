@@ -19,6 +19,16 @@ const ICONS = {
       <path d="m9 12 2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
     </svg>
   ),
+  analytics: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M3 3v18h18M7 15l3-4 3 3 4-6" />
+    </svg>
+  ),
+  users: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
 }
 
 export default function Layout() {
@@ -40,12 +50,19 @@ export default function Layout() {
   })
 
   const tabs =
-    profile?.role === 'validator'
+    profile?.role === 'admin'
       ? [
+          { to: `/c/${companyId}/analytics`, label: 'Analytics', icon: ICONS.analytics },
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
           { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+          { to: `/c/${companyId}/utilisateurs`, label: 'Utilisateurs', icon: ICONS.users },
         ]
-      : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
+      : profile?.role === 'validator'
+        ? [
+            { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+            { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+          ]
+        : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
 
   const navItem = (tab: (typeof tabs)[number]) => (
     <NavLink
@@ -90,7 +107,13 @@ export default function Layout() {
           <p className="truncate px-1 text-xs text-slate-400">
             {profile?.full_name || profile?.username}
             <span className="ml-1 text-slate-500">
-              ({profile?.role === 'validator' ? 'validateur' : 'agent'})
+              (
+              {profile?.role === 'admin'
+                ? 'admin'
+                : profile?.role === 'validator'
+                  ? 'validateur'
+                  : 'agent'}
+              )
             </span>
           </p>
           <button

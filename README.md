@@ -4,6 +4,7 @@ Application de pointage du personnel avec photo.
 
 - **L'agent (pointeur)** ouvre l'app sur son téléphone → choisit l'entreprise → choisit le site → appuie sur « Pointer » à côté d'un employé → prend une photo → Valider. L'heure est enregistrée automatiquement.
 - **Le validateur (bureau)** ouvre l'app → choisit l'entreprise → voit deux onglets : **Employés** (la liste complète du personnel) et **Pointage** (les photos envoyées par les agents, avec les boutons Valider / Refuser).
+- **L'admin** a en plus un onglet **Analytics** (tableau de bord : effectifs, retraites, présences/absences du jour, graphiques) et un onglet **Utilisateurs** pour créer et gérer tous les comptes (pointeur / bureau / admin) directement dans l'app, sans SQL.
 
 La connexion se fait avec un **nom d'utilisateur et un mot de passe**. Pas d'e-mail, aucun message n'est envoyé à personne.
 

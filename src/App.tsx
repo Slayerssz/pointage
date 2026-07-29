@@ -7,7 +7,10 @@ import CompanySelectPage from './pages/CompanySelectPage'
 import AgentPointagePage from './pages/agent/AgentPointagePage'
 import ValidationPage from './pages/validator/ValidationPage'
 import EmployesPage from './pages/validator/EmployesPage'
+import AnalyticsPage from './pages/admin/AnalyticsPage'
+import UsersPage from './pages/admin/UsersPage'
 import { Spinner } from './components/ui'
+import type { UserRole } from './lib/types'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,14 +50,21 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function CompanyIndexRedirect() {
   const { profile } = useAuth()
   const { companyId } = useParams()
-  const target = profile?.role === 'validator' ? 'employes' : 'pointage'
+  const target =
+    profile?.role === 'admin'
+      ? 'analytics'
+      : profile?.role === 'validator'
+        ? 'employes'
+        : 'pointage'
   return <Navigate to={`/c/${companyId}/${target}`} replace />
 }
 
-function RequireRole({ role, children }: { role: 'agent' | 'validator'; children: React.ReactNode }) {
+function RequireRole({ roles, children }: { roles: UserRole[]; children: React.ReactNode }) {
   const { profile } = useAuth()
   const { companyId } = useParams()
-  if (profile?.role !== role) return <Navigate to={`/c/${companyId}`} replace />
+  if (!profile || !roles.includes(profile.role)) {
+    return <Navigate to={`/c/${companyId}`} replace />
+  }
   return <>{children}</>
 }
 
@@ -85,7 +95,7 @@ export default function App() {
               <Route
                 path="pointage"
                 element={
-                  <RequireRole role="agent">
+                  <RequireRole roles={['agent', 'admin']}>
                     <AgentPointagePage />
                   </RequireRole>
                 }
@@ -93,7 +103,7 @@ export default function App() {
               <Route
                 path="validation"
                 element={
-                  <RequireRole role="validator">
+                  <RequireRole roles={['validator', 'admin']}>
                     <ValidationPage />
                   </RequireRole>
                 }
@@ -101,8 +111,24 @@ export default function App() {
               <Route
                 path="employes"
                 element={
-                  <RequireRole role="validator">
+                  <RequireRole roles={['validator', 'admin']}>
                     <EmployesPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="analytics"
+                element={
+                  <RequireRole roles={['admin']}>
+                    <AnalyticsPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="utilisateurs"
+                element={
+                  <RequireRole roles={['admin']}>
+                    <UsersPage />
                   </RequireRole>
                 }
               />

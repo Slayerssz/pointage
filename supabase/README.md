@@ -23,3 +23,17 @@ select public.creer_utilisateur('bureau1', 'MotDePasse123', 'Nom complet', 'vali
 | `009_nouvelles_entreprises.sql` | AL SAFAE EL MAGHREB, BO, DUO MULTI SERVICE, EDEN VERT SERVICE |
 | `010_maj_triple_a.sql` | Mise à jour Groupe Triple A depuis l'Excel (adresses, etc.) |
 | `011_nouvelles_entreprises_2.sql` | MEGANTER, NORD PLANET, SERCLEAN, TRIMAX, VIGILMA |
+| `012_role_admin.sql` | Ajoute le rôle admin — **à exécuter SEUL, avant 013** |
+| `013_admin_fonctions.sql` | Onglets Utilisateurs & Analytics pour l'admin |
+
+### Créer le premier administrateur
+
+Après `013`, exécutez (en adaptant le mot de passe) :
+
+```sql
+select public.creer_utilisateur('admin', 'MotDePasseAdmin', 'Administrateur', 'validator');
+update public.profiles set role = 'admin' where username = 'admin';
+```
+
+Connectez-vous ensuite avec `admin` : l'onglet **Utilisateurs** permet de créer
+tous les autres comptes (pointeur / bureau / admin) sans SQL.
