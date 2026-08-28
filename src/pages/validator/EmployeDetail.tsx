@@ -11,9 +11,10 @@ import {
 } from '../../lib/paie'
 import { TYPES_CONTRAT, contratAffichage, contratStatut, joursRestants } from '../../lib/contrats'
 import { TYPES_ABSENCE, gardeLabel } from '../../lib/gardes'
-import type { Contrat, Employee, TypeContrat } from '../../lib/types'
+import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
 import { Chip, DateInputFr, ErrorNote, Spinner } from '../../components/ui'
 import DocumentsSignes from '../../components/DocumentsSignes'
+import EngagementPrint from '../../components/EngagementPrint'
 import { useDocuments } from '../../lib/documents'
 
 const inputCls =
@@ -33,9 +34,11 @@ type Onglet = 'contrats' | 'conges' | 'dette'
 /** Panneau « Contrats · Congés · Dettes » d'un employé. */
 export default function EmployeDetail({
   employee,
+  entreprise,
   onImprimerContrat,
 }: {
   employee: Employee
+  entreprise: string
   onImprimerContrat: (contrat: Contrat) => void
 }) {
   const [onglet, setOnglet] = useState<Onglet>('contrats')
@@ -65,7 +68,7 @@ export default function EmployeDetail({
       {onglet === 'contrats' && (
         <ContratsPanel employee={employee} onImprimer={onImprimerContrat} />
       )}
-      {onglet === 'conges' && <CongesPanel employee={employee} />}
+      {onglet === 'conges' && <CongesPanel employee={employee} entreprise={entreprise} />}
       {onglet === 'dette' && <DettePanel employee={employee} />}
     </div>
   )
@@ -472,11 +475,18 @@ function SupprimerContrat({
 
 // --------------------------------------------------------------- Congés -----
 
-function CongesPanel({ employee }: { employee: Employee }) {
+function CongesPanel({
+  employee,
+  entreprise,
+}: {
+  employee: Employee
+  entreprise: string
+}) {
   const { data: conges, isLoading } = useCongesEmploye(employee.id)
   const creer = useCreerConge(employee.id)
   const supprimer = useSupprimerConge(employee.id)
   const [f, setF] = useState({ debut: '', fin: '', type: 'C', motif: '' })
+  const [engagement, setEngagement] = useState<Conge | null>(null)
 
   if (isLoading) return <Spinner label="Chargement des congés…" />
 
@@ -559,17 +569,24 @@ function CongesPanel({ employee }: { employee: Employee }) {
                   {c.motif ? ` · ${c.motif}` : ''}
                 </p>
               </div>
-              <button
-                onClick={() => supprimer.mutate(c.id)}
-                disabled={supprimer.isPending}
-                className="shrink-0 rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-              >
-                Supprimer
-              </button>
+              <div className="flex shrink-0 flex-wrap gap-1.5">
+                <button
+                  onClick={() => setEngagement(c)}
+                  className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Imprimer / PDF
+                </button>
+                <button
+                  onClick={() => supprimer.mutate(c.id)}
+                  disabled={supprimer.isPending}
+                  className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
 
-            {/* L'engagement est établi sur papier de leur côté : on ne
-                stocke ici que le scan de la feuille signée. */}
+            {/* Circuit : imprimer → faire signer → scanner → joindre */}
             <div className="mt-3">
               <DocumentsSignes
                 companyId={employee.company_id}
@@ -577,17 +594,24 @@ function CongesPanel({ employee }: { employee: Employee }) {
                 type="engagement"
                 congeId={c.id}
                 intitule="l’engagement signé"
-                aide="Aucun engagement joint. Déposez ici la feuille signée par l’employé."
+                aide="Imprimez l’engagement, faites-le signer, puis déposez le scan ici."
               />
             </div>
           </li>
         ))}
       </ul>
 
+      {engagement && (
+        <EngagementPrint
+          conge={engagement}
+          employee={employee}
+          entreprise={entreprise}
+          onClose={() => setEngagement(null)}
+        />
+      )}
     </div>
   )
 }
-
 
 // ---------------------------------------------------------------- Dette -----
 
