@@ -249,7 +249,7 @@ export default function EmployesPage() {
                 <th className="px-4 py-3 text-right font-medium">Salaire</th>
                 <th className="px-4 py-3 text-right font-medium">H / jour</th>
                 <th className="px-4 py-3 text-right font-medium">Gardes</th>
-                <th className="px-4 py-3" />
+                <th className="sticky right-0 bg-white px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -353,10 +353,10 @@ export default function EmployesPage() {
                     <td className="px-4 py-3 text-right font-medium text-slate-900 tabular-nums">
                       {formatGardes(emp.jours_travailles)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="sticky right-0 bg-inherit px-4 py-3 text-right">
                       <button
                         onClick={() => setEditing(emp)}
-                        className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
                       >
                         Modifier
                       </button>
@@ -640,7 +640,10 @@ function EmployeeFormModal({
           </div>
         )}
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+          {employee && vue === 'fiche' && (
+            <SupprimerEmploye employee={employee} onDeleted={onClose} />
+          )}
           <button
             onClick={onClose}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
@@ -657,6 +660,135 @@ function EmployeeFormModal({
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+interface ApercuSuppression {
+  nom_prenom: string
+  pointages: number
+  photos: number
+  contrats: number
+  conges: number
+  dettes: number
+  dette_restante: number
+  lignes_paie: number
+  mois_de_paie: string[]
+  supprimable: boolean
+}
+
+/**
+ * Suppression d'un employé. On montre d'abord exactement ce qui serait
+ * effacé : tout est en cascade, donc la décision doit être éclairée.
+ * Un employé déjà passé en paie n'est pas supprimable — on le marque « Sorti ».
+ */
+function SupprimerEmploye({
+  employee,
+  onDeleted,
+}: {
+  employee: Employee
+  onDeleted: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [ouvert, setOuvert] = useState(false)
+
+  const { data: apercu, isLoading } = useQuery({
+    queryKey: ['apercu-suppression', employee.id],
+    enabled: ouvert,
+    queryFn: async (): Promise<ApercuSuppression> => {
+      const { data, error } = await supabase.rpc('apercu_suppression_employe', {
+        p_employee_id: employee.id,
+      })
+      if (error) throw error
+      return data as ApercuSuppression
+    },
+  })
+
+  const supprimer = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('supprimer_employe', { p_employee_id: employee.id })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['site-employees'] })
+      queryClient.invalidateQueries({ queryKey: ['employe-filtres'] })
+      onDeleted()
+    },
+  })
+
+  if (!ouvert) {
+    return (
+      <button
+        onClick={() => setOuvert(true)}
+        className="mr-auto rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+      >
+        Supprimer
+      </button>
+    )
+  }
+
+  return (
+    <div className="mr-auto w-full rounded-xl border border-red-200 bg-red-50 p-3">
+      {isLoading && <p className="text-sm text-red-800">Vérification…</p>}
+
+      {apercu && !apercu.supprimable && (
+        <>
+          <p className="text-sm font-semibold text-red-900">Suppression impossible</p>
+          <p className="mt-1 text-sm text-red-800">
+            {apercu.nom_prenom} figure dans {apercu.lignes_paie} bulletin(s) de paie
+            {apercu.mois_de_paie.length > 0 && ` (${apercu.mois_de_paie.join(', ')})`}. Le
+            supprimer effacerait cet historique de paie. Passez son statut à{' '}
+            <strong>« Sorti »</strong> : il quitte les listes sans rien perdre.
+          </p>
+        </>
+      )}
+
+      {apercu && apercu.supprimable && (
+        <>
+          <p className="text-sm font-semibold text-red-900">
+            Supprimer définitivement {apercu.nom_prenom} ?
+          </p>
+          <p className="mt-1 text-sm text-red-800">Seront effacés en même temps :</p>
+          <ul className="mt-1 list-disc pl-5 text-sm text-red-800">
+            <li>{apercu.pointages} pointage(s){apercu.photos > 0 && `, dont ${apercu.photos} avec photo`}</li>
+            <li>{apercu.contrats} contrat(s)</li>
+            <li>{apercu.conges} congé(s)</li>
+            <li>
+              {apercu.dettes} dette(s)
+              {Number(apercu.dette_restante) > 0 &&
+                ` — dont ${formatDH(apercu.dette_restante)} encore dus`}
+            </li>
+          </ul>
+          <p className="mt-2 text-sm text-red-800">
+            Si cet employé a réellement travaillé, préférez le statut <strong>« Sorti »</strong>.
+          </p>
+        </>
+      )}
+
+      {supprimer.error && (
+        <div className="mt-2">
+          <ErrorNote>{supprimer.error.message}</ErrorNote>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => setOuvert(false)}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+        >
+          Annuler
+        </button>
+        {apercu?.supprimable && (
+          <button
+            onClick={() => supprimer.mutate()}
+            disabled={supprimer.isPending}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {supprimer.isPending ? 'Suppression…' : 'Oui, supprimer définitivement'}
+          </button>
+        )}
       </div>
     </div>
   )
