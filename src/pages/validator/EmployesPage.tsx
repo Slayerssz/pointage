@@ -14,7 +14,10 @@ import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
 import { useContratsCourants, formatDH } from '../../lib/paie'
 import { contratAffichage } from '../../lib/contrats'
-import type { Contrat, Employee } from '../../lib/types'
+import type { Contrat, Employee, SituationFamiliale } from '../../lib/types'
+import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
+import PhotoProfil from '../../components/PhotoProfil'
+import FichePrint from '../../components/FichePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
 import ContratPrint from '../../components/ContratPrint'
@@ -49,6 +52,9 @@ export default function EmployesPage() {
     },
   })
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
+  // Fiches à imprimer : une seule, ou toute la sélection filtrée
+  const [fiches, setFiches] = useState<Employee[] | null>(null)
+  const [chargementFiches, setChargementFiches] = useState(false)
   const { data: entreprises } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
@@ -94,7 +100,7 @@ export default function EmployesPage() {
       let query = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, situation_familiale, nombre_enfants, photo_path, date_sortie',
           { count: 'exact' },
         )
         .order('matricule', { ascending: true, nullsFirst: false })
@@ -141,6 +147,39 @@ export default function EmployesPage() {
     return c?.statut === contratFilter
   })
 
+  /** Imprime la fiche de tous les employés correspondant aux filtres actuels,
+   *  et pas seulement ceux de la page affichée. */
+  const imprimerSelection = async () => {
+    setChargementFiches(true)
+    try {
+      let q = supabase
+        .from('employees')
+        .select(
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, situation_familiale, nombre_enfants, photo_path, date_sortie',
+        )
+        .order('matricule', { ascending: true, nullsFirst: false })
+        .limit(500)
+      if (!(estAdmin && toutesEntreprises)) q = q.eq('company_id', companyId!)
+      if (siteFilter) q = q.eq('site_id', siteFilter)
+      if (principalFilter) {
+        const ids = (sites ?? [])
+          .filter((s) => s.site_principal_id === principalFilter)
+          .map((s) => s.id)
+        q = q.in('site_id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
+      }
+      if (villeFilter) q = q.eq('ville', villeFilter)
+      if (modeFilter) q = q.eq('mode_reglement', modeFilter)
+      if (qualifFilter) q = q.eq('qualification', qualifFilter)
+      if (statutFilter === 'actif') q = q.eq('actif', true)
+      else if (statutFilter === 'sorti') q = q.eq('actif', false)
+      const { data: rows, error } = await q
+      if (error) throw error
+      setFiches(rows as Employee[])
+    } finally {
+      setChargementFiches(false)
+    }
+  }
+
   const resetPage = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v)
     setPage(1)
@@ -177,12 +216,22 @@ export default function EmployesPage() {
               : 'Liste du personnel'}
           </p>
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-        >
-          + Ajouter un employé
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={imprimerSelection}
+            disabled={chargementFiches || !data?.count}
+            title="Imprimer la fiche de tous les employés correspondant aux filtres"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            {chargementFiches ? 'Préparation…' : `Imprimer les fiches${data ? ` (${data.count})` : ''}`}
+          </button>
+          <button
+            onClick={() => setAdding(true)}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            + Ajouter un employé
+          </button>
+        </div>
       </div>
 
       <div className="mb-5 flex flex-wrap gap-2">
@@ -369,12 +418,21 @@ export default function EmployesPage() {
                       {formatGardes(emp.jours_travailles)}
                     </td>
                     <td className="sticky right-0 bg-inherit px-4 py-3 text-right">
-                      <button
-                        onClick={() => setEditing(emp)}
-                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
-                      >
-                        Modifier
-                      </button>
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => setFiches([emp])}
+                          title="Imprimer la fiche de cet employé"
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
+                        >
+                          Fiche
+                        </button>
+                        <button
+                          onClick={() => setEditing(emp)}
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
+                        >
+                          Modifier
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -390,11 +448,22 @@ export default function EmployesPage() {
         <EmployeeFormModal
           companyId={companyId}
           employee={editing}
+          entreprise={company?.name ?? ''}
           onImprimerContrat={(contrat, employee) => setImpression({ contrat, employee })}
           onClose={() => {
             setEditing(null)
             setAdding(false)
           }}
+        />
+      )}
+
+      {fiches && fiches.length > 0 && (
+        <FichePrint
+          employees={fiches}
+          entreprise={company?.name ?? ''}
+          sites={sites ?? []}
+          contrats={contrats}
+          onClose={() => setFiches(null)}
         />
       )}
 
@@ -414,11 +483,13 @@ export default function EmployesPage() {
 function EmployeeFormModal({
   companyId,
   employee,
+  entreprise,
   onImprimerContrat,
   onClose,
 }: {
   companyId: string
   employee: Employee | null
+  entreprise: string
   onImprimerContrat: (contrat: Contrat, employee: Employee) => void
   onClose: () => void
 }) {
@@ -447,6 +518,8 @@ function EmployeeFormModal({
     banque: employee?.banque ?? '',
     salaire: employee?.salaire?.toString() ?? '',
     heures_par_jour: employee?.heures_par_jour?.toString() ?? '8',
+    situation_familiale: employee?.situation_familiale ?? '',
+    nombre_enfants: employee?.nombre_enfants?.toString() ?? '0',
     statut: employee && !employee.actif ? 'sorti' : 'actif',
     date_sortie: employee?.date_sortie ?? '',
   })
@@ -478,6 +551,11 @@ function EmployeeFormModal({
         banque: form.banque.trim() || null,
         salaire: form.salaire.trim() ? Number(form.salaire) : null,
         heures_par_jour: form.heures_par_jour.trim() ? Number(form.heures_par_jour) : null,
+        situation_familiale: form.situation_familiale || null,
+        // Un célibataire n'a pas d'enfants à déclarer ici
+        nombre_enfants: SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale)
+          ? Math.max(0, Number(form.nombre_enfants) || 0)
+          : 0,
         // « actif » est dérivé automatiquement de la date de sortie côté base.
         // Statut « sorti » sans date → date du jour.
         date_sortie:
@@ -548,8 +626,15 @@ function EmployeeFormModal({
         {employee && vue === 'dossier' && (
           <EmployeDetail
             employee={employee}
+            entreprise={entreprise}
             onImprimerContrat={(contrat) => onImprimerContrat(contrat, employee)}
           />
+        )}
+
+        {employee && vue === 'fiche' && (
+          <div className="mb-5">
+            <PhotoProfil employee={employee} />
+          </div>
         )}
 
         <div className={`grid gap-4 sm:grid-cols-2 ${employee && vue !== 'fiche' ? 'hidden' : ''}`}>
@@ -586,6 +671,25 @@ function EmployeeFormModal({
           {field("Date d'embauche", (
             <DateInputFr value={form.date_embauche} onChange={set('date_embauche')} className={inputCls} />
           ))}
+          {field('Situation familiale', (
+            <select
+              value={form.situation_familiale}
+              onChange={(e) => set('situation_familiale')(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">— Non renseignée —</option>
+              {SITUATIONS_FAMILIALES.map((sf) => (
+                <option key={sf} value={sf}>{sf}</option>
+              ))}
+            </select>
+          ))}
+          {SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale) &&
+            field("Nombre d'enfants", (
+              <input
+                type="number" min="0" max="30" value={form.nombre_enfants}
+                onChange={(e) => set('nombre_enfants')(e.target.value)} className={inputCls}
+              />
+            ))}
           {field('Téléphone', (
             <input type="tel" value={form.telephone} onChange={(e) => set('telephone')(e.target.value)} className={inputCls} placeholder="06 00 00 00 00" />
           ))}

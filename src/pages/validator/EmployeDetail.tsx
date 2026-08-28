@@ -12,8 +12,10 @@ import {
 } from '../../lib/paie'
 import { TYPES_CONTRAT, contratAffichage, contratStatut, joursRestants } from '../../lib/contrats'
 import { TYPES_ABSENCE, gardeLabel } from '../../lib/gardes'
-import type { Contrat, Employee, TypeContrat } from '../../lib/types'
+import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
 import { Chip, DateInputFr, ErrorNote, Spinner } from '../../components/ui'
+import DocumentsSignes from '../../components/DocumentsSignes'
+import EngagementPrint from '../../components/EngagementPrint'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none'
@@ -32,9 +34,11 @@ type Onglet = 'contrats' | 'conges' | 'dettes'
 /** Panneau « Contrats · Congés · Dettes » d'un employé. */
 export default function EmployeDetail({
   employee,
+  entreprise,
   onImprimerContrat,
 }: {
   employee: Employee
+  entreprise: string
   onImprimerContrat: (contrat: Contrat) => void
 }) {
   const [onglet, setOnglet] = useState<Onglet>('contrats')
@@ -64,7 +68,7 @@ export default function EmployeDetail({
       {onglet === 'contrats' && (
         <ContratsPanel employee={employee} onImprimer={onImprimerContrat} />
       )}
-      {onglet === 'conges' && <CongesPanel employee={employee} />}
+      {onglet === 'conges' && <CongesPanel employee={employee} entreprise={entreprise} />}
       {onglet === 'dettes' && <DettesPanel employee={employee} />}
     </div>
   )
@@ -174,6 +178,17 @@ function ContratsPanel({
                         Modifier
                       </button>
                     </div>
+                  </div>
+
+                  {/* Circuit : imprimer → signer → légaliser → scanner → joindre */}
+                  <div className="mt-3">
+                    <DocumentsSignes
+                      companyId={employee.company_id}
+                      employeeId={employee.id}
+                      type="contrat"
+                      contratId={c.id}
+                      intitule="le contrat signé et légalisé"
+                    />
                   </div>
                 </li>
               )
@@ -384,11 +399,18 @@ function ContratForm({
 
 // --------------------------------------------------------------- Congés -----
 
-function CongesPanel({ employee }: { employee: Employee }) {
+function CongesPanel({
+  employee,
+  entreprise,
+}: {
+  employee: Employee
+  entreprise: string
+}) {
   const { data: conges, isLoading } = useCongesEmploye(employee.id)
   const creer = useCreerConge(employee.id)
   const supprimer = useSupprimerConge(employee.id)
   const [f, setF] = useState({ debut: '', fin: '', type: 'C', motif: '' })
+  const [engagement, setEngagement] = useState<Conge | null>(null)
 
   if (isLoading) return <Spinner label="Chargement des congés…" />
 
@@ -413,7 +435,8 @@ function CongesPanel({ employee }: { employee: Employee }) {
         </div>
         <p className="mt-2 text-xs text-slate-500">
           Les jours sont écrits automatiquement dans le pointage. Le jour de repos hebdomadaire de
-          l’employé n’est pas décompté.
+          l’employé n’est pas décompté. Un employé peut cumuler plusieurs congés, à condition
+          qu’ils ne se chevauchent pas.
         </p>
         {creer.error && (
           <div className="mt-3">
@@ -443,29 +466,59 @@ function CongesPanel({ employee }: { employee: Employee }) {
 
       <ul className="space-y-2">
         {conges?.map((c) => (
-          <li key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
-            <div>
-              <p className="text-sm font-medium text-slate-900">
-                {formatDateFr(c.date_debut)} → {formatDateFr(c.date_fin)}
-                <span className="ml-2 text-xs font-normal text-slate-500">
-                  {c.jours} jour{c.jours > 1 ? 's' : ''}
-                </span>
-              </p>
-              <p className="text-xs text-slate-500">
-                {gardeLabel(c.type)}
-                {c.motif ? ` · ${c.motif}` : ''}
-              </p>
+          <li key={c.id} className="rounded-xl border border-slate-200 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-slate-900">
+                  {formatDateFr(c.date_debut)} → {formatDateFr(c.date_fin)}
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    {c.jours} jour{c.jours > 1 ? 's' : ''}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-500">
+                  {gardeLabel(c.type)}
+                  {c.motif ? ` · ${c.motif}` : ''}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-1.5">
+                <button
+                  onClick={() => setEngagement(c)}
+                  className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Imprimer l’engagement
+                </button>
+                <button
+                  onClick={() => supprimer.mutate(c.id)}
+                  disabled={supprimer.isPending}
+                  className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => supprimer.mutate(c.id)}
-              disabled={supprimer.isPending}
-              className="shrink-0 rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-            >
-              Supprimer
-            </button>
+
+            {/* Circuit : imprimer → faire signer → scanner → joindre */}
+            <div className="mt-3">
+              <DocumentsSignes
+                companyId={employee.company_id}
+                employeeId={employee.id}
+                type="engagement"
+                congeId={c.id}
+                intitule="l’engagement signé"
+              />
+            </div>
           </li>
         ))}
       </ul>
+
+      {engagement && (
+        <EngagementPrint
+          conge={engagement}
+          employee={employee}
+          entreprise={entreprise}
+          onClose={() => setEngagement(null)}
+        />
+      )}
     </div>
   )
 }

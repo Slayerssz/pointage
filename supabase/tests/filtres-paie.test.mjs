@@ -12,8 +12,12 @@ const filtrer = (r='', reg='', site='', princ='') => lignes.filter(l => {
   if (site && (l.site_nom ?? '') !== site) return false
   if (princ && (l.site_principal_nom ?? '') !== princ) return false
   if (!r) return true
-  const q=r.toLowerCase()
-  return l.nom_prenom.toLowerCase().includes(q) || String(l.matricule??'').includes(q) || (l.site_nom??'').toLowerCase().includes(q)
+  const q = r.toLowerCase()
+  return (
+    l.nom_prenom.toLowerCase().includes(q) ||
+    String(l.matricule ?? '').includes(q) ||
+    (l.site_nom ?? '').toLowerCase().includes(q)
+  )
 })
 const tot = f => ({
   employes: f.length,
@@ -21,7 +25,11 @@ const tot = f => ({
   virement: f.filter(l=>estVirement(l.mode_reglement)).reduce((s,l)=>s+l.net_a_payer,0),
   especes:  f.filter(l=>!estVirement(l.mode_reglement)).reduce((s,l)=>s+l.net_a_payer,0),
 })
-let P=0,F=0; const ok=(n,c,x='')=>{c?(P++,console.log('  ✓ '+n)):(F++,console.log('  ✗ '+n+' '+x))}
+let P = 0, F = 0
+const ok = (n, c, x = '') => {
+  if (c) { P++; console.log('  ✓ ' + n) }
+  else   { F++; console.log('  ✗ ' + n + ' ' + x) }
+}
 
 let t=tot(filtrer())
 ok('sans filtre : 5 employés, net 17 800', t.employes===5 && t.net===17800, JSON.stringify(t))

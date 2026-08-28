@@ -37,6 +37,11 @@ body {
     box-shadow: none;
   }
 
+  /* Une fiche par page lorsqu'on en imprime plusieurs */
+  body.impression .document-imprimable > article + article {
+    break-before: page;
+  }
+
   @page {
     size: A4;
     margin: 16mm;

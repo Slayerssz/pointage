@@ -53,7 +53,38 @@ export interface Employee {
   salaire: number | null
   /** Durée d'une garde normale, en heures (ex. 8). */
   heures_par_jour: number | null
+  situation_familiale: SituationFamiliale | null
+  nombre_enfants: number
+  /** Photo de profil, chemin dans le bucket « photos ». */
+  photo_path: string | null
   date_sortie: string | null
+}
+
+export type SituationFamiliale = 'Célibataire' | 'Marié(e)' | 'Divorcé(e)' | 'Veuf/Veuve'
+
+export const SITUATIONS_FAMILIALES: SituationFamiliale[] = [
+  'Célibataire', 'Marié(e)', 'Divorcé(e)', 'Veuf/Veuve',
+]
+
+/** Les situations pour lesquelles on demande le nombre d'enfants. */
+export const SITUATIONS_AVEC_ENFANTS: SituationFamiliale[] = [
+  'Marié(e)', 'Divorcé(e)', 'Veuf/Veuve',
+]
+
+/** Pièce signée scannée : engagement de congé, contrat légalisé… */
+export interface Document {
+  id: string
+  company_id: string
+  employee_id: string
+  type: 'engagement' | 'contrat' | 'autre'
+  conge_id: string | null
+  contrat_id: string | null
+  chemin: string
+  nom_fichier: string
+  mime: string | null
+  taille: number | null
+  libelle: string | null
+  created_at: string
 }
 
 export interface Pointage {
