@@ -8,11 +8,12 @@ import {
   useSiteEmployees,
   useSitePointages,
   useSites,
+  useSitesPrincipaux,
   type SiteEmployee,
 } from '../../lib/queries'
 import type { Site } from '../../lib/types'
 import CameraCapture from '../../components/CameraCapture'
-import SiteAccordion from '../../components/SiteAccordion'
+import SitesTree from '../../components/SitesTree'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 
 interface CaptureTarget {
@@ -23,6 +24,7 @@ interface CaptureTarget {
 export default function AgentPointagePage() {
   const { companyId } = useParams()
   const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
+  const { data: principaux } = useSitesPrincipaux(companyId)
   const [target, setTarget] = useState<CaptureTarget | null>(null)
   const queryClient = useQueryClient()
 
@@ -57,7 +59,7 @@ export default function AgentPointagePage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-xl font-semibold text-slate-900">Pointage</h1>
       <p className="mb-6 text-sm text-slate-500">
-        Sélectionnez un site puis pointez chaque employé présent en prenant une photo.
+        Ouvrez un site principal, puis l’annexe, et pointez chaque employé présent en prenant une photo.
       </p>
 
       {isLoading && <Spinner label="Chargement des sites…" />}
@@ -65,8 +67,9 @@ export default function AgentPointagePage() {
       {sites && sites.length === 0 && <EmptyState>Aucun site pour cette entreprise.</EmptyState>}
 
       {sites && (
-        <SiteAccordion
+        <SitesTree
           sites={sites}
+          principaux={principaux ?? []}
           renderSite={(site, expanded) => (
             <SiteEmployeeList site={site} enabled={expanded} onPointer={(employee) => setTarget({ employee, site })} />
           )}

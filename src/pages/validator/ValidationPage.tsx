@@ -18,6 +18,7 @@ import {
   useSiteEmployees,
   useSiteWeekPointages,
   useSites,
+  useSitesPrincipaux,
   type DayPointage,
   type SiteEmployee,
 } from '../../lib/queries'
@@ -30,7 +31,7 @@ import {
   gardeSymbole,
   type TypeGarde,
 } from '../../lib/gardes'
-import SiteAccordion from '../../components/SiteAccordion'
+import SitesTree from '../../components/SitesTree'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import ValidationMois from './ValidationMois'
 
@@ -46,6 +47,7 @@ export default function ValidationPage() {
   const { companyId } = useParams()
   const [monday, setMonday] = useState(() => mondayOf(new Date()))
   const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
+  const { data: principaux } = useSitesPrincipaux(companyId)
   const [selection, setSelection] = useState<CellSelection | null>(null)
 
   const mondayIso = dateToIso(monday)
@@ -58,7 +60,8 @@ export default function ValidationPage() {
         <div>
           <h1 className="mb-1 text-xl font-semibold text-slate-900">Pointage de la semaine</h1>
           <p className="text-sm text-slate-500">
-            Cliquez sur une case : voir la photo, valider, refuser, ou marquer une absence.
+            Ouvrez un site principal, puis l’annexe. Cliquez ensuite sur une case : voir la photo,
+            valider, refuser, ou marquer une absence.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -102,8 +105,9 @@ export default function ValidationPage() {
       {sites && sites.length === 0 && <EmptyState>Aucun site pour cette entreprise.</EmptyState>}
 
       {sites && (
-        <SiteAccordion
+        <SitesTree
           sites={sites}
+          principaux={principaux ?? []}
           renderSite={(site, expanded) => (
             <SiteWeekGrid
               site={site}
