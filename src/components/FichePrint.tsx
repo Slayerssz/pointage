@@ -3,27 +3,25 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { computeAge, formatDateFr, jourDeReposLabel } from '../lib/dates'
 import { formatDH } from '../lib/paie'
-import { contratStatut } from '../lib/contrats'
-import type { ContratCourant, Employee } from '../lib/types'
+import type { Employee } from '../lib/types'
 
 /**
  * FICHE D'EMPLOYÉ imprimable — une par page.
  *
- * Contient l'identité, l'état civil, le poste, le contrat et le salaire.
- * Les DETTES n'y figurent jamais : ce document circule, elles restent
- * à l'écran, dans le dossier de l'employé.
+ * Contient l'identité, l'état civil, le poste et le salaire.
+ * Ni contrat ni bloc de signature : la fiche est un document de
+ * référence interne, pas une pièce à signer. Les DETTES n'y figurent
+ * jamais non plus.
  */
 export default function FichePrint({
   employees,
   entreprise,
   sites,
-  contrats,
   onClose,
 }: {
   employees: Employee[]
   entreprise: string
   sites: { id: string; name: string }[]
-  contrats: Map<string, ContratCourant> | undefined
   onClose: () => void
 }) {
   useEffect(() => {
@@ -79,8 +77,6 @@ export default function FichePrint({
 
       <div className="document-imprimable">
         {employees.map((e, i) => {
-          const contrat = contrats?.get(e.id)
-          const statut = contrat ? contratStatut(contrat.date_debut, contrat.date_fin) : null
           const photo = e.photo_path ? photos?.get(e.photo_path) : undefined
           return (
             <article
@@ -138,32 +134,6 @@ export default function FichePrint({
                 />
               </Bloc>
 
-              <Bloc titre="Contrat">
-                {contrat ? (
-                  <>
-                    <Ligne label="Type" valeur={contrat.type_contrat} fort />
-                    <Ligne label="Numéro" valeur={contrat.numero ?? '—'} />
-                    <Ligne label="Date de début" valeur={formatDateFr(contrat.date_debut)} />
-                    <Ligne
-                      label="Date de fin"
-                      valeur={contrat.date_fin ? formatDateFr(contrat.date_fin) : 'Durée indéterminée'}
-                    />
-                    <Ligne
-                      label="État"
-                      valeur={
-                        statut === 'termine'
-                          ? 'Terminé'
-                          : statut === 'bientot'
-                            ? `Se termine dans ${contrat.jours_restants} jour(s)`
-                            : 'En cours'
-                      }
-                    />
-                  </>
-                ) : (
-                  <p className="py-1 text-sm italic">Aucun contrat enregistré.</p>
-                )}
-              </Bloc>
-
               <Bloc titre="Rémunération">
                 <Ligne label="Salaire mensuel" valeur={formatDH(e.salaire)} fort />
                 <Ligne label="Mode de règlement" valeur={e.mode_reglement ?? '—'} />
@@ -171,20 +141,6 @@ export default function FichePrint({
                 <Ligne label="RIB" valeur={e.rib ?? '—'} />
               </Bloc>
 
-              <div className="mt-10 flex justify-between gap-8">
-                <div className="w-1/2 text-center">
-                  <p className="mb-14 text-sm font-semibold">L’Employeur</p>
-                  <p className="border-t border-black pt-1 text-xs">{entreprise}</p>
-                </div>
-                <div className="w-1/2 text-center">
-                  <p className="mb-14 text-sm font-semibold">Le Salarié</p>
-                  <p className="border-t border-black pt-1 text-xs">{e.nom_prenom}</p>
-                </div>
-              </div>
-
-              <p className="mt-6 text-center text-[8pt] text-slate-500">
-                Fiche éditée le {new Date().toLocaleDateString('fr-FR')}
-              </p>
             </article>
           )
         })}

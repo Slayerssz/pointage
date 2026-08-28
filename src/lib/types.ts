@@ -53,6 +53,8 @@ export interface Employee {
   salaire: number | null
   /** Durée d'une garde normale, en heures (ex. 8). */
   heures_par_jour: number | null
+  /** Ce que l'employé doit encore. La paie le fait baisser à la validation. */
+  dette: number
   situation_familiale: SituationFamiliale | null
   nombre_enfants: number
   /** Photo de profil, chemin dans le bucket « photos ». */
@@ -170,19 +172,6 @@ export interface Conge {
   motif: string | null
   jours: number
   created_at: string
-}
-
-// --- Dettes -----------------------------------------------------------------
-
-export interface Dette {
-  id: string
-  company_id: string
-  employee_id: string
-  libelle: string
-  montant_total: number
-  montant_rembourse: number
-  date_creation: string
-  soldee: boolean
 }
 
 // --- Paie -------------------------------------------------------------------

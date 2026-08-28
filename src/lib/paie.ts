@@ -5,7 +5,6 @@ import type {
   Conge,
   Contrat,
   ContratCourant,
-  Dette,
   LignePaie,
   ParametresPaie,
   PeriodePaie,
@@ -241,37 +240,21 @@ export function useSupprimerConge(employeeId: string | undefined) {
 
 // --- Dettes ------------------------------------------------------------------
 
-export function useDettesEmploye(employeeId: string | undefined) {
-  return useQuery({
-    queryKey: ['dettes', employeeId],
-    enabled: Boolean(employeeId),
-    queryFn: async (): Promise<Dette[]> => {
-      const { data, error } = await supabase
-        .from('dettes')
-        .select('*')
-        .eq('employee_id', employeeId!)
-        .order('date_creation', { ascending: false })
-      if (error) throw error
-      return data as Dette[]
-    },
-  })
-}
-
-/** Reste à rembourser, tous employés de l'entreprise (pour l'écran Paie). */
+/** Ce que chaque employé doit encore (pour l'écran Paie). */
 export function useDettesOuvertes(companyId: string | undefined) {
   return useQuery({
     queryKey: ['dettes', 'ouvertes', companyId],
     enabled: Boolean(companyId),
     queryFn: async (): Promise<Map<string, number>> => {
       const { data, error } = await supabase
-        .from('dettes')
-        .select('employee_id, montant_total, montant_rembourse')
+        .from('employees')
+        .select('id, dette')
         .eq('company_id', companyId!)
-        .eq('soldee', false)
+        .gt('dette', 0)
       if (error) throw error
       const map = new Map<string, number>()
-      for (const d of data as Dette[]) {
-        map.set(d.employee_id, (map.get(d.employee_id) ?? 0) + (d.montant_total - d.montant_rembourse))
+      for (const e of data as { id: string; dette: number }[]) {
+        map.set(e.id, Number(e.dette))
       }
       return map
     },

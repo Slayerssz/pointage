@@ -19,7 +19,7 @@ select c.name                     as entreprise,
        pp.statut,
        (select count(*) from public.lignes_paie lp where lp.periode_id = pp.id) as lignes,
        (select coalesce(sum(lp.net_a_payer),0) from public.lignes_paie lp where lp.periode_id = pp.id) as total_net,
-       (select coalesce(sum(r.montant),0) from public.remboursements_dette r where r.periode_id = pp.id) as dettes_imputees
+       (select coalesce(sum(lp.retenue_dette),0) from public.lignes_paie lp where lp.periode_id = pp.id) as dettes_retenues
 from public.periodes_paie pp
 join public.companies c on c.id = pp.company_id
 order by pp.annee desc, pp.mois desc, c.name;
@@ -38,23 +38,23 @@ declare
   v_n     int := 0;
 begin
   for v_p in
-    select pp.id, c.name as entreprise
+    select pp.id, pp.paie_validee_le, c.name as entreprise
     from public.periodes_paie pp
     join public.companies c on c.id = pp.company_id
     where pp.annee = v_annee and pp.mois = v_mois
   loop
-    -- 1. rendre aux dettes ce que la validation leur avait retiré
-    update public.dettes d
-       set montant_rembourse = greatest(0, d.montant_rembourse - r.total),
-           soldee = false
-      from (select dette_id, sum(montant) as total
-              from public.remboursements_dette
-             where periode_id = v_p.id
-             group by dette_id) r
-     where d.id = r.dette_id;
+    -- 1. si la paie avait été validée, rendre aux employés ce qu'elle
+    --    avait retenu sur leur dette
+    if v_p.paie_validee_le is not null then
+      update public.employees e
+         set dette = e.dette + lp.retenue_dette
+        from public.lignes_paie lp
+       where lp.periode_id = v_p.id
+         and lp.employee_id = e.id
+         and lp.retenue_dette > 0;
+    end if;
 
-    -- 2. supprimer la période (les lignes de paie et les remboursements
-    --    partent automatiquement avec elle)
+    -- 2. supprimer la période (les lignes de paie partent avec elle)
     delete from public.periodes_paie where id = v_p.id;
 
     v_n := v_n + 1;
@@ -76,13 +76,15 @@ end $$;
 do $$
 declare v_n int;
 begin
-  -- rendre aux dettes tout ce qui leur a été retiré
-  update public.dettes d
-     set montant_rembourse = greatest(0, d.montant_rembourse - r.total),
-         soldee = false
-    from (select dette_id, sum(montant) as total
-            from public.remboursements_dette group by dette_id) r
-   where d.id = r.dette_id;
+  -- rendre aux employés tout ce que les paies validées leur ont retenu
+  update public.employees e
+     set dette = e.dette + r.total
+    from (select lp.employee_id, sum(lp.retenue_dette) as total
+            from public.lignes_paie lp
+            join public.periodes_paie pp on pp.id = lp.periode_id
+           where pp.paie_validee_le is not null and lp.retenue_dette > 0
+           group by lp.employee_id) r
+   where e.id = r.employee_id;
 
   delete from public.periodes_paie;
   get diagnostics v_n = row_count;
@@ -103,8 +105,8 @@ delete from public.conges;
 -- Les contrats d'essai
 delete from public.contrats;
 
--- Les dettes d'essai
-delete from public.dettes;
+-- Remettre les dettes à zéro
+update public.employees set dette = 0;
 
 -- Remettre à zéro le compteur « Gardes » des fiches employés
 -- (il se reconstruit au fil des validations suivantes)

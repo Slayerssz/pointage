@@ -18,6 +18,7 @@ import type { Contrat, Employee, SituationFamiliale } from '../../lib/types'
 import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
+import ListePrint from '../../components/ListePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
 import ContratPrint from '../../components/ContratPrint'
@@ -52,9 +53,10 @@ export default function EmployesPage() {
     },
   })
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
-  // Fiches à imprimer : une seule, ou toute la sélection filtrée
-  const [fiches, setFiches] = useState<Employee[] | null>(null)
-  const [chargementFiches, setChargementFiches] = useState(false)
+  // Fiche individuelle (une personne) et liste du personnel (la sélection)
+  const [fiche, setFiche] = useState<Employee | null>(null)
+  const [liste, setListe] = useState<Employee[] | null>(null)
+  const [chargementListe, setChargementListe] = useState(false)
   const { data: entreprises } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
@@ -100,7 +102,7 @@ export default function EmployesPage() {
       let query = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, situation_familiale, nombre_enfants, photo_path, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
           { count: 'exact' },
         )
         .order('matricule', { ascending: true, nullsFirst: false })
@@ -147,15 +149,15 @@ export default function EmployesPage() {
     return c?.statut === contratFilter
   })
 
-  /** Imprime la fiche de tous les employés correspondant aux filtres actuels,
-   *  et pas seulement ceux de la page affichée. */
+  /** Liste du personnel : tous les employés correspondant aux filtres
+   *  actuels, et pas seulement ceux de la page affichée. */
   const imprimerSelection = async () => {
-    setChargementFiches(true)
+    setChargementListe(true)
     try {
       let q = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, situation_familiale, nombre_enfants, photo_path, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
         )
         .order('matricule', { ascending: true, nullsFirst: false })
         .limit(500)
@@ -174,11 +176,21 @@ export default function EmployesPage() {
       else if (statutFilter === 'sorti') q = q.eq('actif', false)
       const { data: rows, error } = await q
       if (error) throw error
-      setFiches(rows as Employee[])
+      setListe(rows as Employee[])
     } finally {
-      setChargementFiches(false)
+      setChargementListe(false)
     }
   }
+
+  /** Ce qui a été filtré, pour le rappeler en tête de la liste imprimée. */
+  const intituleListe = [
+    principalFilter ? principaux?.find((p) => p.id === principalFilter)?.name : null,
+    siteFilter ? sites?.find((s) => s.id === siteFilter)?.name : null,
+    qualifFilter || null,
+    villeFilter || null,
+    modeFilter || null,
+    statutFilter === 'sorti' ? 'Employés sortis' : null,
+  ].filter(Boolean).join(' · ')
 
   const resetPage = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v)
@@ -219,11 +231,11 @@ export default function EmployesPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={imprimerSelection}
-            disabled={chargementFiches || !data?.count}
-            title="Imprimer la fiche de tous les employés correspondant aux filtres"
+            disabled={chargementListe || !data?.count}
+            title="Liste de tous les employés correspondant aux filtres, regroupés par site"
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
           >
-            {chargementFiches ? 'Préparation…' : `Imprimer les fiches${data ? ` (${data.count})` : ''}`}
+            {chargementListe ? 'Préparation…' : `Imprimer la liste${data ? ` (${data.count})` : ''}`}
           </button>
           <button
             onClick={() => setAdding(true)}
@@ -420,7 +432,7 @@ export default function EmployesPage() {
                     <td className="sticky right-0 bg-inherit px-4 py-3 text-right">
                       <div className="flex justify-end gap-1.5">
                         <button
-                          onClick={() => setFiches([emp])}
+                          onClick={() => setFiche(emp)}
                           title="Imprimer la fiche de cet employé"
                           className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
                         >
@@ -456,13 +468,23 @@ export default function EmployesPage() {
         />
       )}
 
-      {fiches && fiches.length > 0 && (
+      {fiche && (
         <FichePrint
-          employees={fiches}
+          employees={[fiche]}
           entreprise={company?.name ?? ''}
           sites={sites ?? []}
-          contrats={contrats}
-          onClose={() => setFiches(null)}
+          onClose={() => setFiche(null)}
+        />
+      )}
+
+      {liste && liste.length > 0 && (
+        <ListePrint
+          employees={liste}
+          entreprise={company?.name ?? ''}
+          sites={sites ?? []}
+          principaux={principaux ?? []}
+          intitule={intituleListe || undefined}
+          onClose={() => setListe(null)}
         />
       )}
 
@@ -515,6 +537,7 @@ function EmployeeFormModal({
     banque: employee?.banque ?? '',
     salaire: employee?.salaire?.toString() ?? '',
     heures_par_jour: employee?.heures_par_jour?.toString() ?? '8',
+    dette: employee?.dette?.toString() ?? '0',
     situation_familiale: employee?.situation_familiale ?? '',
     nombre_enfants: employee?.nombre_enfants?.toString() ?? '0',
     statut: employee && !employee.actif ? 'sorti' : 'actif',
@@ -548,6 +571,7 @@ function EmployeeFormModal({
         banque: form.banque.trim() || null,
         salaire: form.salaire.trim() ? Number(form.salaire) : null,
         heures_par_jour: form.heures_par_jour.trim() ? Number(form.heures_par_jour) : null,
+        dette: Math.max(0, Number(form.dette) || 0),
         situation_familiale: form.situation_familiale || null,
         // Un célibataire n'a pas d'enfants à déclarer ici
         nombre_enfants: SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale)
@@ -733,6 +757,20 @@ function EmployeeFormModal({
               <input type="text" value={form.rib} onChange={(e) => set('rib')(e.target.value)} className={inputCls} placeholder="24 chiffres" />
             ))}
           </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-slate-700">Dette (DH)</span>
+              <input
+                type="number" min="0" step="0.01" value={form.dette}
+                onChange={(e) => set('dette')(e.target.value)}
+                className={inputCls} placeholder="0"
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                Ce que l’employé doit encore. Dans la paie, vous saisissez le montant à retenir
+                ce mois-ci ; à la validation, ce solde baisse d’autant.
+              </span>
+            </label>
+          </div>
 
           <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
             <p className="text-sm font-semibold text-slate-700">Statut</p>
@@ -786,7 +824,7 @@ interface ApercuSuppression {
   photos: number
   contrats: number
   conges: number
-  dettes: number
+  documents: number
   dette_restante: number
   lignes_paie: number
   mois_de_paie: string[]
@@ -870,11 +908,12 @@ function SupprimerEmploye({
             <li>{apercu.pointages} pointage(s){apercu.photos > 0 && `, dont ${apercu.photos} avec photo`}</li>
             <li>{apercu.contrats} contrat(s)</li>
             <li>{apercu.conges} congé(s)</li>
-            <li>
-              {apercu.dettes} dette(s)
-              {Number(apercu.dette_restante) > 0 &&
-                ` — dont ${formatDH(apercu.dette_restante)} encore dus`}
-            </li>
+            <li>{apercu.documents} document(s) signé(s)</li>
+            {Number(apercu.dette_restante) > 0 && (
+              <li>
+                une dette de <strong>{formatDH(apercu.dette_restante)}</strong> encore due
+              </li>
+            )}
           </ul>
           <p className="mt-2 text-sm text-red-800">
             Si cet employé a réellement travaillé, préférez le statut <strong>« Sorti »</strong>.
