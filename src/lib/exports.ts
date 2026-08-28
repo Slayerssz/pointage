@@ -52,7 +52,7 @@ export async function exporterPaieExcel(opts: {
   // En-têtes
   const colonnes = [
     'Matricule', 'Nom & Prénom', 'Site', 'Qualification', 'CIN', 'CNSS',
-    'Salaire de base', 'Base (j)', 'Gardes', 'Congé', 'Malade', 'Sans solde',
+    'Salaire de base', 'Base (j)', 'Gardes', 'Congé', 'Malade',
     'Jours payés', 'Heures', 'Salaire brut', 'Prime', 'Retenue dette',
     'Autres retenues', 'NET À PAYER', 'Règlement', 'Banque', 'RIB', 'Observations',
   ]
@@ -71,7 +71,6 @@ export async function exporterPaieExcel(opts: {
       { type: Number, value: Number(l.gardes_travaillees) },
       { type: Number, value: Number(l.jours_conge) },
       { type: Number, value: Number(l.jours_maladie) },
-      { type: Number, value: Number(l.jours_sans_solde) },
       { type: Number, value: Number(l.jours_payes), fontWeight: 'bold' },
       { type: Number, value: l.heures_effectuees == null ? undefined : Number(l.heures_effectuees) },
       { ...money, value: Number(l.salaire_brut) },
@@ -128,7 +127,7 @@ export async function exporterPaieExcel(opts: {
 
   const columns = [
     { width: 11 }, { width: 30 }, { width: 24 }, { width: 20 }, { width: 12 }, { width: 14 },
-    { width: 15 }, { width: 9 }, { width: 9 }, { width: 9 }, { width: 9 }, { width: 11 },
+    { width: 15 }, { width: 9 }, { width: 9 }, { width: 9 }, { width: 9 },
     { width: 12 }, { width: 10 }, { width: 15 }, { width: 12 }, { width: 14 },
     { width: 15 }, { width: 16 }, { width: 13 }, { width: 20 }, { width: 28 }, { width: 26 },
   ]

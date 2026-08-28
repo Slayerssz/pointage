@@ -1,6 +1,6 @@
 /** Types de garde et d'absence choisis par le validateur. */
 
-export type TypeGarde = 'X05' | 'X' | 'X15' | 'XX' | 'RT' | 'M' | 'C' | 'CS' | 'AJ'
+export type TypeGarde = 'X05' | 'X' | 'X15' | 'XX' | 'RT' | 'M' | 'C'
 
 export interface GardeInfo {
   code: TypeGarde
@@ -22,8 +22,6 @@ export const TYPES_GARDE: GardeInfo[] = [
   { code: 'RT', symbole: 'RT', label: 'Repos travaillé', valeur: 1, absence: false, couleur: 'bg-teal-600 text-white' },
   { code: 'M', symbole: 'M', label: 'Malade (absence approuvée)', valeur: 1, absence: true, couleur: 'bg-violet-500 text-white' },
   { code: 'C', symbole: 'C', label: 'Congé payé', valeur: 1, absence: true, couleur: 'bg-sky-500 text-white' },
-  { code: 'CS', symbole: 'CS', label: 'Congé sans solde', valeur: 0, absence: true, couleur: 'bg-slate-400 text-white' },
-  { code: 'AJ', symbole: 'AJ', label: 'Absence justifiée (non payée)', valeur: 0, absence: true, couleur: 'bg-slate-500 text-white' },
 ]
 
 /** Les types que le validateur propose pour un jour travaillé. */

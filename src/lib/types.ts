@@ -117,7 +117,7 @@ export interface ContratCourant {
 
 // --- Congés & absences ------------------------------------------------------
 
-export type TypeConge = 'C' | 'CS' | 'M' | 'AJ'
+export type TypeConge = 'C' | 'M'
 
 export interface Conge {
   id: string
@@ -187,6 +187,7 @@ export interface LignePaie {
   gardes_travaillees: number
   jours_conge: number
   jours_maladie: number
+  /** Colonne héritée : plus alimentée depuis le retrait de CS / AJ. */
   jours_sans_solde: number
   jours_absent: number
   jours_repos: number
