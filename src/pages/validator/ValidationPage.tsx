@@ -22,9 +22,17 @@ import {
   type SiteEmployee,
 } from '../../lib/queries'
 import type { Site } from '../../lib/types'
-import { TYPES_GARDE, gardeSymbole, type TypeGarde } from '../../lib/gardes'
+import {
+  TYPES_ABSENCE,
+  TYPES_TRAVAIL,
+  gardeCouleur,
+  gardeLabel,
+  gardeSymbole,
+  type TypeGarde,
+} from '../../lib/gardes'
 import SiteAccordion from '../../components/SiteAccordion'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import ValidationMois from './ValidationMois'
 
 /** Cellule sélectionnée dans la grille (pour le détail / les actions). */
 interface CellSelection {
@@ -50,7 +58,7 @@ export default function ValidationPage() {
         <div>
           <h1 className="mb-1 text-xl font-semibold text-slate-900">Pointage de la semaine</h1>
           <p className="text-sm text-slate-500">
-            Cliquez sur une case : voir la photo, valider, refuser ou marquer présent.
+            Cliquez sur une case : voir la photo, valider, refuser, ou marquer une absence.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -73,12 +81,16 @@ export default function ValidationPage() {
         </div>
       </div>
 
+      {/* Clôture du mois → bascule vers La Paie */}
+      <ValidationMois companyId={companyId} />
+
       {/* Légende */}
-      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-        <LegendItem cls="bg-emerald-500 text-white" sym="X">Une garde</LegendItem>
-        <LegendItem cls="bg-emerald-500 text-white" sym="X̸">Une garde et demi</LegendItem>
-        <LegendItem cls="bg-emerald-500 text-white" sym="XX">Deux gardes</LegendItem>
-        <LegendItem cls="bg-emerald-500 text-white" sym="RT">Repos travaillé</LegendItem>
+      <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">
+        {[...TYPES_TRAVAIL, ...TYPES_ABSENCE].map((t) => (
+          <LegendItem key={t.code} cls={t.couleur} sym={t.symbole}>
+            {t.label}
+          </LegendItem>
+        ))}
         <LegendItem cls="bg-amber-400 text-white" sym="!">Photo à valider</LegendItem>
         <LegendItem cls="bg-red-500 text-white" sym="✕">Refusé</LegendItem>
         <LegendItem cls="bg-blue-400 text-white" sym="R">Jour de repos</LegendItem>
@@ -104,9 +116,7 @@ export default function ValidationPage() {
         />
       )}
 
-      {selection && (
-        <CellModal selection={selection} onClose={() => setSelection(null)} />
-      )}
+      {selection && <CellModal selection={selection} onClose={() => setSelection(null)} />}
     </div>
   )
 }
@@ -114,7 +124,7 @@ export default function ValidationPage() {
 function LegendItem({ cls, sym, children }: { cls: string; sym: string; children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={`flex h-4 w-5 items-center justify-center rounded text-[10px] font-bold ${cls}`}>
+      <span className={`flex h-4 w-6 items-center justify-center rounded text-[10px] font-bold ${cls}`}>
         {sym}
       </span>
       {children}
@@ -228,12 +238,12 @@ function DayCell({
 }) {
   let cls = 'bg-slate-100 text-slate-400'
   let label = '–'
-  let title = 'Absent — cliquer pour marquer présent'
+  let title = 'Absent — cliquer pour marquer présent ou justifier'
 
   if (pointage?.status === 'validated') {
-    cls = 'bg-emerald-500 text-white'
+    cls = gardeCouleur(pointage.type_garde)
     label = gardeSymbole(pointage.type_garde)
-    title = 'Présent (validé) — cliquer pour changer le type'
+    title = `${gardeLabel(pointage.type_garde)} — cliquer pour modifier`
   } else if (pointage?.status === 'pending') {
     cls = 'bg-amber-400 text-white animate-pulse'
     label = '!'
@@ -254,7 +264,7 @@ function DayCell({
     <button
       onClick={onClick}
       title={title}
-      className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold transition hover:scale-110 ${cls}`}
+      className={`inline-flex h-7 w-8 items-center justify-center rounded-lg text-xs font-bold transition hover:scale-110 ${cls}`}
     >
       {label}
     </button>
@@ -274,6 +284,7 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['site-week-pointages', site.id] })
     queryClient.invalidateQueries({ queryKey: ['site-pointages', site.id] })
+    queryClient.invalidateQueries({ queryKey: ['employees'] })
   }
 
   const decide = useMutation({
@@ -302,13 +313,24 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
     onSuccess: invalidate,
   })
 
-  const marquerPresent = useMutation({
+  const marquer = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('marquer_present', {
         p_employee_id: employee.id,
         p_date: date,
         p_type: type,
       })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidate()
+      onClose()
+    },
+  })
+
+  const supprimer = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('supprimer_pointage', { p_pointage_id: pointage!.id })
       if (error) throw error
     },
     onSuccess: () => {
@@ -330,12 +352,39 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
     },
   })
 
-  const mutationError = decide.error ?? marquerPresent.error ?? changerType.error
+  const mutationError =
+    decide.error ?? marquer.error ?? changerType.error ?? supprimer.error
+  const estConge = Boolean(pointage?.conge_id)
+
+  const boutonType = (t: (typeof TYPES_TRAVAIL)[number]) => {
+    const active = type === t.code
+    return (
+      <button
+        key={t.code}
+        title={`${t.label} (${t.valeur.toLocaleString('fr-FR')} garde)`}
+        disabled={estConge}
+        onClick={() => {
+          setType(t.code)
+          if (pointage?.status === 'validated') changerType.mutate(t.code)
+        }}
+        className={`rounded-lg border px-2 py-2 text-center transition disabled:opacity-40 ${
+          active
+            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+            : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        <span className="block text-base font-bold">{t.symbole}</span>
+        <span className="block text-[10px] leading-tight">
+          {t.valeur.toLocaleString('fr-FR')} g.
+        </span>
+      </button>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold text-slate-900">{employee.nom_prenom}</h2>
@@ -343,14 +392,20 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
           {site.name} · {formatDateFr(date)}
           {pointage && (
             <>
-              {' '}
-              ·{' '}
+              {' '}·{' '}
               {pointage.photo_path
                 ? `Pointé à ${formatTimeFr(pointage.pointed_at)}`
-                : 'Présence marquée par le bureau'}
+                : 'Saisi par le bureau'}
             </>
           )}
         </p>
+
+        {estConge && (
+          <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
+            Ce jour fait partie d’un congé enregistré. Pour le modifier, passez par la fiche
+            de l’employé (onglet Employés → Congés).
+          </div>
+        )}
 
         {pointage?.photo_path && photoUrl && (
           <button onClick={() => setZoom(true)} className="mb-4 block w-full">
@@ -365,46 +420,21 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
           <div className="mb-4 h-40 w-full animate-pulse rounded-xl bg-slate-200" />
         )}
 
-        {!pointage && employee.jour_de_repos != null && (
+        {!pointage && employee.jour_de_repos != null && isReposDay && (
           <p className="mb-3 text-sm text-blue-600">
             Jour de repos de cet employé : {jourDeReposLabel(employee.jour_de_repos)}
           </p>
         )}
 
-        {/* Sélecteur de type de garde : à l'acceptation, à la présence manuelle,
-            ou pour changer un pointage déjà validé. */}
         {pointage?.status !== 'refused' && (
           <div className="mb-4">
-            <p className="mb-1.5 text-sm font-medium text-slate-700">Type de garde</p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {TYPES_GARDE.map((t) => {
-                const active = type === t.code
-                return (
-                  <button
-                    key={t.code}
-                    title={`${t.label} (${t.valeur.toLocaleString('fr-FR')})`}
-                    onClick={() => {
-                      setType(t.code)
-                      // Si déjà validé, changer immédiatement le type
-                      if (pointage?.status === 'validated') changerType.mutate(t.code)
-                    }}
-                    className={`rounded-lg border px-2 py-2 text-center transition ${
-                      active
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="block text-base font-bold">{t.symbole}</span>
-                    <span className="block text-[10px] leading-tight">
-                      {t.valeur.toLocaleString('fr-FR')} g.
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <p className="mt-1.5 text-xs text-slate-500">
-              {TYPES_GARDE.find((t) => t.code === type)?.label}
-            </p>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">Jour travaillé</p>
+            <div className="grid grid-cols-5 gap-1.5">{TYPES_TRAVAIL.map(boutonType)}</div>
+
+            <p className="mb-1.5 mt-3 text-sm font-medium text-slate-700">Absence approuvée</p>
+            <div className="grid grid-cols-4 gap-1.5">{TYPES_ABSENCE.map(boutonType)}</div>
+
+            <p className="mt-2 text-xs text-slate-500">{gardeLabel(type)}</p>
           </div>
         )}
 
@@ -421,6 +451,18 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
           >
             Fermer
           </button>
+
+          {/* Supprimer un jour saisi à la main (hors congé) */}
+          {pointage?.status === 'validated' && !pointage.photo_path && !estConge && (
+            <button
+              onClick={() => supprimer.mutate()}
+              disabled={supprimer.isPending}
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              {supprimer.isPending ? '…' : 'Supprimer'}
+            </button>
+          )}
+
           {pointage?.status === 'pending' && (
             <>
               <button
@@ -439,13 +481,14 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
               </button>
             </>
           )}
+
           {(!pointage || pointage.status === 'refused') && (
             <button
-              onClick={() => marquerPresent.mutate()}
-              disabled={marquerPresent.isPending}
+              onClick={() => marquer.mutate()}
+              disabled={marquer.isPending}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              {marquerPresent.isPending ? '…' : `Marquer présent (${gardeSymbole(type)})`}
+              {marquer.isPending ? '…' : `Enregistrer (${gardeSymbole(type)})`}
             </button>
           )}
         </div>

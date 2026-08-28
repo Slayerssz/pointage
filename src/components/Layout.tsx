@@ -29,6 +29,27 @@ const ICONS = {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
+  paie: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  bulletins: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6M8 13h8M8 17h5" />
+    </svg>
+  ),
+  sites: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  entreprises: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M3 21h18M5 21V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14M9 9h2m2 0h2M9 13h2m2 0h2M9 17h2m2 0h2" />
+    </svg>
+  ),
 }
 
 export default function Layout() {
@@ -55,14 +76,24 @@ export default function Layout() {
           { to: `/c/${companyId}/analytics`, label: 'Analytics', icon: ICONS.analytics },
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
           { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+          { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
+          { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
+          { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
+          { to: `/c/${companyId}/entreprises`, label: 'Entreprises', icon: ICONS.entreprises },
           { to: `/c/${companyId}/utilisateurs`, label: 'Utilisateurs', icon: ICONS.users },
         ]
       : profile?.role === 'validator'
         ? [
             { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
             { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+            { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           ]
-        : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
+        : profile?.role === 'paie'
+          ? [
+              { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
+              { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
+            ]
+          : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
 
   const navItem = (tab: (typeof tabs)[number]) => (
     <NavLink
@@ -102,7 +133,7 @@ export default function Layout() {
             <p className="text-xs text-slate-400">Pointage</p>
           </div>
         </Link>
-        <nav className="flex flex-1 flex-col gap-1">{tabs.map(navItem)}</nav>
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">{tabs.map(navItem)}</nav>
         <div className="border-t border-slate-800 pt-3">
           <p className="truncate px-1 text-xs text-slate-400">
             {profile?.full_name || profile?.username}
@@ -112,7 +143,9 @@ export default function Layout() {
                 ? 'admin'
                 : profile?.role === 'validator'
                   ? 'validateur'
-                  : 'agent'}
+                  : profile?.role === 'paie'
+                    ? 'paie'
+                    : 'agent'}
               )
             </span>
           </p>
@@ -149,13 +182,13 @@ export default function Layout() {
       </header>
 
       {/* Bottom nav (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-around overflow-x-auto border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] md:hidden">
         {tabs.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium ${
+              `flex min-w-16 flex-1 shrink-0 flex-col items-center gap-0.5 py-2.5 text-xs font-medium ${
                 isActive ? 'text-emerald-400' : 'text-slate-400'
               }`
             }

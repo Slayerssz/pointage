@@ -9,3 +9,41 @@ body {
   color: var(--color-slate-900);
   -webkit-font-smoothing: antialiased;
 }
+
+/* ------------------------------------------------------------------
+   Impression d'un document (contrat de travail)
+
+   Quand la fenêtre d'impression est ouverte, <body> reçoit la classe
+   « impression » : tout est masqué sauf le document lui-même, qui est
+   sorti du flux pour occuper seul la ou les pages.
+   ------------------------------------------------------------------ */
+@media print {
+  body.impression * {
+    visibility: hidden;
+  }
+
+  body.impression .document-imprimable,
+  body.impression .document-imprimable * {
+    visibility: visible;
+  }
+
+  body.impression .document-imprimable {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+}
