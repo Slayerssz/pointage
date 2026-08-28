@@ -1,81 +1,48 @@
 -- ============================================================================
---  MISE À JOUR « PAIE & CONTRATS » — BLOC 1 sur 4
+--  021 — CORRECTIF DE SÉCURITÉ  ⚠️  À EXÉCUTER SANS ATTENDRE
 --  ============================================================
---  À exécuter dans : Supabase → SQL Editor → coller → Run
+--  Supabase → SQL Editor → coller → Run
 --
---  ⚠️  ORDRE OBLIGATOIRE : BLOC 1, puis BLOC 2, puis BLOC 3, puis BLOC 4.
---      Attendez le « Success » de chaque bloc avant de lancer le suivant.
+--  LE PROBLÈME
+--  Les contrôles de rôle que j'ai écrits dans les blocs précédents
+--  s'écrivaient « if role not in ('validator','admin') then refuser ».
+--  Pour un appelant sans profil (clé publique, non connecté), ce rôle
+--  vaut NULL ; or en PL/pgSQL « NULL not in (...) » vaut NULL, et un
+--  « if NULL » ne se déclenche jamais. Le refus était donc silencieusement
+--  ignoré : n'importe qui disposant de la clé publique — celle qui figure
+--  dans le dépôt GitHub public — pouvait appeler ces fonctions.
 --
---  Ce fichier = migrations 015 + 016 + 017
+--  LA CORRECTION
+--  Le rôle est désormais ramené à '' quand il est absent, ce qui déclenche
+--  le refus. Toutes les fonctions concernées sont redéfinies ci-dessous.
+--
+--  Ce fichier supprime aussi le compte « __sonde__ », créé par erreur
+--  pendant mes vérifications — c'est lui qui a révélé la faille.
 -- ============================================================================
 
--- ============================================================
--- 015 — Heures mensuelles, paramètres de paie et contrats
--- À exécuter après 014_types_garde.sql
---
--- 1. Chaque employé a un nombre d'heures mensuelles à faire.
--- 2. Chaque entreprise a ses paramètres de paie (base 26 jours…).
--- 3. Table des contrats : début / fin, impression PDF, alertes
---    bleu (fin dans ≤ 10 jours) et jaune (contrat terminé).
--- ============================================================
+-- 1. Garde-fou réutilisable, sûr face à NULL ---------------------------------
 
--- 1. Heures de travail par jour ----------------------------------------------
--- Durée d'une garde normale, en heures (ex. 8).
--- Le nombre d'heures d'un jour suit le type de garde :
---   ½  = 0,5 garde → 4 h      X   = 1 garde   → 8 h
---   X̸  = 1,5 garde → 12 h     XX  = 2 gardes  → 16 h
--- Le salaire journalier, lui, vaut salaire mensuel / jours_base (26).
-
-alter table public.employees
-  add column if not exists heures_par_jour numeric(5, 2) default 8;
-
--- 2. Paramètres de paie par entreprise --------------------------------------
-
-create table if not exists public.parametres_paie (
-  company_id uuid primary key references public.companies(id) on delete cascade,
-  -- Nombre de jours qui correspond au salaire complet (26 par défaut)
-  jours_base numeric(5, 2) not null default 26 check (jours_base > 0),
-  -- Un jour « Malade » est-il payé (compté comme un jour travaillé) ?
-  maladie_payee boolean not null default true,
-  -- Un jour de congé est-il payé (compté comme un jour travaillé) ?
-  conge_paye boolean not null default true,
-  -- Heures par jour par défaut pour les nouveaux employés
-  heures_par_jour_defaut numeric(5, 2) default 8,
-  devise text not null default 'DH',
-  updated_at timestamptz not null default now()
-);
-
--- Une ligne de paramètres pour chaque entreprise existante
-insert into public.parametres_paie (company_id)
-  select id from public.companies
-  on conflict (company_id) do nothing;
-
--- …et pour chaque nouvelle entreprise créée ensuite
-create or replace function public.companies_after_insert()
-returns trigger
+create or replace function public.exiger_role(variadic p_roles text[])
+returns void
 language plpgsql
+stable
 security definer
 set search_path = public
 as $$
+declare
+  v text := coalesce(public.current_user_role()::text, '');
 begin
-  insert into public.parametres_paie (company_id) values (new.id)
-    on conflict (company_id) do nothing;
-  return new;
+  if not (v = any(p_roles)) then
+    raise exception 'Action réservée à : %. Rôle actuel : %.',
+      array_to_string(p_roles, ', '), coalesce(nullif(v, ''), 'aucun (non connecté)');
+  end if;
 end;
 $$;
 
-drop trigger if exists companies_after_insert on public.companies;
-create trigger companies_after_insert
-  after insert on public.companies
-  for each row execute function public.companies_after_insert();
+revoke all on function public.exiger_role(text[]) from public;
+grant execute on function public.exiger_role(text[]) to authenticated;
 
-alter table public.parametres_paie enable row level security;
-
-drop policy if exists parametres_paie_select on public.parametres_paie;
-create policy parametres_paie_select on public.parametres_paie
-  for select to authenticated using (true);
-
--- La modification passe par la fonction maj_parametres_paie() ci-dessous.
+-- 2. Redéfinition des fonctions avec une garde sûre ---------------------------
 
 create or replace function public.maj_parametres_paie(
   p_company uuid,
@@ -113,235 +80,6 @@ $$;
 
 revoke all on function public.maj_parametres_paie(uuid, numeric, boolean, boolean, numeric) from public;
 grant execute on function public.maj_parametres_paie(uuid, numeric, boolean, boolean, numeric) to authenticated;
-
--- 3. Contrats ----------------------------------------------------------------
-
-create table if not exists public.contrats (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  employee_id uuid not null references public.employees(id) on delete cascade,
-  numero text,
-  type_contrat text not null default 'CDI'
-    check (type_contrat in ('CDI', 'CDD', 'ANAPEC', 'STAGE', 'INTERIM', 'ESSAI')),
-  date_debut date not null,
-  -- null = durée indéterminée (CDI) : aucune alerte de fin
-  date_fin date,
-  periode_essai_jours integer default 0 check (periode_essai_jours >= 0),
-  poste text,
-  lieu_travail text,
-  salaire_mensuel numeric(10, 2),
-  heures_par_jour numeric(5, 2),
-  mode_reglement text,
-  -- Signature
-  signe_a text,
-  signe_le date,
-  representant_employeur text,
-  observations text,
-  -- Un contrat archivé n'entre plus dans le calcul des alertes
-  archive boolean not null default false,
-  created_at timestamptz not null default now(),
-  created_by uuid references auth.users(id),
-  check (date_fin is null or date_fin >= date_debut)
-);
-
-create index if not exists contrats_employee_idx on public.contrats (employee_id, date_debut desc);
-create index if not exists contrats_company_idx on public.contrats (company_id);
-create index if not exists contrats_fin_idx on public.contrats (date_fin) where date_fin is not null;
-
--- Numéro de contrat automatique : CT-<année>-<n°> par entreprise
-create or replace function public.contrats_before_insert()
-returns trigger
-language plpgsql
-as $$
-declare
-  v_n integer;
-begin
-  new.created_by := coalesce(new.created_by, auth.uid());
-  if new.numero is null or trim(new.numero) = '' then
-    select count(*) + 1 into v_n
-      from public.contrats
-      where company_id = new.company_id
-        and date_part('year', date_debut) = date_part('year', new.date_debut);
-    new.numero := 'CT-' || to_char(new.date_debut, 'YYYY') || '-' || lpad(v_n::text, 4, '0');
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists contrats_before_insert on public.contrats;
-create trigger contrats_before_insert
-  before insert on public.contrats
-  for each row execute function public.contrats_before_insert();
-
--- Statut d'un contrat, pour la couleur affichée dans l'application :
---   'termine'  → JAUNE  (date de fin dépassée)
---   'bientot'  → BLEU   (se termine dans 10 jours ou moins)
---   'actif'    → normal
---   'a_venir'  → commence plus tard
-create or replace function public.contrat_statut(p_debut date, p_fin date, p_ref date default null)
-returns text
-language sql
-immutable
-as $$
-  select case
-    when p_fin is not null and p_fin < coalesce(p_ref, current_date) then 'termine'
-    when p_debut > coalesce(p_ref, current_date) then 'a_venir'
-    when p_fin is not null
-     and p_fin - coalesce(p_ref, current_date) between 0 and 10 then 'bientot'
-    else 'actif'
-  end;
-$$;
-
-grant execute on function public.contrat_statut(date, date, date) to authenticated;
-
-alter table public.contrats enable row level security;
-
-drop policy if exists contrats_select on public.contrats;
-create policy contrats_select on public.contrats
-  for select to authenticated using (true);
-
-drop policy if exists contrats_insert on public.contrats;
-create policy contrats_insert on public.contrats
-  for insert to authenticated
-  with check (public.current_user_role()::text in ('validator', 'admin'));
-
-drop policy if exists contrats_update on public.contrats;
-create policy contrats_update on public.contrats
-  for update to authenticated
-  using (public.current_user_role()::text in ('validator', 'admin'))
-  with check (true);
-
-drop policy if exists contrats_delete on public.contrats;
-create policy contrats_delete on public.contrats
-  for delete to authenticated
-  using (public.current_user_role()::text in ('validator', 'admin'));
-
--- Contrat courant de chaque employé (le plus récent non archivé) + son statut.
-drop view if exists public.contrats_courants;
-create view public.contrats_courants
-  with (security_invoker = on) as
-  select distinct on (c.employee_id)
-    c.id, c.employee_id, c.company_id, c.numero, c.type_contrat,
-    c.date_debut, c.date_fin, c.poste, c.salaire_mensuel,
-    public.contrat_statut(c.date_debut, c.date_fin) as statut,
-    case when c.date_fin is null then null
-         else c.date_fin - (now() at time zone 'Africa/Casablanca')::date end as jours_restants
-  from public.contrats c
-  where not c.archive
-  order by c.employee_id, c.date_debut desc, c.created_at desc;
-
-grant select on public.contrats_courants to authenticated;
-
-
--- ============================================================
--- 016 — Absences justifiées : Malade et Congé
--- À exécuter après 015_heures_contrats.sql
---
--- Nouveaux types de garde :
---   X05 = Demi-garde         → une demi-journée travaillée (0,5)
---   M  = Malade              → absence approuvée (payée par défaut)
---   C  = Congé payé          → compte comme une garde travaillée
---   CS = Congé sans solde    → absence approuvée, non payée
---   AJ = Absence justifiée   → absence approuvée, non payée (autre motif)
---
--- Le congé se saisit sur une période (du … au …) : les jours sont
--- alors créés automatiquement dans le pointage.
--- ============================================================
-
--- 0. Garde-fou « mois de paie verrouillé » -------------------------------------
--- Version provisoire : remplacée par la vraie implémentation dans 017_paie.sql.
--- (Définie ici pour que les fonctions ci-dessous puissent l'appeler.)
-
-create or replace function public.assert_mois_ouvert(p_company uuid, p_date date)
-returns void
-language plpgsql
-as $$
-begin
-  return;
-end;
-$$;
-
-grant execute on function public.assert_mois_ouvert(uuid, date) to authenticated;
-
--- 1. Nouveaux codes de type de garde ----------------------------------------
-
-alter table public.pointages drop constraint if exists pointages_type_garde_check;
-alter table public.pointages
-  add constraint pointages_type_garde_check
-  check (type_garde in ('X05', 'X', 'X15', 'XX', 'RT', 'M', 'C', 'CS', 'AJ'));
-
--- Valeur en gardes (compteur « jours travaillés » de la fiche employé).
--- Le calcul de la paie, lui, applique les paramètres de l'entreprise
--- (maladie_payee / conge_paye) — voir 017_paie.sql.
-create or replace function public.garde_valeur(p_type text)
-returns numeric
-language sql
-immutable
-as $$
-  select case p_type
-    when 'X05' then 0.5   -- demi-garde
-    when 'X'   then 1
-    when 'X15' then 1.5
-    when 'XX'  then 2
-    when 'RT'  then 1
-    when 'M'   then 1     -- malade : payé par défaut
-    when 'C'   then 1     -- congé payé
-    when 'CS'  then 0     -- congé sans solde
-    when 'AJ'  then 0     -- absence justifiée non payée
-    else 0
-  end::numeric;
-$$;
-
--- Un type de garde est-il une absence approuvée (≠ travail effectif) ?
-create or replace function public.garde_est_absence(p_type text)
-returns boolean
-language sql
-immutable
-as $$
-  select p_type in ('M', 'C', 'CS', 'AJ');
-$$;
-
-grant execute on function public.garde_est_absence(text) to authenticated;
-
--- 2. Congés (périodes) --------------------------------------------------------
-
-create table if not exists public.conges (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  employee_id uuid not null references public.employees(id) on delete cascade,
-  type text not null default 'C' check (type in ('C', 'CS', 'M', 'AJ')),
-  date_debut date not null,
-  date_fin date not null,
-  motif text,
-  -- Nombre de jours effectivement créés dans le pointage
-  jours integer not null default 0,
-  created_at timestamptz not null default now(),
-  created_by uuid references auth.users(id),
-  check (date_fin >= date_debut)
-);
-
-create index if not exists conges_employee_idx on public.conges (employee_id, date_debut desc);
-create index if not exists conges_company_idx on public.conges (company_id, date_debut desc);
-
-alter table public.conges enable row level security;
-
-drop policy if exists conges_select on public.conges;
-create policy conges_select on public.conges
-  for select to authenticated using (true);
-
--- Création / suppression uniquement par les fonctions ci-dessous.
-
--- Lien pointage → congé, pour pouvoir tout annuler d'un coup.
-alter table public.pointages
-  add column if not exists conge_id uuid references public.conges(id) on delete cascade;
-
-create index if not exists pointages_conge_idx on public.pointages (conge_id)
-  where conge_id is not null;
-
--- 3. Marquer un jour (présence, maladie, congé…) ------------------------------
--- Remplace marquer_present() en acceptant les nouveaux codes.
-
-drop function if exists public.marquer_present(uuid, date, text);
 
 create or replace function public.marquer_present(
   p_employee_id uuid,
@@ -402,8 +140,6 @@ $$;
 revoke all on function public.marquer_present(uuid, date, text) from public;
 grant execute on function public.marquer_present(uuid, date, text) to authenticated;
 
--- 4. Supprimer un jour marqué manuellement -------------------------------------
-
 create or replace function public.supprimer_pointage(p_pointage_id uuid)
 returns void
 language plpgsql
@@ -449,11 +185,6 @@ $$;
 
 revoke all on function public.supprimer_pointage(uuid) from public;
 grant execute on function public.supprimer_pointage(uuid) to authenticated;
-
--- 5. Créer un congé sur une période ---------------------------------------------
--- Crée un pointage validé (type C / CS / M / AJ) pour chaque jour de la période.
--- Le jour de repos hebdomadaire de l'employé est ignoré (il ne consomme pas
--- de jour de congé) ; les jours déjà pointés sont laissés tels quels.
 
 create or replace function public.creer_conge(
   p_employee_id uuid,
@@ -546,8 +277,6 @@ $$;
 revoke all on function public.creer_conge(uuid, date, date, text, text) from public;
 grant execute on function public.creer_conge(uuid, date, date, text, text) to authenticated;
 
--- 6. Supprimer un congé (et les jours de pointage qu'il a créés) ------------------
-
 create or replace function public.supprimer_conge(p_conge_id uuid)
 returns void
 language plpgsql
@@ -591,214 +320,6 @@ $$;
 
 revoke all on function public.supprimer_conge(uuid) from public;
 grant execute on function public.supprimer_conge(uuid) to authenticated;
-
-
--- ============================================================
--- 017 — La Paie
--- À exécuter après 016_absences_conges.sql
---
--- Cycle d'un mois :
---   1. ouvert                → le pointage se saisit normalement
---   2. valider_pointage_mois → le mois est figé et bascule en paie
---   3. la paie s'ajuste (dettes, primes, retenues) puis valider_paie
---   4. paie_validee          → plus aucune modification possible
---   5. demander_reouverture  → une demande part vers l'administrateur
---   6. approuver_reouverture → l'admin rouvre le mois
--- ============================================================
-
-do $$
-begin
-  if not exists (select 1 from pg_type where typname = 'periode_statut') then
-    create type public.periode_statut as enum (
-      'ouvert',
-      'pointage_valide',
-      'paie_validee',
-      'reouverture_demandee'
-    );
-  end if;
-end $$;
-
--- 1. Dettes / avances de l'employé -------------------------------------------
-
-create table if not exists public.dettes (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  employee_id uuid not null references public.employees(id) on delete cascade,
-  libelle text not null,
-  montant_total numeric(10, 2) not null check (montant_total > 0),
-  montant_rembourse numeric(10, 2) not null default 0 check (montant_rembourse >= 0),
-  date_creation date not null default (now() at time zone 'Africa/Casablanca')::date,
-  soldee boolean not null default false,
-  created_at timestamptz not null default now(),
-  created_by uuid references auth.users(id)
-);
-
-create index if not exists dettes_employee_idx on public.dettes (employee_id) where not soldee;
-create index if not exists dettes_company_idx on public.dettes (company_id);
-
-alter table public.dettes enable row level security;
-
-drop policy if exists dettes_select on public.dettes;
-create policy dettes_select on public.dettes
-  for select to authenticated using (true);
-
-drop policy if exists dettes_insert on public.dettes;
-create policy dettes_insert on public.dettes
-  for insert to authenticated
-  with check (public.current_user_role()::text in ('validator', 'admin', 'paie'));
-
-drop policy if exists dettes_update on public.dettes;
-create policy dettes_update on public.dettes
-  for update to authenticated
-  using (public.current_user_role()::text in ('validator', 'admin', 'paie'))
-  with check (true);
-
-drop policy if exists dettes_delete on public.dettes;
-create policy dettes_delete on public.dettes
-  for delete to authenticated
-  using (public.current_user_role()::text in ('admin', 'paie'));
-
--- 2. Périodes de paie (un mois × une entreprise) -------------------------------
-
-create table if not exists public.periodes_paie (
-  id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
-  annee integer not null check (annee between 2020 and 2100),
-  mois integer not null check (mois between 1 and 12),
-  statut public.periode_statut not null default 'ouvert',
-  -- Paramètres figés au moment de la validation du pointage
-  jours_base numeric(5, 2) not null default 26,
-  maladie_payee boolean not null default true,
-  conge_paye boolean not null default true,
-  -- Traçabilité
-  pointage_valide_par uuid references auth.users(id),
-  pointage_valide_le timestamptz,
-  paie_validee_par uuid references auth.users(id),
-  paie_validee_le timestamptz,
-  reouverture_motif text,
-  reouverture_demandee_par uuid references auth.users(id),
-  reouverture_demandee_le timestamptz,
-  created_at timestamptz not null default now(),
-  unique (company_id, annee, mois)
-);
-
-create index if not exists periodes_paie_company_idx
-  on public.periodes_paie (company_id, annee desc, mois desc);
-
-alter table public.periodes_paie enable row level security;
-
-drop policy if exists periodes_paie_select on public.periodes_paie;
-create policy periodes_paie_select on public.periodes_paie
-  for select to authenticated using (true);
-
--- 3. Lignes de paie (une par employé et par mois) --------------------------------
--- Tout est figé au moment de la génération : si l'employé change de site ou
--- de salaire ensuite, le bulletin déjà validé ne bouge pas.
-
-create table if not exists public.lignes_paie (
-  id uuid primary key default gen_random_uuid(),
-  periode_id uuid not null references public.periodes_paie(id) on delete cascade,
-  employee_id uuid not null references public.employees(id) on delete cascade,
-  -- Instantané de l'employé
-  matricule integer,
-  nom_prenom text not null,
-  cin text,
-  cnss text,
-  site_id uuid,
-  site_nom text,
-  qualification text,
-  mode_reglement text,
-  banque text,
-  rib text,
-  -- Base de calcul
-  salaire_base numeric(10, 2) not null default 0,
-  jours_base numeric(5, 2) not null default 26,
-  heures_par_jour numeric(5, 2),
-  -- Comptage issu du pointage
-  gardes_travaillees numeric(6, 2) not null default 0,
-  jours_conge numeric(6, 2) not null default 0,
-  jours_maladie numeric(6, 2) not null default 0,
-  jours_sans_solde numeric(6, 2) not null default 0,
-  jours_absent numeric(6, 2) not null default 0,
-  jours_repos numeric(6, 2) not null default 0,
-  -- Jours réellement payés (travaillés + congés/maladie si payés)
-  jours_payes numeric(6, 2) not null default 0,
-  heures_effectuees numeric(7, 2),
-  -- Montants
-  salaire_brut numeric(10, 2) not null default 0,
-  prime numeric(10, 2) not null default 0,
-  retenue_dette numeric(10, 2) not null default 0,
-  autres_retenues numeric(10, 2) not null default 0,
-  net_a_payer numeric(10, 2) not null default 0,
-  observations text,
-  unique (periode_id, employee_id)
-);
-
-create index if not exists lignes_paie_periode_idx on public.lignes_paie (periode_id);
-create index if not exists lignes_paie_employee_idx on public.lignes_paie (employee_id);
-
-alter table public.lignes_paie enable row level security;
-
-drop policy if exists lignes_paie_select on public.lignes_paie;
-create policy lignes_paie_select on public.lignes_paie
-  for select to authenticated using (true);
-
--- Les lignes ne se modifient que par maj_ligne_paie() (fonction ci-dessous).
-
--- 4. Remboursements de dette rattachés à un mois -----------------------------------
-
-create table if not exists public.remboursements_dette (
-  id uuid primary key default gen_random_uuid(),
-  dette_id uuid not null references public.dettes(id) on delete cascade,
-  periode_id uuid not null references public.periodes_paie(id) on delete cascade,
-  employee_id uuid not null references public.employees(id) on delete cascade,
-  montant numeric(10, 2) not null check (montant > 0),
-  created_at timestamptz not null default now(),
-  created_by uuid references auth.users(id)
-);
-
-create index if not exists remb_dette_idx on public.remboursements_dette (dette_id);
-create index if not exists remb_periode_idx on public.remboursements_dette (periode_id, employee_id);
-
-alter table public.remboursements_dette enable row level security;
-
-drop policy if exists remb_select on public.remboursements_dette;
-create policy remb_select on public.remboursements_dette
-  for select to authenticated using (true);
-
--- 5. Verrouillage du pointage d'un mois validé --------------------------------------
--- Vraie implémentation (remplace le garde-fou provisoire de 016).
-
-create or replace function public.assert_mois_ouvert(p_company uuid, p_date date)
-returns void
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  v_statut public.periode_statut;
-begin
-  select statut into v_statut
-    from public.periodes_paie
-    where company_id = p_company
-      and annee = date_part('year', p_date)::int
-      and mois = date_part('month', p_date)::int;
-
-  if v_statut is null or v_statut = 'ouvert' then
-    return;
-  end if;
-
-  raise exception 'Le mois % est clôturé (%). Le pointage ne peut plus être modifié — demandez la réouverture à l''administrateur.',
-    to_char(p_date, 'MM/YYYY'), v_statut;
-end;
-$$;
-
-grant execute on function public.assert_mois_ouvert(uuid, date) to authenticated;
-
--- 6. Les fonctions de pointage respectent le verrouillage ----------------------------
-
-drop function if exists public.validate_pointage(uuid, text, text);
 
 create or replace function public.validate_pointage(
   p_pointage_id uuid,
@@ -911,48 +432,6 @@ $$;
 revoke all on function public.changer_type_garde(uuid, text) from public;
 grant execute on function public.changer_type_garde(uuid, text) to authenticated;
 
--- 7. État d'un mois + aperçu avant validation -----------------------------------------
-
-create or replace function public.apercu_mois(p_company uuid, p_annee int, p_mois int)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  v_debut date := make_date(p_annee, p_mois, 1);
-  v_fin date := (make_date(p_annee, p_mois, 1) + interval '1 month - 1 day')::date;
-  v_res jsonb;
-begin
-  select jsonb_build_object(
-    'annee', p_annee,
-    'mois', p_mois,
-    'debut', v_debut,
-    'fin', v_fin,
-    'statut', coalesce((select statut::text from public.periodes_paie
-                        where company_id = p_company and annee = p_annee and mois = p_mois),
-                       'ouvert'),
-    'employes_actifs', (select count(*) from public.employees
-                        where company_id = p_company and actif),
-    'en_attente', (select count(*) from public.pointages
-                   where company_id = p_company and status = 'pending'
-                     and pointed_on between v_debut and v_fin),
-    'valides', (select count(*) from public.pointages
-                where company_id = p_company and status = 'validated'
-                  and pointed_on between v_debut and v_fin),
-    'sans_salaire', (select count(*) from public.employees
-                     where company_id = p_company and actif
-                       and coalesce(salaire, 0) = 0)
-  ) into v_res;
-  return v_res;
-end;
-$$;
-
-grant execute on function public.apercu_mois(uuid, int, int) to authenticated;
-
--- 8. Valider le pointage du mois → génère la paie ---------------------------------------
-
 create or replace function public.valider_pointage_mois(
   p_company uuid,
   p_annee int,
@@ -1031,9 +510,6 @@ $$;
 
 revoke all on function public.valider_pointage_mois(uuid, int, int) from public;
 grant execute on function public.valider_pointage_mois(uuid, int, int) to authenticated;
-
--- 9. Génération (ou régénération) des lignes de paie d'une période -------------------------
--- Les montants saisis à la main (prime, retenues, observations) sont conservés.
 
 create or replace function public.generer_lignes_paie(p_periode uuid)
 returns integer
@@ -1177,8 +653,6 @@ $$;
 revoke all on function public.generer_lignes_paie(uuid) from public;
 grant execute on function public.generer_lignes_paie(uuid) to authenticated;
 
--- 10. Ajuster une ligne de paie (prime, retenue de dette, autres retenues) --------------
-
 create or replace function public.maj_ligne_paie(
   p_ligne uuid,
   p_prime numeric default null,
@@ -1238,8 +712,6 @@ $$;
 
 revoke all on function public.maj_ligne_paie(uuid, numeric, numeric, numeric, text) from public;
 grant execute on function public.maj_ligne_paie(uuid, numeric, numeric, numeric, text) to authenticated;
-
--- 11. Valider la paie du mois → verrouillage + remboursement des dettes -------------------
 
 create or replace function public.valider_paie(p_periode uuid)
 returns void
@@ -1316,8 +788,6 @@ $$;
 
 revoke all on function public.valider_paie(uuid) from public;
 grant execute on function public.valider_paie(uuid) to authenticated;
-
--- 12. Demande de réouverture / approbation par l'administrateur ---------------------------
 
 create or replace function public.demander_reouverture(p_periode uuid, p_motif text)
 returns void
@@ -1419,75 +889,400 @@ $$;
 revoke all on function public.repondre_reouverture(uuid, boolean) from public;
 grant execute on function public.repondre_reouverture(uuid, boolean) to authenticated;
 
--- 13. Bulletin de paie journalier : qui a travaillé, sur quel site, tel jour --------------
-
-create or replace function public.bulletin_journalier(p_company uuid, p_date date)
-returns jsonb
-language sql
-stable
+create or replace function public.admin_creer_entreprise(p_nom text)
+returns uuid
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select coalesce(jsonb_agg(x order by x->>'site'), '[]'::jsonb)
-  from (
-    select jsonb_build_object(
-      'site_id', s.id,
-      'site', s.name,
-      'employes', (
-        select coalesce(jsonb_agg(jsonb_build_object(
-          'employee_id', e.id,
-          'matricule', e.matricule,
-          'nom_prenom', e.nom_prenom,
-          'qualification', e.qualification,
-          'cin', e.cin,
-          'type_garde', p.type_garde,
-          'heure', to_char(p.pointed_at at time zone 'Africa/Casablanca', 'HH24:MI'),
-          'photo', p.photo_path is not null
-        ) order by e.matricule nulls last), '[]'::jsonb)
-        from public.pointages p
-        join public.employees e on e.id = p.employee_id
-        where p.site_id = s.id and p.pointed_on = p_date and p.status = 'validated'
-      )
-    ) as x
-    from public.sites s
-    where s.company_id = p_company and s.pointage_actif
-      and exists (select 1 from public.pointages p
-                  where p.site_id = s.id and p.pointed_on = p_date and p.status = 'validated')
-  ) t;
+declare
+  v_id uuid;
+  v_nom text := trim(p_nom);
+begin
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
+    raise exception 'Seul l''administrateur peut créer une entreprise';
+  end if;
+  if v_nom = '' then
+    raise exception 'Le nom de l''entreprise est obligatoire';
+  end if;
+  if exists (select 1 from public.companies where lower(name) = lower(v_nom)) then
+    raise exception 'Une entreprise porte déjà ce nom';
+  end if;
+
+  insert into public.companies (name) values (v_nom) returning id into v_id;
+  return v_id;
+end;
 $$;
 
-grant execute on function public.bulletin_journalier(uuid, date) to authenticated;
+revoke all on function public.admin_creer_entreprise(text) from public;
+grant execute on function public.admin_creer_entreprise(text) to authenticated;
 
--- 14. Totaux d'une période (pour l'en-tête de l'écran Paie et les exports) ----------------
-
-create or replace function public.totaux_periode(p_periode uuid)
-returns jsonb
-language sql
-stable
+create or replace function public.admin_renommer_entreprise(p_company uuid, p_nom text)
+returns void
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select jsonb_build_object(
-    'employes', count(*),
-    'total_brut', coalesce(sum(salaire_brut), 0),
-    'total_primes', coalesce(sum(prime), 0),
-    'total_dettes', coalesce(sum(retenue_dette), 0),
-    'total_autres_retenues', coalesce(sum(autres_retenues), 0),
-    'total_net', coalesce(sum(net_a_payer), 0),
-    'total_virement', coalesce(sum(net_a_payer) filter (
-      where lower(coalesce(mode_reglement, '')) like 'vir%'), 0),
-    'total_especes', coalesce(sum(net_a_payer) filter (
-      where lower(coalesce(mode_reglement, '')) not like 'vir%'), 0),
-    'par_banque', (
-      select coalesce(jsonb_agg(jsonb_build_object('banque', b, 'n', n, 'montant', m)
-                                order by m desc), '[]'::jsonb)
-      from (select coalesce(nullif(trim(banque), ''), '(non renseignée)') as b,
-                   count(*) as n, sum(net_a_payer) as m
-            from public.lignes_paie where periode_id = p_periode
-              and lower(coalesce(mode_reglement, '')) like 'vir%'
-            group by 1) q)
-  )
-  from public.lignes_paie where periode_id = p_periode;
+declare
+  v_nom text := trim(p_nom);
+begin
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
+    raise exception 'Seul l''administrateur peut modifier une entreprise';
+  end if;
+  if v_nom = '' then
+    raise exception 'Le nom de l''entreprise est obligatoire';
+  end if;
+  if exists (select 1 from public.companies where lower(name) = lower(v_nom) and id <> p_company) then
+    raise exception 'Une entreprise porte déjà ce nom';
+  end if;
+
+  update public.companies set name = v_nom where id = p_company;
+end;
 $$;
 
-grant execute on function public.totaux_periode(uuid) to authenticated;
+revoke all on function public.admin_renommer_entreprise(uuid, text) from public;
+grant execute on function public.admin_renommer_entreprise(uuid, text) to authenticated;
+
+create or replace function public.creer_site(
+  p_company uuid,
+  p_nom text,
+  p_pointage_actif boolean default true
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_nom text := trim(p_nom);
+begin
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin') then
+    raise exception 'Réservé aux validateurs et à l''administrateur';
+  end if;
+  if v_nom = '' then
+    raise exception 'Le nom du site est obligatoire';
+  end if;
+  if exists (select 1 from public.sites
+             where company_id = p_company and lower(name) = lower(v_nom)) then
+    raise exception 'Ce site existe déjà dans cette entreprise';
+  end if;
+
+  insert into public.sites (company_id, name, pointage_actif)
+  values (p_company, v_nom, coalesce(p_pointage_actif, true))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+revoke all on function public.creer_site(uuid, text, boolean) from public;
+grant execute on function public.creer_site(uuid, text, boolean) to authenticated;
+
+create or replace function public.maj_site(
+  p_site uuid,
+  p_nom text,
+  p_pointage_actif boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_company uuid;
+  v_nom text := trim(p_nom);
+begin
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin') then
+    raise exception 'Réservé aux validateurs et à l''administrateur';
+  end if;
+  if v_nom = '' then
+    raise exception 'Le nom du site est obligatoire';
+  end if;
+
+  select company_id into v_company from public.sites where id = p_site;
+  if v_company is null then
+    raise exception 'Site introuvable';
+  end if;
+  if exists (select 1 from public.sites
+             where company_id = v_company and lower(name) = lower(v_nom) and id <> p_site) then
+    raise exception 'Un autre site porte déjà ce nom';
+  end if;
+
+  update public.sites
+    set name = v_nom, pointage_actif = coalesce(p_pointage_actif, true)
+    where id = p_site;
+end;
+$$;
+
+revoke all on function public.maj_site(uuid, text, boolean) from public;
+grant execute on function public.maj_site(uuid, text, boolean) to authenticated;
+
+create or replace function public.supprimer_site(p_site uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin') then
+    raise exception 'Réservé aux validateurs et à l''administrateur';
+  end if;
+  if exists (select 1 from public.employees where site_id = p_site) then
+    raise exception 'Ce site a encore des employés : déplacez-les d''abord';
+  end if;
+
+  delete from public.sites where id = p_site;
+end;
+$$;
+
+revoke all on function public.supprimer_site(uuid) from public;
+grant execute on function public.supprimer_site(uuid) to authenticated;
+
+create or replace function public.admin_creer_utilisateur(
+  p_username text,
+  p_password text,
+  p_full_name text,
+  p_role text
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+declare
+  v_id uuid := gen_random_uuid();
+  v_username text := lower(trim(p_username));
+  v_login_id text := lower(trim(p_username)) || '@pointage.local';
+begin
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
+    raise exception 'Réservé aux administrateurs';
+  end if;
+  if v_username = '' or v_username !~ '^[a-z0-9._-]+$' then
+    raise exception 'Nom d''utilisateur invalide (lettres, chiffres, . _ - ; sans espace)';
+  end if;
+  if length(p_password) < 6 then
+    raise exception 'Le mot de passe doit contenir au moins 6 caractères';
+  end if;
+  if coalesce(p_role, '') not in ('agent', 'validator', 'admin', 'paie') then
+    raise exception 'Rôle invalide';
+  end if;
+  if exists (select 1 from public.profiles where username = v_username) then
+    raise exception 'Ce nom d''utilisateur existe déjà';
+  end if;
+
+  insert into auth.users (
+    instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, recovery_token, email_change_token_new, email_change
+  ) values (
+    '00000000-0000-0000-0000-000000000000', v_id, 'authenticated', 'authenticated',
+    v_login_id, extensions.crypt(p_password, extensions.gen_salt('bf')), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    jsonb_build_object('username', v_username), now(), now(),
+    '', '', '', ''
+  );
+
+  insert into auth.identities (
+    id, user_id, provider_id, identity_data, provider,
+    last_sign_in_at, created_at, updated_at
+  ) values (
+    gen_random_uuid(), v_id, v_id::text,
+    jsonb_build_object('sub', v_id::text, 'email', v_login_id, 'email_verified', true),
+    'email', now(), now(), now()
+  );
+
+  insert into public.profiles (user_id, username, full_name, role)
+  values (v_id, v_username, nullif(trim(p_full_name), ''), p_role::public.user_role);
+
+  return v_username;
+end;
+$$;
+
+revoke all on function public.admin_creer_utilisateur(text, text, text, text) from public;
+grant execute on function public.admin_creer_utilisateur(text, text, text, text) to authenticated;
+
+create or replace function public.admin_modifier_utilisateur(
+  p_user_id uuid,
+  p_full_name text,
+  p_role text,
+  p_password text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+begin
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
+    raise exception 'Réservé aux administrateurs';
+  end if;
+  if coalesce(p_role, '') not in ('agent', 'validator', 'admin', 'paie') then
+    raise exception 'Rôle invalide';
+  end if;
+  if p_user_id = auth.uid() and p_role <> 'admin' then
+    raise exception 'Vous ne pouvez pas retirer votre propre rôle d''administrateur';
+  end if;
+
+  update public.profiles
+    set full_name = nullif(trim(p_full_name), ''), role = p_role::public.user_role
+    where user_id = p_user_id;
+
+  if p_password is not null and length(p_password) >= 6 then
+    update auth.users
+      set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')),
+          updated_at = now()
+      where id = p_user_id;
+  end if;
+end;
+$$;
+
+revoke all on function public.admin_modifier_utilisateur(uuid, text, text, text) from public;
+grant execute on function public.admin_modifier_utilisateur(uuid, text, text, text) to authenticated;
+
+create or replace function public.creer_conge(
+  p_employee_id uuid,
+  p_date_debut date,
+  p_date_fin date,
+  p_type text default 'C',
+  p_motif text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_company uuid;
+  v_site uuid;
+  v_repos smallint;
+  v_conge uuid;
+  v_jour date;
+  v_n integer := 0;
+  v_valeur numeric;
+begin
+  if coalesce(p_type, '') not in ('C', 'CS', 'M', 'AJ') then
+    raise exception 'Type de congé invalide';
+  end if;
+  v_role := coalesce(public.current_user_role()::text, '');
+  if v_role not in ('validator', 'admin') then
+    raise exception 'Réservé aux validateurs';
+  end if;
+  if p_date_fin < p_date_debut then
+    raise exception 'La date de fin doit être après la date de début';
+  end if;
+  if p_date_fin - p_date_debut > 365 then
+    raise exception 'Période trop longue (365 jours maximum)';
+  end if;
+
+  select company_id, site_id, jour_de_repos
+    into v_company, v_site, v_repos
+    from public.employees where id = p_employee_id;
+  if v_company is null then
+    raise exception 'Employé introuvable';
+  end if;
+
+  -- Tous les mois traversés doivent être ouverts
+  perform public.assert_periode_ouverte(v_company, p_date_debut, p_date_fin);
+
+  insert into public.conges (company_id, employee_id, type, date_debut, date_fin, motif, created_by)
+  values (v_company, p_employee_id, p_type, p_date_debut, p_date_fin, nullif(trim(p_motif), ''), auth.uid())
+  returning id into v_conge;
+
+  v_valeur := public.garde_valeur(p_type);
+
+  perform set_config('app.pointage_manuel', 'on', true);
+  for v_jour in select generate_series(p_date_debut, p_date_fin, interval '1 day')::date loop
+    if v_repos is not null and extract(isodow from v_jour)::int = v_repos then
+      continue;
+    end if;
+    if exists (
+      select 1 from public.pointages
+      where employee_id = p_employee_id and pointed_on = v_jour and status <> 'refused'
+    ) then
+      continue;
+    end if;
+
+    insert into public.pointages
+      (company_id, site_id, employee_id, agent_id, photo_path,
+       pointed_at, pointed_on, status, type_garde, validated_by, validated_at, conge_id)
+    values
+      (v_company, v_site, p_employee_id, auth.uid(), null,
+       now(), v_jour, 'validated', p_type, auth.uid(), now(), v_conge);
+    v_n := v_n + 1;
+  end loop;
+  perform set_config('app.pointage_manuel', 'off', true);
+
+  update public.conges set jours = v_n where id = v_conge;
+
+  if v_valeur > 0 then
+    update public.employees
+      set jours_travailles = jours_travailles + (v_n * v_valeur)
+      where id = p_employee_id;
+  end if;
+
+  return v_conge;
+end;
+$$;
+
+revoke all on function public.creer_conge(uuid, date, date, text, text) from public;
+grant execute on function public.creer_conge(uuid, date, date, text, text) to authenticated;
+
+create or replace function public.supprimer_conge(p_conge_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_employee uuid;
+  v_company uuid;
+  v_type text;
+  v_debut date;
+  v_fin date;
+  v_n integer;
+begin
+  v_role := coalesce(public.current_user_role()::text, '');
+  if v_role not in ('validator', 'admin') then
+    raise exception 'Réservé aux validateurs';
+  end if;
+
+  select employee_id, company_id, type, date_debut, date_fin
+    into v_employee, v_company, v_type, v_debut, v_fin
+    from public.conges where id = p_conge_id for update;
+  if v_employee is null then
+    raise exception 'Congé introuvable';
+  end if;
+
+  perform public.assert_periode_ouverte(v_company, v_debut, v_fin);
+
+  delete from public.pointages where conge_id = p_conge_id;
+  get diagnostics v_n = row_count;
+
+  update public.employees
+    set jours_travailles = greatest(0, jours_travailles - (v_n * public.garde_valeur(v_type)))
+    where id = v_employee;
+
+  delete from public.conges where id = p_conge_id;
+end;
+$$;
+
+revoke all on function public.supprimer_conge(uuid) from public;
+grant execute on function public.supprimer_conge(uuid) to authenticated;
+
+-- 3. Suppression du compte de sonde créé par erreur ---------------------------
+
+do $$
+declare v_id uuid;
+begin
+  select user_id into v_id from public.profiles where username = '__sonde__';
+  if v_id is not null then
+    delete from public.profiles  where user_id = v_id;
+    delete from auth.identities  where user_id = v_id;
+    delete from auth.users       where id      = v_id;
+    raise notice 'Compte « __sonde__ » supprimé.';
+  else
+    raise notice 'Aucun compte « __sonde__ » à supprimer.';
+  end if;
+end $$;

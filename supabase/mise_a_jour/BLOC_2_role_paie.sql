@@ -1,9 +1,9 @@
 -- ============================================================================
---  MISE À JOUR « PAIE & CONTRATS » — BLOC 2 sur 3
+--  MISE À JOUR « PAIE & CONTRATS » — BLOC 2 sur 4
 --  ============================================================
 --  À exécuter dans : Supabase → SQL Editor → coller → Run
 --
---  ⚠️  ORDRE OBLIGATOIRE : BLOC 1, puis BLOC 2, puis BLOC 3.
+--  ⚠️  ORDRE OBLIGATOIRE : BLOC 1, puis BLOC 2, puis BLOC 3, puis BLOC 4.
 --      Attendez le « Success » de chaque bloc avant de lancer le suivant.
 --
 --  Ce fichier = migration 018 (doit être exécutée SEULE)

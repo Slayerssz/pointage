@@ -82,23 +82,28 @@ function ContratsPanel({
   const { data: contrats, isLoading } = useContratsEmploye(employee.id)
   const [nouveau, setNouveau] = useState(false)
   const [edite, setEdite] = useState<Contrat | null>(null)
+  // Renouvellement : le formulaire est prérempli avec l'ancien contrat,
+  // dates déjà avancées. Il ne reste qu'à ajuster la fin et le salaire.
+  const [renouvele, setRenouvele] = useState<Contrat | null>(null)
 
   if (isLoading) return <Spinner label="Chargement des contrats…" />
 
   return (
     <div>
-      {(nouveau || edite) && (
+      {(nouveau || edite || renouvele) && (
         <ContratForm
           employee={employee}
           contrat={edite}
+          renouvelle={renouvele}
           onClose={() => {
             setNouveau(false)
             setEdite(null)
+            setRenouvele(null)
           }}
         />
       )}
 
-      {!nouveau && !edite && (
+      {!nouveau && !edite && !renouvele && (
         <>
           <div className="mb-3 flex justify-end">
             <button
@@ -142,7 +147,20 @@ function ContratsPanel({
                         {c.salaire_mensuel != null ? ` · ${formatDH(c.salaire_mensuel)}` : ''}
                       </p>
                     </div>
-                    <div className="flex shrink-0 gap-1.5">
+                    <div className="flex shrink-0 flex-wrap gap-1.5">
+                      {!c.archive && (
+                        <button
+                          onClick={() => setRenouvele(c)}
+                          title="Repart de ce contrat : dates avancées, il ne reste que la fin et le salaire à ajuster"
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            statut === 'bientot' || statut === 'termine'
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                              : 'border border-slate-300 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          Renouveler
+                        </button>
+                      )}
                       <button
                         onClick={() => onImprimer(c)}
                         className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -167,30 +185,54 @@ function ContratsPanel({
   )
 }
 
+/** Le jour suivant une date ISO. */
+function lendemain(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Même date, un an plus tard. */
+function unAnApres(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setFullYear(d.getFullYear() + 1)
+  d.setDate(d.getDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function ContratForm({
   employee,
   contrat,
+  renouvelle,
   onClose,
 }: {
   employee: Employee
   contrat: Contrat | null
+  renouvelle?: Contrat | null
   onClose: () => void
 }) {
   const qc = useQueryClient()
+  // Un renouvellement reprend tout l'ancien contrat, mais enchaîne les dates :
+  // début = lendemain de l'ancienne fin, fin = un an plus tard.
+  const base = contrat ?? renouvelle ?? null
+  const debutRenouv =
+    renouvelle?.date_fin ? lendemain(renouvelle.date_fin) : todayIso()
   const [f, setF] = useState({
-    type_contrat: (contrat?.type_contrat ?? 'CDI') as TypeContrat,
-    date_debut: contrat?.date_debut ?? employee.date_embauche ?? todayIso(),
-    date_fin: contrat?.date_fin ?? '',
-    periode_essai_jours: contrat?.periode_essai_jours?.toString() ?? '90',
-    poste: contrat?.poste ?? employee.qualification ?? '',
-    lieu_travail: contrat?.lieu_travail ?? '',
-    salaire_mensuel: contrat?.salaire_mensuel?.toString() ?? employee.salaire?.toString() ?? '',
-    heures_par_jour: contrat?.heures_par_jour?.toString() ?? employee.heures_par_jour?.toString() ?? '8',
-    mode_reglement: contrat?.mode_reglement ?? employee.mode_reglement ?? '',
-    signe_a: contrat?.signe_a ?? employee.ville ?? '',
-    signe_le: contrat?.signe_le ?? todayIso(),
-    representant_employeur: contrat?.representant_employeur ?? '',
-    observations: contrat?.observations ?? '',
+    type_contrat: (base?.type_contrat ?? 'CDI') as TypeContrat,
+    date_debut: renouvelle ? debutRenouv : (contrat?.date_debut ?? employee.date_embauche ?? todayIso()),
+    date_fin: renouvelle
+      ? (renouvelle.date_fin ? unAnApres(debutRenouv) : '')
+      : (contrat?.date_fin ?? ''),
+    periode_essai_jours: renouvelle ? '0' : (base?.periode_essai_jours?.toString() ?? '90'),
+    poste: base?.poste ?? employee.qualification ?? '',
+    lieu_travail: base?.lieu_travail ?? '',
+    salaire_mensuel: base?.salaire_mensuel?.toString() ?? employee.salaire?.toString() ?? '',
+    heures_par_jour: base?.heures_par_jour?.toString() ?? employee.heures_par_jour?.toString() ?? '8',
+    mode_reglement: base?.mode_reglement ?? employee.mode_reglement ?? '',
+    signe_a: base?.signe_a ?? employee.ville ?? '',
+    signe_le: renouvelle ? todayIso() : (contrat?.signe_le ?? todayIso()),
+    representant_employeur: base?.representant_employeur ?? '',
+    observations: base?.observations ?? '',
     archive: contrat?.archive ?? false,
   })
   const set = (k: keyof typeof f) => (v: string | boolean) => setF((p) => ({ ...p, [k]: v }))
@@ -225,6 +267,13 @@ function ContratForm({
       } else {
         const { error } = await supabase.from('contrats').insert(payload)
         if (error) throw error
+        // Renouvellement : l'ancien contrat passe en archive, il ne déclenche
+        // plus d'alerte de fin, mais reste consultable dans l'historique.
+        if (renouvelle) {
+          const { error: e2 } = await supabase
+            .from('contrats').update({ archive: true }).eq('id', renouvelle.id)
+          if (e2) throw e2
+        }
       }
     },
     onSuccess: () => {
@@ -237,8 +286,19 @@ function ContratForm({
   return (
     <div className="rounded-xl border border-slate-200 p-4">
       <p className="mb-4 text-sm font-semibold text-slate-900">
-        {contrat ? `Modifier le contrat ${contrat.numero ?? ''}` : 'Nouveau contrat'}
+        {contrat
+          ? `Modifier le contrat ${contrat.numero ?? ''}`
+          : renouvelle
+            ? `Renouveler le contrat ${renouvelle.numero ?? ''}`
+            : 'Nouveau contrat'}
       </p>
+      {renouvelle && (
+        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          Tout est repris de l’ancien contrat. Vérifiez la <strong>date de fin</strong> et le
+          <strong> salaire</strong>, puis enregistrez : l’ancien contrat sera archivé
+          automatiquement.
+        </p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {field('Type de contrat', (

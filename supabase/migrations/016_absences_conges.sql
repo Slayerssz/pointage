@@ -123,11 +123,11 @@ declare
   v_company uuid;
   v_site uuid;
 begin
-  if p_type not in ('X05', 'X', 'X15', 'XX', 'RT', 'M', 'C', 'CS', 'AJ') then
+  if coalesce(p_type, '') not in ('X05', 'X', 'X15', 'XX', 'RT', 'M', 'C', 'CS', 'AJ') then
     raise exception 'Type de garde invalide';
   end if;
 
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs';
   end if;
@@ -184,7 +184,7 @@ declare
   v_date date;
   v_conge uuid;
 begin
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs';
   end if;
@@ -242,10 +242,10 @@ declare
   v_n integer := 0;
   v_valeur numeric;
 begin
-  if p_type not in ('C', 'CS', 'M', 'AJ') then
+  if coalesce(p_type, '') not in ('C', 'CS', 'M', 'AJ') then
     raise exception 'Type de congé invalide';
   end if;
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs';
   end if;
@@ -328,7 +328,7 @@ declare
   v_fin date;
   v_n integer;
 begin
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs';
   end if;

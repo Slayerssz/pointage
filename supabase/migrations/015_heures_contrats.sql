@@ -79,7 +79,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if public.current_user_role()::text not in ('admin', 'paie') then
+  if coalesce(public.current_user_role()::text, '') not in ('admin', 'paie') then
     raise exception 'Réservé à l''administrateur et au responsable de paie';
   end if;
   if p_jours_base is null or p_jours_base <= 0 then

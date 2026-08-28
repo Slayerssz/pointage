@@ -10,6 +10,7 @@ import {
   todayIso,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites } from '../../lib/queries'
+import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
 import { useContratsCourants, formatDH } from '../../lib/paie'
 import { contratAffichage } from '../../lib/contrats'
@@ -47,6 +48,14 @@ export default function EmployesPage() {
     },
   })
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
+  const { data: entreprises } = useQuery({
+    queryKey: ['companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('companies').select('id, name').order('name')
+      if (error) throw error
+      return data as { id: string; name: string }[]
+    },
+  })
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -56,6 +65,10 @@ export default function EmployesPage() {
   const [qualifFilter, setQualifFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('actif')
   const [contratFilter, setContratFilter] = useState('')
+  const { profile } = useAuth()
+  const estAdmin = profile?.role === 'admin'
+  // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.
+  const [toutesEntreprises, setToutesEntreprises] = useState(false)
   const [editing, setEditing] = useState<Employee | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -70,7 +83,7 @@ export default function EmployesPage() {
   const { data, isLoading, error, isPlaceholderData } = useQuery({
     queryKey: [
       'employees', companyId, page, debouncedSearch,
-      siteFilter, villeFilter, modeFilter, qualifFilter, statutFilter,
+      siteFilter, villeFilter, modeFilter, qualifFilter, statutFilter, toutesEntreprises,
     ],
     enabled: Boolean(companyId),
     placeholderData: keepPreviousData,
@@ -81,9 +94,10 @@ export default function EmployesPage() {
           'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, date_sortie',
           { count: 'exact' },
         )
-        .eq('company_id', companyId!)
         .order('matricule', { ascending: true, nullsFirst: false })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+      // Vue « toutes les entreprises » : réservée à l'administrateur
+      if (!(estAdmin && toutesEntreprises)) query = query.eq('company_id', companyId!)
       if (siteFilter) query = query.eq('site_id', siteFilter)
       if (villeFilter) query = query.eq('ville', villeFilter)
       if (modeFilter) query = query.eq('mode_reglement', modeFilter)
@@ -104,6 +118,9 @@ export default function EmployesPage() {
 
   const pageCount = Math.max(1, Math.ceil((data?.count ?? 0) / PAGE_SIZE))
   const siteName = (id: string) => sites?.find((s) => s.id === id)?.name ?? '—'
+  // En vue « toutes les entreprises », les sites des autres sociétés ne sont
+  // pas chargés : on n'affiche donc pas de nom de site trompeur.
+  const siteCell = (id: string) => (toutesEntreprises ? '—' : siteName(id))
 
   // Le filtre « contrat » s'applique sur la page affichée (les statuts de
   // contrat sont calculés à partir de la vue contrats_courants).
@@ -145,7 +162,9 @@ export default function EmployesPage() {
         <div>
           <h1 className="mb-1 text-xl font-semibold text-slate-900">Employés</h1>
           <p className="text-sm text-slate-500">
-            {data ? `${data.count} employé(s)` : 'Liste du personnel de l’entreprise'}
+            {data
+              ? `${data.count} employé(s)${estAdmin && toutesEntreprises ? ' — toutes entreprises' : ''}`
+              : 'Liste du personnel'}
           </p>
         </div>
         <button
@@ -164,7 +183,7 @@ export default function EmployesPage() {
           placeholder="Rechercher (nom, matricule, CIN)…"
           className="w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
         />
-        {filterSelect(siteFilter, resetPage(setSiteFilter), 'Tous les sites',
+        {!toutesEntreprises && filterSelect(siteFilter, resetPage(setSiteFilter), 'Tous les sites',
           (sites ?? []).map((s) => ({ value: s.id, label: s.name })))}
         {filterSelect(villeFilter, resetPage(setVilleFilter), 'Toutes les villes',
           (filtres?.villes ?? []).map((v) => ({ value: v, label: v })))}
@@ -176,6 +195,17 @@ export default function EmployesPage() {
           { value: 'actif', label: 'En poste' },
           { value: 'sorti', label: 'Sortis' },
         ])}
+        {estAdmin && (
+          <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={toutesEntreprises}
+              onChange={(e) => { setToutesEntreprises(e.target.checked); setPage(1) }}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            Toutes les entreprises
+          </label>
+        )}
         {filterSelect(contratFilter, resetPage(setContratFilter), 'Tous les contrats', [
           { value: 'bientot', label: 'Contrat bientôt terminé (≤ 10 j)' },
           { value: 'termine', label: 'Contrat terminé' },
@@ -199,6 +229,9 @@ export default function EmployesPage() {
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-medium">N°</th>
                 <th className="px-4 py-3 font-medium">Nom & Prénom</th>
+                {estAdmin && toutesEntreprises && (
+                  <th className="px-4 py-3 font-medium">Entreprise</th>
+                )}
                 <th className="px-4 py-3 font-medium">Site</th>
                 <th className="px-4 py-3 font-medium">Âge</th>
                 <th className="px-4 py-3 font-medium">Naissance</th>
@@ -270,7 +303,12 @@ export default function EmployesPage() {
                         <p className="text-xs text-slate-500">{emp.qualification}</p>
                       )}
                     </td>
-                    <td className="max-w-40 truncate px-4 py-3 text-slate-600">{siteName(emp.site_id)}</td>
+                    {estAdmin && toutesEntreprises && (
+                      <td className="max-w-40 truncate px-4 py-3 font-medium text-slate-700">
+                        {entreprises?.find((c) => c.id === emp.company_id)?.name ?? '—'}
+                      </td>
+                    )}
+                    <td className="max-w-40 truncate px-4 py-3 text-slate-600">{siteCell(emp.site_id)}</td>
                     <td className="px-4 py-3 text-slate-600">
                       {retirement ? `${retirement.age} ans` : '—'}
                     </td>

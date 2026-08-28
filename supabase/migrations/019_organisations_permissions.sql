@@ -27,7 +27,7 @@ declare
   v_id uuid;
   v_nom text := trim(p_nom);
 begin
-  if public.current_user_role()::text <> 'admin' then
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
     raise exception 'Seul l''administrateur peut créer une entreprise';
   end if;
   if v_nom = '' then
@@ -54,7 +54,7 @@ as $$
 declare
   v_nom text := trim(p_nom);
 begin
-  if public.current_user_role()::text <> 'admin' then
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
     raise exception 'Seul l''administrateur peut modifier une entreprise';
   end if;
   if v_nom = '' then
@@ -87,7 +87,7 @@ declare
   v_id uuid;
   v_nom text := trim(p_nom);
 begin
-  if public.current_user_role()::text not in ('validator', 'admin') then
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs et à l''administrateur';
   end if;
   if v_nom = '' then
@@ -122,7 +122,7 @@ declare
   v_company uuid;
   v_nom text := trim(p_nom);
 begin
-  if public.current_user_role()::text not in ('validator', 'admin') then
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs et à l''administrateur';
   end if;
   if v_nom = '' then
@@ -154,7 +154,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if public.current_user_role()::text not in ('validator', 'admin') then
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs et à l''administrateur';
   end if;
   if exists (select 1 from public.employees where site_id = p_site) then
@@ -186,7 +186,7 @@ declare
   v_username text := lower(trim(p_username));
   v_login_id text := lower(trim(p_username)) || '@pointage.local';
 begin
-  if public.current_user_role()::text <> 'admin' then
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
     raise exception 'Réservé aux administrateurs';
   end if;
   if v_username = '' or v_username !~ '^[a-z0-9._-]+$' then
@@ -195,7 +195,7 @@ begin
   if length(p_password) < 6 then
     raise exception 'Le mot de passe doit contenir au moins 6 caractères';
   end if;
-  if p_role not in ('agent', 'validator', 'admin', 'paie') then
+  if coalesce(p_role, '') not in ('agent', 'validator', 'admin', 'paie') then
     raise exception 'Rôle invalide';
   end if;
   if exists (select 1 from public.profiles where username = v_username) then
@@ -245,10 +245,10 @@ security definer
 set search_path = public, auth, extensions
 as $$
 begin
-  if public.current_user_role()::text <> 'admin' then
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
     raise exception 'Réservé aux administrateurs';
   end if;
-  if p_role not in ('agent', 'validator', 'admin', 'paie') then
+  if coalesce(p_role, '') not in ('agent', 'validator', 'admin', 'paie') then
     raise exception 'Rôle invalide';
   end if;
   if p_user_id = auth.uid() and p_role <> 'admin' then

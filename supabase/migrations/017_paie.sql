@@ -222,7 +222,7 @@ declare
   v_company uuid;
   v_date date;
 begin
-  if p_decision not in ('validated', 'refused') then
+  if coalesce(p_decision, '') not in ('validated', 'refused') then
     raise exception 'Décision invalide';
   end if;
   if p_decision = 'validated'
@@ -230,7 +230,7 @@ begin
     raise exception 'Type de garde invalide';
   end if;
 
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs';
   end if;
@@ -281,11 +281,11 @@ declare
   v_date date;
   v_conge uuid;
 begin
-  if p_type not in ('X05', 'X', 'X15', 'XX', 'RT', 'M', 'C', 'CS', 'AJ') then
+  if coalesce(p_type, '') not in ('X05', 'X', 'X15', 'XX', 'RT', 'M', 'C', 'CS', 'AJ') then
     raise exception 'Type de garde invalide';
   end if;
 
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs';
   end if;
@@ -377,7 +377,7 @@ declare
   v_statut public.periode_statut;
   v_par public.parametres_paie%rowtype;
 begin
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('validator', 'admin') then
     raise exception 'Réservé aux validateurs et à l''administrateur';
   end if;
@@ -452,7 +452,7 @@ declare
   v_fin date;
   v_n integer := 0;
 begin
-  if public.current_user_role()::text not in ('validator', 'admin', 'paie') then
+  if coalesce(public.current_user_role()::text, '') not in ('validator', 'admin', 'paie') then
     raise exception 'Non autorisé';
   end if;
 
@@ -604,7 +604,7 @@ declare
   v_autres numeric;
   v_brut numeric;
 begin
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('paie', 'admin') then
     raise exception 'Réservé au responsable de paie et à l''administrateur';
   end if;
@@ -660,7 +660,7 @@ declare
   v_dette record;
   v_pris numeric;
 begin
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('paie', 'admin') then
     raise exception 'Réservé au responsable de paie et à l''administrateur';
   end if;
@@ -734,7 +734,7 @@ declare
   v_role text;
   v_statut public.periode_statut;
 begin
-  v_role := public.current_user_role()::text;
+  v_role := coalesce(public.current_user_role()::text, '');
   if v_role not in ('paie', 'validator', 'admin') then
     raise exception 'Non autorisé';
   end if;
@@ -774,7 +774,7 @@ as $$
 declare
   v_p public.periodes_paie%rowtype;
 begin
-  if public.current_user_role()::text <> 'admin' then
+  if coalesce(public.current_user_role()::text, '') <> 'admin' then
     raise exception 'Seul l''administrateur peut répondre à une demande de réouverture';
   end if;
 
