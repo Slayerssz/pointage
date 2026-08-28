@@ -9,6 +9,10 @@ import ValidationPage from './pages/validator/ValidationPage'
 import EmployesPage from './pages/validator/EmployesPage'
 import AnalyticsPage from './pages/admin/AnalyticsPage'
 import UsersPage from './pages/admin/UsersPage'
+import OrganisationsPage from './pages/admin/OrganisationsPage'
+import SitesPage from './pages/validator/SitesPage'
+import PaiePage from './pages/paie/PaiePage'
+import BulletinsPage from './pages/paie/BulletinsPage'
 import { Spinner } from './components/ui'
 import type { UserRole } from './lib/types'
 
@@ -55,7 +59,9 @@ function CompanyIndexRedirect() {
       ? 'analytics'
       : profile?.role === 'validator'
         ? 'employes'
-        : 'pointage'
+        : profile?.role === 'paie'
+          ? 'paie'
+          : 'pointage'
   return <Navigate to={`/c/${companyId}/${target}`} replace />
 }
 
@@ -117,10 +123,42 @@ export default function App() {
                 }
               />
               <Route
+                path="sites"
+                element={
+                  <RequireRole roles={['validator', 'admin']}>
+                    <SitesPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="paie"
+                element={
+                  <RequireRole roles={['paie', 'admin']}>
+                    <PaiePage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="bulletins"
+                element={
+                  <RequireRole roles={['paie', 'admin']}>
+                    <BulletinsPage />
+                  </RequireRole>
+                }
+              />
+              <Route
                 path="analytics"
                 element={
                   <RequireRole roles={['admin']}>
                     <AnalyticsPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="entreprises"
+                element={
+                  <RequireRole roles={['admin']}>
+                    <OrganisationsPage />
                   </RequireRole>
                 }
               />

@@ -11,8 +11,12 @@ import {
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites } from '../../lib/queries'
 import { formatGardes } from '../../lib/gardes'
-import type { Employee } from '../../lib/types'
+import { useContratsCourants, formatDH } from '../../lib/paie'
+import { contratAffichage } from '../../lib/contrats'
+import type { Contrat, Employee } from '../../lib/types'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
+import EmployeDetail from './EmployeDetail'
+import ContratPrint from '../../components/ContratPrint'
 
 const PAGE_SIZE = 50
 
@@ -31,6 +35,18 @@ export default function EmployesPage() {
   const { companyId } = useParams()
   const { data: sites } = useSites(companyId)
   const { data: filtres } = useEmployeFiltres(companyId)
+  const { data: contrats } = useContratsCourants(companyId)
+  const { data: company } = useQuery({
+    queryKey: ['company', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies').select('id, name').eq('id', companyId!).single()
+      if (error) throw error
+      return data
+    },
+  })
+  const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -39,6 +55,7 @@ export default function EmployesPage() {
   const [modeFilter, setModeFilter] = useState('')
   const [qualifFilter, setQualifFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('actif')
+  const [contratFilter, setContratFilter] = useState('')
   const [editing, setEditing] = useState<Employee | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -61,7 +78,7 @@ export default function EmployesPage() {
       let query = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, date_sortie',
           { count: 'exact' },
         )
         .eq('company_id', companyId!)
@@ -87,6 +104,15 @@ export default function EmployesPage() {
 
   const pageCount = Math.max(1, Math.ceil((data?.count ?? 0) / PAGE_SIZE))
   const siteName = (id: string) => sites?.find((s) => s.id === id)?.name ?? '—'
+
+  // Le filtre « contrat » s'applique sur la page affichée (les statuts de
+  // contrat sont calculés à partir de la vue contrats_courants).
+  const lignes = (data?.rows ?? []).filter((emp) => {
+    if (!contratFilter) return true
+    const c = contrats?.get(emp.id)
+    if (contratFilter === 'sans') return !c
+    return c?.statut === contratFilter
+  })
 
   const resetPage = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v)
@@ -150,19 +176,25 @@ export default function EmployesPage() {
           { value: 'actif', label: 'En poste' },
           { value: 'sorti', label: 'Sortis' },
         ])}
+        {filterSelect(contratFilter, resetPage(setContratFilter), 'Tous les contrats', [
+          { value: 'bientot', label: 'Contrat bientôt terminé (≤ 10 j)' },
+          { value: 'termine', label: 'Contrat terminé' },
+          { value: 'actif', label: 'Contrat en cours' },
+          { value: 'sans', label: 'Sans contrat' },
+        ])}
       </div>
 
       {isLoading && <Spinner label="Chargement des employés…" />}
       {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
-      {data && data.rows.length === 0 && <EmptyState>Aucun employé trouvé.</EmptyState>}
+      {data && lignes.length === 0 && <EmptyState>Aucun employé trouvé.</EmptyState>}
 
-      {data && data.rows.length > 0 && (
+      {data && lignes.length > 0 && (
         <div
           className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm ${
             isPlaceholderData ? 'opacity-60' : ''
           }`}
         >
-          <table className="w-full min-w-[1700px] text-left text-sm">
+          <table className="w-full min-w-[1900px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-medium">N°</th>
@@ -177,21 +209,36 @@ export default function EmployesPage() {
                 <th className="px-4 py-3 font-medium">Adresse</th>
                 <th className="px-4 py-3 font-medium">Ville</th>
                 <th className="px-4 py-3 font-medium">Repos</th>
+                <th className="px-4 py-3 font-medium">Contrat</th>
                 <th className="px-4 py-3 font-medium">Règlement</th>
                 <th className="px-4 py-3 font-medium">RIB</th>
                 <th className="px-4 py-3 font-medium">Banque</th>
                 <th className="px-4 py-3 text-right font-medium">Salaire</th>
+                <th className="px-4 py-3 text-right font-medium">H / jour</th>
                 <th className="px-4 py-3 text-right font-medium">Gardes</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.rows.map((emp) => {
+              {lignes.map((emp) => {
                 const retirement = retirementStatus(emp.date_naissance)
                 const isRetired = retirement?.kind === 'retired'
                 const isGone = !emp.actif
+                const contrat = contrats?.get(emp.id)
+                const aff = contratAffichage(contrat?.statut ?? null, contrat?.jours_restants ?? null)
+                // Contrat bientôt fini → ligne BLEUE · contrat terminé → ligne JAUNE
+                const fondContrat = isGone || isRetired ? '' : (aff?.ligne ?? '')
                 return (
-                  <tr key={emp.id} className={isGone ? 'bg-slate-50 text-slate-400' : isRetired ? 'bg-red-50/80' : undefined}>
+                  <tr
+                    key={emp.id}
+                    className={
+                      isGone
+                        ? 'bg-slate-50 text-slate-400'
+                        : isRetired
+                          ? 'bg-red-50/80'
+                          : fondContrat || undefined
+                    }
+                  >
                     <td className="px-4 py-3 font-medium text-slate-700">{emp.matricule ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -237,11 +284,33 @@ export default function EmployesPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-600">{emp.ville ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{jourDeReposLabel(emp.jour_de_repos)}</td>
+                    <td className="px-4 py-3">
+                      {contrat ? (
+                        <div>
+                          <p className="text-xs font-medium text-slate-700">
+                            {contrat.type_contrat}
+                            {contrat.date_fin && (
+                              <span className="font-normal text-slate-500">
+                                {' '}· fin {formatDateFr(contrat.date_fin)}
+                              </span>
+                            )}
+                          </p>
+                          {aff && (aff.chip === 'blue' || aff.chip === 'amber') && (
+                            <Chip tone={aff.chip}>{aff.label}</Chip>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">Aucun contrat</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{emp.mode_reglement ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{emp.rib ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{emp.banque ?? '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">
-                      {emp.salaire != null ? `${emp.salaire.toLocaleString('fr-FR')} DH` : '—'}
+                    <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
+                      {emp.salaire != null ? formatDH(emp.salaire) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
+                      {emp.heures_par_jour != null ? `${formatGardes(emp.heures_par_jour)} h` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-900 tabular-nums">
                       {formatGardes(emp.jours_travailles)}
@@ -268,10 +337,20 @@ export default function EmployesPage() {
         <EmployeeFormModal
           companyId={companyId}
           employee={editing}
+          onImprimerContrat={(contrat, employee) => setImpression({ contrat, employee })}
           onClose={() => {
             setEditing(null)
             setAdding(false)
           }}
+        />
+      )}
+
+      {impression && (
+        <ContratPrint
+          contrat={impression.contrat}
+          employee={impression.employee}
+          entreprise={company?.name ?? ''}
+          onClose={() => setImpression(null)}
         />
       )}
     </div>
@@ -282,14 +361,19 @@ export default function EmployesPage() {
 function EmployeeFormModal({
   companyId,
   employee,
+  onImprimerContrat,
   onClose,
 }: {
   companyId: string
   employee: Employee | null
+  onImprimerContrat: (contrat: Contrat, employee: Employee) => void
   onClose: () => void
 }) {
   const { data: sites } = useSites(companyId)
   const queryClient = useQueryClient()
+  // « Fiche » = les informations de l'employé ; « Dossier » = contrats,
+  // congés et dettes (uniquement pour un employé déjà enregistré).
+  const [vue, setVue] = useState<'fiche' | 'dossier'>('fiche')
 
   const [form, setForm] = useState({
     site_id: employee?.site_id ?? '',
@@ -309,6 +393,7 @@ function EmployeeFormModal({
     rib: employee?.rib ?? '',
     banque: employee?.banque ?? '',
     salaire: employee?.salaire?.toString() ?? '',
+    heures_par_jour: employee?.heures_par_jour?.toString() ?? '8',
     statut: employee && !employee.actif ? 'sorti' : 'actif',
     date_sortie: employee?.date_sortie ?? '',
   })
@@ -339,6 +424,7 @@ function EmployeeFormModal({
         rib: form.rib.trim() || null,
         banque: form.banque.trim() || null,
         salaire: form.salaire.trim() ? Number(form.salaire) : null,
+        heures_par_jour: form.heures_par_jour.trim() ? Number(form.heures_par_jour) : null,
         // « actif » est dérivé automatiquement de la date de sortie côté base.
         // Statut « sorti » sans date → date du jour.
         date_sortie:
@@ -375,19 +461,45 @@ function EmployeeFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-1 text-lg font-semibold text-slate-900">
-          {employee ? `Modifier — ${employee.nom_prenom}` : 'Ajouter un employé'}
+          {employee ? `${employee.nom_prenom}` : 'Ajouter un employé'}
         </h2>
-        <p className="mb-5 text-sm text-slate-500">
+        <p className="mb-4 text-sm text-slate-500">
           {employee
-            ? 'Tous les champs sont modifiables.'
+            ? 'Fiche, contrats, congés et dettes de cet employé.'
             : 'Laissez le matricule vide : le prochain numéro disponible sera attribué automatiquement.'}
         </p>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        {employee && (
+          <div className="mb-5 flex gap-1 rounded-xl bg-slate-100 p-1">
+            {([
+              { code: 'fiche', label: 'Fiche' },
+              { code: 'dossier', label: 'Contrats · Congés · Dettes' },
+            ] as const).map((o) => (
+              <button
+                key={o.code}
+                onClick={() => setVue(o.code)}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  vue === o.code ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {employee && vue === 'dossier' && (
+          <EmployeDetail
+            employee={employee}
+            onImprimerContrat={(contrat) => onImprimerContrat(contrat, employee)}
+          />
+        )}
+
+        <div className={`grid gap-4 sm:grid-cols-2 ${employee && vue !== 'fiche' ? 'hidden' : ''}`}>
           {field('Nom & Prénom *', (
             <input type="text" value={form.nom_prenom} onChange={(e) => set('nom_prenom')(e.target.value)} className={inputCls} />
           ))}
@@ -454,8 +566,11 @@ function EmployeeFormModal({
           <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
             <p className="text-sm font-semibold text-slate-700">Paie & banque</p>
           </div>
-          {field('Salaire (DH)', (
+          {field('Salaire mensuel (DH)', (
             <input type="number" min="0" step="0.01" value={form.salaire} onChange={(e) => set('salaire')(e.target.value)} className={inputCls} placeholder="ex. 3000" />
+          ))}
+          {field('Heures par jour', (
+            <input type="number" min="0" step="0.5" value={form.heures_par_jour} onChange={(e) => set('heures_par_jour')(e.target.value)} className={inputCls} placeholder="ex. 8" />
           ))}
           {field('Banque', (
             <input type="text" value={form.banque} onChange={(e) => set('banque')(e.target.value)} className={inputCls} placeholder="ex. Attijariwafa Bank" />
@@ -481,7 +596,7 @@ function EmployeeFormModal({
             ))}
         </div>
 
-        {save.error && (
+        {save.error && (!employee || vue === 'fiche') && (
           <div className="mt-4">
             <ErrorNote>Enregistrement impossible : {save.error.message}</ErrorNote>
           </div>
@@ -492,15 +607,17 @@ function EmployeeFormModal({
             onClick={onClose}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
           >
-            Annuler
+            {employee && vue === 'dossier' ? 'Fermer' : 'Annuler'}
           </button>
-          <button
-            onClick={() => save.mutate()}
-            disabled={save.isPending}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {save.isPending ? 'Enregistrement…' : employee ? 'Enregistrer' : 'Ajouter'}
-          </button>
+          {(!employee || vue === 'fiche') && (
+            <button
+              onClick={() => save.mutate()}
+              disabled={save.isPending}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {save.isPending ? 'Enregistrement…' : employee ? 'Enregistrer' : 'Ajouter'}
+            </button>
+          )}
         </div>
       </div>
     </div>

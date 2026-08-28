@@ -1,4 +1,4 @@
-export type UserRole = 'agent' | 'validator' | 'admin'
+export type UserRole = 'agent' | 'validator' | 'admin' | 'paie'
 export type PointageStatus = 'pending' | 'validated' | 'refused'
 
 export interface Profile {
@@ -41,6 +41,8 @@ export interface Employee {
   rib: string | null
   banque: string | null
   salaire: number | null
+  /** Durée d'une garde normale, en heures (ex. 8). */
+  heures_par_jour: number | null
   date_sortie: string | null
 }
 
@@ -55,6 +57,173 @@ export interface Pointage {
   pointed_on: string
   status: PointageStatus
   type_garde: string | null
+  conge_id: string | null
   validated_by: string | null
   validated_at: string | null
+}
+
+/** Paramètres de calcul de la paie, propres à chaque entreprise. */
+export interface ParametresPaie {
+  company_id: string
+  jours_base: number
+  maladie_payee: boolean
+  conge_paye: boolean
+  heures_par_jour_defaut: number | null
+  devise: string
+}
+
+// --- Contrats ---------------------------------------------------------------
+
+export type TypeContrat = 'CDI' | 'CDD' | 'ANAPEC' | 'STAGE' | 'INTERIM' | 'ESSAI'
+
+/** `bientot` → bleu (fin dans ≤ 10 j) · `termine` → jaune (fin dépassée) */
+export type ContratStatut = 'actif' | 'bientot' | 'termine' | 'a_venir'
+
+export interface Contrat {
+  id: string
+  company_id: string
+  employee_id: string
+  numero: string | null
+  type_contrat: TypeContrat
+  date_debut: string
+  date_fin: string | null
+  periode_essai_jours: number | null
+  poste: string | null
+  lieu_travail: string | null
+  salaire_mensuel: number | null
+  heures_par_jour: number | null
+  mode_reglement: string | null
+  signe_a: string | null
+  signe_le: string | null
+  representant_employeur: string | null
+  observations: string | null
+  archive: boolean
+  created_at: string
+}
+
+export interface ContratCourant {
+  id: string
+  employee_id: string
+  company_id: string
+  numero: string | null
+  type_contrat: TypeContrat
+  date_debut: string
+  date_fin: string | null
+  poste: string | null
+  salaire_mensuel: number | null
+  statut: ContratStatut
+  jours_restants: number | null
+}
+
+// --- Congés & absences ------------------------------------------------------
+
+export type TypeConge = 'C' | 'CS' | 'M' | 'AJ'
+
+export interface Conge {
+  id: string
+  company_id: string
+  employee_id: string
+  type: TypeConge
+  date_debut: string
+  date_fin: string
+  motif: string | null
+  jours: number
+  created_at: string
+}
+
+// --- Dettes -----------------------------------------------------------------
+
+export interface Dette {
+  id: string
+  company_id: string
+  employee_id: string
+  libelle: string
+  montant_total: number
+  montant_rembourse: number
+  date_creation: string
+  soldee: boolean
+}
+
+// --- Paie -------------------------------------------------------------------
+
+export type PeriodeStatut =
+  | 'ouvert'
+  | 'pointage_valide'
+  | 'paie_validee'
+  | 'reouverture_demandee'
+
+export interface PeriodePaie {
+  id: string
+  company_id: string
+  annee: number
+  mois: number
+  statut: PeriodeStatut
+  jours_base: number
+  maladie_payee: boolean
+  conge_paye: boolean
+  pointage_valide_le: string | null
+  paie_validee_le: string | null
+  reouverture_motif: string | null
+  reouverture_demandee_le: string | null
+}
+
+export interface LignePaie {
+  id: string
+  periode_id: string
+  employee_id: string
+  matricule: number | null
+  nom_prenom: string
+  cin: string | null
+  cnss: string | null
+  site_id: string | null
+  site_nom: string | null
+  qualification: string | null
+  mode_reglement: string | null
+  banque: string | null
+  rib: string | null
+  salaire_base: number
+  jours_base: number
+  heures_par_jour: number | null
+  gardes_travaillees: number
+  jours_conge: number
+  jours_maladie: number
+  jours_sans_solde: number
+  jours_absent: number
+  jours_repos: number
+  jours_payes: number
+  heures_effectuees: number | null
+  salaire_brut: number
+  prime: number
+  retenue_dette: number
+  autres_retenues: number
+  net_a_payer: number
+  observations: string | null
+}
+
+export interface TotauxPeriode {
+  employes: number
+  total_brut: number
+  total_primes: number
+  total_dettes: number
+  total_autres_retenues: number
+  total_net: number
+  total_virement: number
+  total_especes: number
+  par_banque: { banque: string; n: number; montant: number }[]
+}
+
+/** Une entrée du bulletin journalier : un site et les employés qui y ont travaillé. */
+export interface BulletinSite {
+  site_id: string
+  site: string
+  employes: {
+    employee_id: string
+    matricule: number | null
+    nom_prenom: string
+    qualification: string | null
+    cin: string | null
+    type_garde: string | null
+    heure: string | null
+    photo: boolean
+  }[]
 }

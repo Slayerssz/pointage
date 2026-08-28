@@ -8,18 +8,20 @@ interface AdminUser {
   user_id: string
   username: string
   full_name: string | null
-  role: 'agent' | 'validator' | 'admin'
+  role: 'agent' | 'validator' | 'admin' | 'paie'
   created_at: string
 }
 
 const ROLE_LABEL: Record<AdminUser['role'], string> = {
   agent: 'Pointeur (terrain)',
   validator: 'Bureau (validateur)',
+  paie: 'Responsable de paie',
   admin: 'Administrateur',
 }
-const ROLE_TONE: Record<AdminUser['role'], 'blue' | 'green' | 'amber'> = {
+const ROLE_TONE: Record<AdminUser['role'], 'blue' | 'green' | 'amber' | 'slate'> = {
   agent: 'blue',
   validator: 'green',
+  paie: 'slate',
   admin: 'amber',
 }
 
@@ -172,8 +174,9 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
           className={`${inputCls} mb-4`}
         >
           <option value="agent">Pointeur (terrain, prend les photos)</option>
-          <option value="validator">Bureau (valide les pointages, gère les employés)</option>
-          <option value="admin">Administrateur (tout + analytics + utilisateurs)</option>
+          <option value="validator">Bureau (valide les pointages, gère les employés et les sites)</option>
+          <option value="paie">Paie (calcule et valide la paie, bulletins de présence)</option>
+          <option value="admin">Administrateur (tout + entreprises + utilisateurs)</option>
         </select>
 
         <label className="mb-1 block text-sm font-medium text-slate-700">
