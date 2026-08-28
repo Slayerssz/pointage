@@ -36,6 +36,8 @@ export async function exporterPaieExcel(opts: {
   mois: number
   lignes: LignePaie[]
   totaux: TotauxPeriode | undefined
+  /** Filtre actif au moment de l'export (ex. « LA COMMUNE · Espece »). */
+  filtre?: string
   devise?: string
 }) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
@@ -47,11 +49,14 @@ export async function exporterPaieExcel(opts: {
   // Titre
   rows.push([{ value: `PAIE — ${entreprise}`, fontWeight: 'bold', fontSize: 14, columnSpan: 8 }])
   rows.push([{ value: `${MOIS_FR[mois - 1]} ${annee}`, fontSize: 11, columnSpan: 8 }])
+  if (opts.filtre) {
+    rows.push([{ value: `Sélection : ${opts.filtre}`, fontSize: 11, fontWeight: 'bold', columnSpan: 8 }])
+  }
   rows.push([])
 
   // En-têtes
   const colonnes = [
-    'Matricule', 'Nom & Prénom', 'Site', 'Qualification', 'CIN', 'CNSS',
+    'Matricule', 'Nom & Prénom', 'Annexe', 'Site principal', 'Qualification', 'CIN', 'CNSS',
     'Salaire de base', 'Base (j)', 'Gardes', 'Congé', 'Malade',
     'Jours payés', 'Heures', 'Salaire brut', 'Prime', 'Retenue dette',
     'Autres retenues', 'NET À PAYER', 'Règlement', 'Banque', 'RIB', 'Observations',
@@ -63,6 +68,7 @@ export async function exporterPaieExcel(opts: {
       { type: Number, value: l.matricule ?? undefined },
       { type: String, value: l.nom_prenom },
       { type: String, value: l.site_nom ?? undefined },
+      { type: String, value: l.site_principal_nom ?? undefined },
       { type: String, value: l.qualification ?? undefined },
       { type: String, value: l.cin ?? undefined },
       { type: String, value: l.cnss ?? undefined },
@@ -89,8 +95,8 @@ export async function exporterPaieExcel(opts: {
   const somme = (f: (l: LignePaie) => number) => lignes.reduce((s, l) => s + Number(f(l)), 0)
   rows.push([])
   rows.push([
-    { value: 'TOTAL', fontWeight: 'bold', columnSpan: 6, backgroundColor: '#F1F5F9' },
-    null, null, null, null, null,
+    { value: 'TOTAL', fontWeight: 'bold', columnSpan: 7, backgroundColor: '#F1F5F9' },
+    null, null, null, null, null, null,
     { ...money, value: somme((l) => l.salaire_base), fontWeight: 'bold' },
     null, null, null, null, null, null, null,
     { ...money, value: somme((l) => l.salaire_brut), fontWeight: 'bold' },
@@ -126,7 +132,7 @@ export async function exporterPaieExcel(opts: {
   }
 
   const columns = [
-    { width: 11 }, { width: 30 }, { width: 24 }, { width: 20 }, { width: 12 }, { width: 14 },
+    { width: 11 }, { width: 30 }, { width: 24 }, { width: 22 }, { width: 20 }, { width: 12 }, { width: 14 },
     { width: 15 }, { width: 9 }, { width: 9 }, { width: 9 }, { width: 9 },
     { width: 12 }, { width: 10 }, { width: 15 }, { width: 12 }, { width: 14 },
     { width: 15 }, { width: 16 }, { width: 13 }, { width: 20 }, { width: 28 }, { width: 26 },
@@ -146,6 +152,7 @@ export async function exporterPaiePdf(opts: {
   mois: number
   lignes: LignePaie[]
   totaux: TotauxPeriode | undefined
+  filtre?: string
   devise?: string
 }) {
   const [{ jsPDF }, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
@@ -162,7 +169,10 @@ export async function exporterPaiePdf(opts: {
   doc.setFontSize(15).setFont('helvetica', 'bold')
   doc.text(`ÉTAT DE PAIE — ${entreprise.toUpperCase()}`, largeur / 2, 14, { align: 'center' })
   doc.setFontSize(11).setFont('helvetica', 'normal')
-  doc.text(`${MOIS_FR[mois - 1]} ${annee}`, largeur / 2, 20, { align: 'center' })
+  doc.text(
+    opts.filtre ? `${MOIS_FR[mois - 1]} ${annee} — ${opts.filtre}` : `${MOIS_FR[mois - 1]} ${annee}`,
+    largeur / 2, 20, { align: 'center' },
+  )
   doc.setFontSize(8).setTextColor(110)
   doc.text(
     `${lignes.length} employé(s) · Édité le ${new Date().toLocaleDateString('fr-FR')}`,

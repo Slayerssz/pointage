@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { supabase } from './supabase'
-import type { Employee, Pointage, Site } from './types'
+import type { Employee, Pointage, Site, SitePrincipal } from './types'
 
 export const SITE_EMPLOYEES_PAGE = 100
 
@@ -14,13 +14,30 @@ export function useSites(companyId: string | undefined, opts?: { pointageOnly?: 
     queryFn: async (): Promise<Site[]> => {
       let query = supabase
         .from('sites')
-        .select('id, company_id, name, pointage_actif')
+        .select('id, company_id, name, pointage_actif, site_principal_id')
         .eq('company_id', companyId!)
         .order('name')
       if (pointageOnly) query = query.eq('pointage_actif', true)
       const { data, error } = await query
       if (error) throw error
       return data
+    },
+  })
+}
+
+/** Les sites principaux d'une entreprise. */
+export function useSitesPrincipaux(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['sites-principaux', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async (): Promise<SitePrincipal[]> => {
+      const { data, error } = await supabase
+        .from('sites_principaux')
+        .select('id, company_id, name')
+        .eq('company_id', companyId!)
+        .order('name')
+      if (error) throw error
+      return data as SitePrincipal[]
     },
   })
 }

@@ -13,11 +13,21 @@ export interface Company {
   name: string
 }
 
+/** Une « annexe » : c'est là que les employés sont rattachés. */
 export interface Site {
   id: string
   company_id: string
   name: string
   pointage_actif: boolean
+  /** Site principal de rattachement (null = annexe indépendante). */
+  site_principal_id: string | null
+}
+
+/** Un regroupement d'annexes (ex. « LA COMMUNE »). */
+export interface SitePrincipal {
+  id: string
+  company_id: string
+  name: string
 }
 
 export interface Employee {
@@ -177,6 +187,7 @@ export interface LignePaie {
   cnss: string | null
   site_id: string | null
   site_nom: string | null
+  site_principal_nom: string | null
   qualification: string | null
   mode_reglement: string | null
   banque: string | null

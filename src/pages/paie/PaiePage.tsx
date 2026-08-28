@@ -94,6 +94,9 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   const { data: dettes } = useDettesOuvertes(companyId)
   const invalider = usePaieInvalidation(companyId, periode.id)
   const [recherche, setRecherche] = useState('')
+  const [filtreReglement, setFiltreReglement] = useState('')
+  const [filtreSite, setFiltreSite] = useState('')
+  const [filtrePrincipal, setFiltrePrincipal] = useState('')
   const [motifReouverture, setMotifReouverture] = useState('')
   const [exportEnCours, setExportEnCours] = useState<string | null>(null)
   const [erreurExport, setErreurExport] = useState<string | null>(null)
@@ -162,26 +165,76 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
   const filtrees = useMemo(() => {
     const q = recherche.trim().toLowerCase()
-    if (!q) return lignes ?? []
-    return (lignes ?? []).filter(
-      (l) =>
+    return (lignes ?? []).filter((l) => {
+      if (filtreReglement && (l.mode_reglement ?? '') !== filtreReglement) return false
+      if (filtreSite && (l.site_nom ?? '') !== filtreSite) return false
+      if (filtrePrincipal && (l.site_principal_nom ?? '') !== filtrePrincipal) return false
+      if (!q) return true
+      return (
         l.nom_prenom.toLowerCase().includes(q) ||
         String(l.matricule ?? '').includes(q) ||
-        (l.site_nom ?? '').toLowerCase().includes(q),
-    )
-  }, [lignes, recherche])
+        (l.site_nom ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [lignes, recherche, filtreReglement, filtreSite, filtrePrincipal])
+
+  const filtreActif = Boolean(filtreReglement || filtreSite || filtrePrincipal || recherche.trim())
+
+  // Les valeurs proposées viennent des lignes du mois : on ne propose que
+  // ce qui existe réellement dans cette paie.
+  const valeurs = useMemo(() => {
+    const uniq = (f: (l: LignePaie) => string | null) =>
+      [...new Set((lignes ?? []).map(f).filter((v): v is string => Boolean(v)))].sort()
+    return {
+      reglements: uniq((l) => l.mode_reglement),
+      sites: uniq((l) => l.site_nom),
+      principaux: uniq((l) => l.site_principal_nom),
+    }
+  }, [lignes])
+
+  /** Totaux de la sélection courante — c'est ce que le patron veut lire. */
+  const totauxFiltres = useMemo(() => {
+    const somme = (f: (l: LignePaie) => number) =>
+      filtrees.reduce((s, l) => s + Number(f(l)), 0)
+    return {
+      employes: filtrees.length,
+      total_brut: somme((l) => l.salaire_brut),
+      total_primes: somme((l) => l.prime),
+      total_dettes: somme((l) => l.retenue_dette),
+      total_autres_retenues: somme((l) => l.autres_retenues),
+      total_net: somme((l) => l.net_a_payer),
+      total_virement: filtrees.filter((l) => estVirement(l.mode_reglement))
+        .reduce((s, l) => s + Number(l.net_a_payer), 0),
+      total_especes: filtrees.filter((l) => !estVirement(l.mode_reglement))
+        .reduce((s, l) => s + Number(l.net_a_payer), 0),
+      par_banque: Object.entries(
+        filtrees.filter((l) => estVirement(l.mode_reglement)).reduce((acc, l) => {
+          const b = (l.banque ?? '').trim() || '(non renseignée)'
+          acc[b] = acc[b] ?? { n: 0, montant: 0 }
+          acc[b].n += 1
+          acc[b].montant += Number(l.net_a_payer)
+          return acc
+        }, {} as Record<string, { n: number; montant: number }>),
+      ).map(([banque, v]) => ({ banque, ...v })).sort((a, b) => b.montant - a.montant),
+    }
+  }, [filtrees])
 
   const exporter = async (format: 'excel' | 'pdf') => {
     if (!lignes) return
     setExportEnCours(format)
     setErreurExport(null)
     try {
+      // L'export reprend exactement ce qui est affiché : si un filtre est
+      // actif, on n'exporte que cette sélection, avec ses propres totaux.
       const opts = {
         entreprise: company?.name ?? 'Entreprise',
         annee: periode.annee,
         mois: periode.mois,
-        lignes,
-        totaux,
+        lignes: filtrees,
+        totaux: filtreActif ? totauxFiltres : totaux,
+        filtre: filtreActif
+          ? [filtrePrincipal, filtreSite, filtreReglement].filter(Boolean).join(' · ')
+          : undefined,
       }
       if (format === 'excel') await exporterPaieExcel(opts)
       else await exporterPaiePdf(opts)
@@ -242,13 +295,38 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         </div>
 
         {totaux && (
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <Total label="Employés" value={String(totaux.employes)} />
-            <Total label="Total brut" value={formatDH(totaux.total_brut)} />
-            <Total label="Retenues" value={formatDH(Number(totaux.total_dettes) + Number(totaux.total_autres_retenues))} />
-            <Total label="Virements" value={formatDH(totaux.total_virement)} />
-            <Total label="NET À PAYER" value={formatDH(totaux.total_net)} fort />
-          </div>
+          <>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              <Total label="Employés" value={String(totauxFiltres.employes)} />
+              <Total label="Total brut" value={formatDH(totauxFiltres.total_brut)} />
+              <Total label="Retenues" value={formatDH(totauxFiltres.total_dettes + totauxFiltres.total_autres_retenues)} />
+              <Total label="Virements" value={formatDH(totauxFiltres.total_virement)} />
+              <Total label="NET À PAYER" value={formatDH(totauxFiltres.total_net)} fort />
+            </div>
+            {filtreActif && (
+              <p className="mt-2 text-xs text-slate-500">
+                Ces totaux ne portent que sur la sélection.
+                {' '}Paie complète du mois : <strong>{formatDH(totaux.total_net)}</strong> pour{' '}
+                {totaux.employes} employé(s).
+              </p>
+            )}
+            {/* Espèces / virement : la question la plus fréquente */}
+            <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+              <span>
+                À payer en <strong className="text-slate-900">espèces</strong> :{' '}
+                <span className="tabular-nums">{formatDH(totauxFiltres.total_especes)}</span>
+              </span>
+              <span>
+                Par <strong className="text-slate-900">virement</strong> :{' '}
+                <span className="tabular-nums">{formatDH(totauxFiltres.total_virement)}</span>
+              </span>
+              {totauxFiltres.par_banque.map((b) => (
+                <span key={b.banque} className="text-slate-500">
+                  {b.banque} : <span className="tabular-nums">{formatDH(b.montant)}</span>
+                </span>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -357,15 +435,57 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
       )}
 
       {/* Recherche */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <input
           type="search"
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
           placeholder="Rechercher (nom, matricule, site)…"
-          className="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          className="w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
         />
-        <p className="text-sm text-slate-500">{filtrees.length} ligne(s)</p>
+        {valeurs.principaux.length > 0 && (
+          <select
+            value={filtrePrincipal}
+            onChange={(e) => setFiltrePrincipal(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="">Tous les sites principaux</option>
+            {valeurs.principaux.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        )}
+        <select
+          value={filtreSite}
+          onChange={(e) => setFiltreSite(e.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Toutes les annexes</option>
+          {valeurs.sites.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select
+          value={filtreReglement}
+          onChange={(e) => setFiltreReglement(e.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Tous les règlements</option>
+          {valeurs.reglements.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        {filtreActif && (
+          <button
+            onClick={() => {
+              setRecherche(''); setFiltreReglement(''); setFiltreSite(''); setFiltrePrincipal('')
+            }}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Tout afficher
+          </button>
+        )}
+        <p className="ml-auto text-sm text-slate-500">{filtrees.length} ligne(s)</p>
       </div>
 
       {/* Tableau de paie */}
@@ -375,7 +495,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
               <th className="px-3 py-3 font-medium">N°</th>
               <th className="px-3 py-3 font-medium">Nom & Prénom</th>
-              <th className="px-3 py-3 font-medium">Site</th>
+              <th className="px-3 py-3 font-medium">Annexe</th>
               <th className="px-3 py-3 text-right font-medium">Salaire base</th>
               <th className="px-3 py-3 text-center font-medium">Gardes</th>
               <th className="px-3 py-3 text-center font-medium">C / M</th>
@@ -505,7 +625,12 @@ function LigneRow({
           <p className="text-xs text-red-600">{(enregistrer.error as Error).message}</p>
         )}
       </td>
-      <td className="max-w-40 truncate px-3 py-2 text-slate-600">{ligne.site_nom ?? '—'}</td>
+      <td className="max-w-40 px-3 py-2 text-slate-600">
+        <p className="truncate">{ligne.site_nom ?? '—'}</p>
+        {ligne.site_principal_nom && (
+          <p className="truncate text-xs text-slate-400">{ligne.site_principal_nom}</p>
+        )}
+      </td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatDH(ligne.salaire_base)}</td>
       <td className="px-3 py-2 text-center tabular-nums text-slate-700">
         {formatNombre(ligne.gardes_travaillees)}

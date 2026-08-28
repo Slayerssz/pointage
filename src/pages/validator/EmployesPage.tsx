@@ -9,7 +9,7 @@ import {
   retirementStatus,
   todayIso,
 } from '../../lib/dates'
-import { useEmployeFiltres, useSites } from '../../lib/queries'
+import { useEmployeFiltres, useSites, useSitesPrincipaux } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
 import { useContratsCourants, formatDH } from '../../lib/paie'
@@ -37,6 +37,7 @@ export default function EmployesPage() {
   const { data: sites } = useSites(companyId)
   const { data: filtres } = useEmployeFiltres(companyId)
   const { data: contrats } = useContratsCourants(companyId)
+  const { data: principaux } = useSitesPrincipaux(companyId)
   const { data: company } = useQuery({
     queryKey: ['company', companyId],
     enabled: Boolean(companyId),
@@ -65,6 +66,7 @@ export default function EmployesPage() {
   const [qualifFilter, setQualifFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('actif')
   const [contratFilter, setContratFilter] = useState('')
+  const [principalFilter, setPrincipalFilter] = useState('')
   const { profile } = useAuth()
   const estAdmin = profile?.role === 'admin'
   // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.
@@ -84,6 +86,7 @@ export default function EmployesPage() {
     queryKey: [
       'employees', companyId, page, debouncedSearch,
       siteFilter, villeFilter, modeFilter, qualifFilter, statutFilter, toutesEntreprises,
+      principalFilter,
     ],
     enabled: Boolean(companyId),
     placeholderData: keepPreviousData,
@@ -99,6 +102,13 @@ export default function EmployesPage() {
       // Vue « toutes les entreprises » : réservée à l'administrateur
       if (!(estAdmin && toutesEntreprises)) query = query.eq('company_id', companyId!)
       if (siteFilter) query = query.eq('site_id', siteFilter)
+      // Filtrer sur un site principal = filtrer sur toutes ses annexes
+      if (principalFilter) {
+        const ids = (sites ?? [])
+          .filter((s) => s.site_principal_id === principalFilter)
+          .map((s) => s.id)
+        query = query.in('site_id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
+      }
       if (villeFilter) query = query.eq('ville', villeFilter)
       if (modeFilter) query = query.eq('mode_reglement', modeFilter)
       if (qualifFilter) query = query.eq('qualification', qualifFilter)
@@ -183,8 +193,13 @@ export default function EmployesPage() {
           placeholder="Rechercher (nom, matricule, CIN)…"
           className="w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
         />
-        {!toutesEntreprises && filterSelect(siteFilter, resetPage(setSiteFilter), 'Tous les sites',
-          (sites ?? []).map((s) => ({ value: s.id, label: s.name })))}
+        {!toutesEntreprises && (principaux ?? []).length > 0 &&
+          filterSelect(principalFilter, resetPage(setPrincipalFilter), 'Tous les sites principaux',
+            (principaux ?? []).map((p) => ({ value: p.id, label: p.name })))}
+        {!toutesEntreprises && filterSelect(siteFilter, resetPage(setSiteFilter), 'Toutes les annexes',
+          (sites ?? [])
+            .filter((s) => !principalFilter || s.site_principal_id === principalFilter)
+            .map((s) => ({ value: s.id, label: s.name })))}
         {filterSelect(villeFilter, resetPage(setVilleFilter), 'Toutes les villes',
           (filtres?.villes ?? []).map((v) => ({ value: v, label: v })))}
         {filterSelect(modeFilter, resetPage(setModeFilter), 'Tous les règlements',
@@ -232,7 +247,7 @@ export default function EmployesPage() {
                 {estAdmin && toutesEntreprises && (
                   <th className="px-4 py-3 font-medium">Entreprise</th>
                 )}
-                <th className="px-4 py-3 font-medium">Site</th>
+                <th className="px-4 py-3 font-medium">Annexe</th>
                 <th className="px-4 py-3 font-medium">Âge</th>
                 <th className="px-4 py-3 font-medium">Naissance</th>
                 <th className="px-4 py-3 font-medium">Embauche</th>
