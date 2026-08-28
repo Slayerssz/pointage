@@ -28,7 +28,7 @@ function field(label: string, input: ReactNode) {
   )
 }
 
-type Onglet = 'contrats' | 'conges'
+type Onglet = 'contrats' | 'conges' | 'dette'
 
 /** Panneau « Contrats · Congés · Dettes » d'un employé. */
 export default function EmployeDetail({
@@ -43,6 +43,7 @@ export default function EmployeDetail({
   const onglets: { code: Onglet; label: string }[] = [
     { code: 'contrats', label: 'Contrats' },
     { code: 'conges', label: 'Congés & absences' },
+    { code: 'dette', label: 'Dette' },
   ]
 
   return (
@@ -65,6 +66,7 @@ export default function EmployeDetail({
         <ContratsPanel employee={employee} onImprimer={onImprimerContrat} />
       )}
       {onglet === 'conges' && <CongesPanel employee={employee} />}
+      {onglet === 'dette' && <DettePanel employee={employee} />}
     </div>
   )
 }
@@ -586,3 +588,79 @@ function CongesPanel({ employee }: { employee: Employee }) {
   )
 }
 
+
+// ---------------------------------------------------------------- Dette -----
+
+/**
+ * Un seul montant : ce que l'employé doit encore.
+ *
+ * Le remboursement se pilote depuis la paie — on y saisit ce qu'on retient
+ * sur le mois, et à la validation ce solde baisse d'autant.
+ */
+function DettePanel({ employee }: { employee: Employee }) {
+  const qc = useQueryClient()
+  const [montant, setMontant] = useState(String(employee.dette ?? 0))
+
+  const enregistrer = useMutation({
+    mutationFn: async () => {
+      const v = Number(montant)
+      if (!Number.isFinite(v) || v < 0) throw new Error('Le montant doit être positif ou nul.')
+      const { error } = await supabase
+        .from('employees').update({ dette: v }).eq('id', employee.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] })
+      qc.invalidateQueries({ queryKey: ['dettes'] })
+    },
+  })
+
+  const modifie = Number(montant) !== Number(employee.dette ?? 0)
+
+  return (
+    <div>
+      <div className="rounded-xl border border-slate-200 p-4">
+        <p className="mb-1 text-sm font-semibold text-slate-900">Dette de l’employé</p>
+        <p className="mb-4 text-sm text-slate-600">
+          Ce que {employee.nom_prenom} doit encore. Vous n’avez rien à déduire ici : dans
+          l’onglet <strong>Paie</strong>, vous saisissez le montant retenu sur le mois, et à la
+          validation ce solde baisse d’autant.
+        </p>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-slate-700">Montant dû (DH)</span>
+            <input
+              type="number" min="0" step="0.01" value={montant}
+              onChange={(e) => setMontant(e.target.value)}
+              className={`${inputCls} w-44 tabular-nums`}
+            />
+          </label>
+          <button
+            onClick={() => enregistrer.mutate()}
+            disabled={enregistrer.isPending || !modifie}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {enregistrer.isPending ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+          {enregistrer.isSuccess && !modifie && (
+            <span className="text-sm text-emerald-700">Enregistré ✓</span>
+          )}
+        </div>
+
+        {enregistrer.error && (
+          <div className="mt-3">
+            <ErrorNote>{enregistrer.error.message}</ErrorNote>
+          </div>
+        )}
+      </div>
+
+      {Number(employee.dette ?? 0) > 0 && (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Solde actuel : <strong>{formatDH(employee.dette)}</strong>. Il apparaîtra en rappel sous
+          la colonne « Dette » de la paie.
+        </p>
+      )}
+    </div>
+  )
+}

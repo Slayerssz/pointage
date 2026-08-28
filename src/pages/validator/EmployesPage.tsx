@@ -537,7 +537,6 @@ function EmployeeFormModal({
     banque: employee?.banque ?? '',
     salaire: employee?.salaire?.toString() ?? '',
     heures_par_jour: employee?.heures_par_jour?.toString() ?? '8',
-    dette: employee?.dette?.toString() ?? '0',
     situation_familiale: employee?.situation_familiale ?? '',
     nombre_enfants: employee?.nombre_enfants?.toString() ?? '0',
     statut: employee && !employee.actif ? 'sorti' : 'actif',
@@ -571,7 +570,6 @@ function EmployeeFormModal({
         banque: form.banque.trim() || null,
         salaire: form.salaire.trim() ? Number(form.salaire) : null,
         heures_par_jour: form.heures_par_jour.trim() ? Number(form.heures_par_jour) : null,
-        dette: Math.max(0, Number(form.dette) || 0),
         situation_familiale: form.situation_familiale || null,
         // Un célibataire n'a pas d'enfants à déclarer ici
         nombre_enfants: SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale)
@@ -756,20 +754,6 @@ function EmployeeFormModal({
             {field('RIB', (
               <input type="text" value={form.rib} onChange={(e) => set('rib')(e.target.value)} className={inputCls} placeholder="24 chiffres" />
             ))}
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700">Dette (DH)</span>
-              <input
-                type="number" min="0" step="0.01" value={form.dette}
-                onChange={(e) => set('dette')(e.target.value)}
-                className={inputCls} placeholder="0"
-              />
-              <span className="mt-1 block text-xs text-slate-500">
-                Ce que l’employé doit encore. Dans la paie, vous saisissez le montant à retenir
-                ce mois-ci ; à la validation, ce solde baisse d’autant.
-              </span>
-            </label>
           </div>
 
           <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
