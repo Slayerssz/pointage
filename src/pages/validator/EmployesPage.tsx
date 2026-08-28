@@ -448,7 +448,6 @@ export default function EmployesPage() {
         <EmployeeFormModal
           companyId={companyId}
           employee={editing}
-          entreprise={company?.name ?? ''}
           onImprimerContrat={(contrat, employee) => setImpression({ contrat, employee })}
           onClose={() => {
             setEditing(null)
@@ -483,13 +482,11 @@ export default function EmployesPage() {
 function EmployeeFormModal({
   companyId,
   employee,
-  entreprise,
   onImprimerContrat,
   onClose,
 }: {
   companyId: string
   employee: Employee | null
-  entreprise: string
   onImprimerContrat: (contrat: Contrat, employee: Employee) => void
   onClose: () => void
 }) {
@@ -626,7 +623,6 @@ function EmployeeFormModal({
         {employee && vue === 'dossier' && (
           <EmployeDetail
             employee={employee}
-            entreprise={entreprise}
             onImprimerContrat={(contrat) => onImprimerContrat(contrat, employee)}
           />
         )}

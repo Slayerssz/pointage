@@ -23,6 +23,7 @@ export default function DocumentsSignes({
   congeId,
   contratId,
   intitule,
+  aide,
 }: {
   companyId: string
   employeeId: string
@@ -31,6 +32,8 @@ export default function DocumentsSignes({
   contratId?: string
   /** Ce qu'on attend, en clair (ex. « l'engagement signé »). */
   intitule: string
+  /** Phrase d'aide quand aucun fichier n'est encore déposé. */
+  aide?: string
 }) {
   const { data: docs, isLoading } = useDocuments({ employeeId, congeId, contratId })
   const deposer = useDeposerDocument({ companyId, employeeId, type, congeId, contratId })
@@ -78,8 +81,8 @@ export default function DocumentsSignes({
 
       {aucun && (
         <p className="mt-2 text-xs text-slate-500">
-          Aucun scan pour l’instant. Imprimez le document, faites-le signer, puis déposez ici{' '}
-          {intitule} — PDF ou photo, 10 Mo maximum.
+          {aide ?? `Aucun scan pour l’instant. Déposez ici ${intitule}.`}{' '}
+          PDF ou photo, 10 Mo maximum.
         </p>
       )}
 
