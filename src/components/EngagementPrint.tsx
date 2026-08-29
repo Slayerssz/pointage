@@ -1,16 +1,17 @@
-import { formatDateFr } from '../lib/dates'
+import { addDays, dateToIso, formatDateFr, todayIso } from '../lib/dates'
 import { gardeLabel } from '../lib/gardes'
-import type { Conge, Employee } from '../lib/types'
+import { modeleDe } from '../lib/modeles'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
+import DocumentCadre, { Signatures, type Bloc } from './DocumentCadre'
+import type { Conge, Employee } from '../lib/types'
 
 /**
- * ENGAGEMENT DE CONGÉ — le papier que l'employé signe.
+ * ENGAGEMENT DE CONGÉ
  *
- * Circuit : on l'imprime ici → l'employé le signe → on le scanne →
- * on le rattache au congé (bouton « Joindre un scan »).
- *
- * Le texte est modifiable dans ce seul fichier.
+ * Le papier que le salarié signe avant de partir. Comme pour le contrat,
+ * la mise en page suit le modèle propre à chaque société — deux sociétés
+ * du groupe n'ont pas le même document. Noir et blanc.
  */
 export default function EngagementPrint({
   conge,
@@ -23,10 +24,75 @@ export default function EngagementPrint({
   entreprise: string
   onClose: () => void
 }) {
+  const modele = modeleDe(entreprise)
   useFermerSurEchap(onClose)
-
   useModeImpression()
   const { pret, imprimer } = useImpression(0)
+
+  // Lendemain de la fin du congé. On reste en dates locales : passer par
+  // toISOString() ferait reculer d'un jour au Maroc (UTC+1).
+  const reprise = formatDateFr(dateToIso(addDays(new Date(conge.date_fin + 'T00:00:00'), 1)))
+
+  const identite: [string, string][] = [
+    ['Nom et prénom', employee.nom_prenom],
+    ['N° de C.I.N.', employee.cin ?? '—'],
+    ['Matricule', employee.matricule != null ? String(employee.matricule) : '—'],
+    ['Qualification', employee.qualification ?? '—'],
+  ]
+
+  const conditions: [string, string][] = [
+    ['Nature de l’absence', gardeLabel(conge.type)],
+    ['Date de départ', formatDateFr(conge.date_debut)],
+    ['Date de fin', formatDateFr(conge.date_fin)],
+    ['Jours décomptés', String(conge.jours)],
+    ['Reprise du travail', reprise],
+    ...(conge.motif ? ([['Motif', conge.motif]] as [string, string][]) : []),
+  ]
+
+  const clauses: Bloc[] = [
+    {
+      titre: 'Objet',
+      corps: (
+        <>
+          Je soussigné(e) <strong>{employee.nom_prenom}</strong>, reconnais avoir été autorisé(e)
+          par mon employeur à m’absenter de mon poste de travail au titre de{' '}
+          <strong>{gardeLabel(conge.type).toLowerCase()}</strong>, du{' '}
+          <strong>{formatDateFr(conge.date_debut)}</strong> au{' '}
+          <strong>{formatDateFr(conge.date_fin)}</strong>, soit{' '}
+          <strong>{conge.jours}</strong> jour(s) décompté(s).
+        </>
+      ),
+    },
+    {
+      titre: 'Engagement de reprise',
+      corps: (
+        <>
+          Je m’engage à reprendre mon poste de travail le{' '}
+          <strong>{reprise}</strong>, à l’heure habituelle de prise de service.
+        </>
+      ),
+    },
+    {
+      titre: 'Absence irrégulière',
+      corps: (
+        <>
+          Je reconnais avoir été informé(e) que toute absence prolongée au-delà de cette date,
+          sans autorisation écrite préalable de l’employeur, sera considérée comme une absence
+          irrégulière et pourra donner lieu aux sanctions prévues par le règlement intérieur et
+          par le Code du travail.
+        </>
+      ),
+    },
+    {
+      titre: 'Exemplaires',
+      corps: (
+        <>
+          Le présent engagement est établi en deux exemplaires, dont un remis à l’intéressé(e)
+          après signature.
+        </>
+      ),
+    },
+  ]
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
@@ -38,74 +104,33 @@ export default function EngagementPrint({
         onClose={onClose}
       />
 
-      <div className="document-imprimable mx-auto my-6 max-w-[210mm] bg-white p-[18mm] text-[11pt] leading-relaxed text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
-        <header className="mb-10 text-center">
-          <h1 className="text-lg font-bold uppercase tracking-wide">{entreprise}</h1>
-          <p className="mt-8 text-xl font-bold uppercase underline">Engagement de congé</p>
-        </header>
-
-        <p className="mb-6">
-          Je soussigné(e) <strong>{employee.nom_prenom}</strong>
-          {employee.cin ? <>, titulaire de la C.I.N. n° <strong>{employee.cin}</strong></> : null}
-          {employee.matricule != null ? <>, matricule n° <strong>{employee.matricule}</strong></> : null}
-          {employee.qualification ? <>, exerçant en qualité de {employee.qualification}</> : null}
-          , reconnais avoir été autorisé(e) par mon employeur à m’absenter de mon poste de
-          travail dans les conditions suivantes :
-        </p>
-
-        <table className="mb-6 w-full border-collapse text-[11pt]">
-          <tbody>
-            <tr>
-              <td className="w-1/2 border border-black px-3 py-2">Nature de l’absence</td>
-              <td className="border border-black px-3 py-2 font-semibold">{gardeLabel(conge.type)}</td>
-            </tr>
-            <tr>
-              <td className="border border-black px-3 py-2">Du</td>
-              <td className="border border-black px-3 py-2 font-semibold">{formatDateFr(conge.date_debut)}</td>
-            </tr>
-            <tr>
-              <td className="border border-black px-3 py-2">Au</td>
-              <td className="border border-black px-3 py-2 font-semibold">{formatDateFr(conge.date_fin)}</td>
-            </tr>
-            <tr>
-              <td className="border border-black px-3 py-2">Nombre de jours décomptés</td>
-              <td className="border border-black px-3 py-2 font-semibold">{conge.jours}</td>
-            </tr>
-            {conge.motif && (
-              <tr>
-                <td className="border border-black px-3 py-2">Motif</td>
-                <td className="border border-black px-3 py-2">{conge.motif}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        <p className="mb-4 text-justify">
-          Je m’engage à reprendre mon poste de travail le lendemain de la date de fin indiquée
-          ci-dessus. Je reconnais avoir été informé(e) que toute absence prolongée au-delà de
-          cette date, sans autorisation écrite préalable de l’employeur, sera considérée comme
-          une absence irrégulière.
-        </p>
-
-        <p className="mb-10 text-justify">
-          Le présent engagement est établi en deux exemplaires, dont un remis à l’intéressé(e).
-        </p>
-
-        <div className="mt-16 flex justify-between gap-8">
-          <div className="w-1/2 text-center">
-            <p className="mb-16 font-semibold">L’Employeur</p>
-            <p className="border-t border-black pt-1 text-sm">{entreprise}</p>
-          </div>
-          <div className="w-1/2 text-center">
-            <p className="mb-16 font-semibold">Le Salarié</p>
-            <p className="border-t border-black pt-1 text-sm">
-              {employee.nom_prenom}
-              <br />
-              <span className="text-xs">(lu et approuvé)</span>
-            </p>
-          </div>
-        </div>
+      <div className="document-imprimable">
+        <DocumentCadre
+          modele={modele}
+          entreprise={entreprise}
+          titre="Engagement de congé"
+          identite={identite}
+          titreIdentite="Le Salarié"
+          conditions={conditions}
+          titreConditions="Période d’absence"
+          blocs={clauses}
+          conclusion={
+            <>
+              Fait à <strong>{employee.ville || '—'}</strong>, le{' '}
+              <strong>{formatDateFr(todayIso())}</strong>.
+            </>
+          }
+          signatures={
+            <Signatures
+              modele={modele}
+              gauche={{ role: 'L’Employeur', nom: entreprise }}
+              droite={{ role: 'Le Salarié', nom: employee.nom_prenom, mention: 'lu et approuvé' }}
+            />
+          }
+        />
       </div>
+
+      <style>{`@media print { @page { size: A4 portrait; margin: 14mm; } }`}</style>
     </div>
   )
 }

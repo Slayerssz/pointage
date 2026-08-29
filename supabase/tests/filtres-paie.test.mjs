@@ -66,5 +66,32 @@ ok('détail par banque : CIH 4 700 + BMCE 4 000',
    JSON.stringify(Object.fromEntries(parBanque))==='{"CIH":4700,"BMCE":4000}',
    JSON.stringify(parBanque))
 
+
+// ── Dates : le calcul doit rester local (le Maroc est en UTC+1) ──────────
+const dateToIso = (d) => {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+const addDays = (d, n) => { const o = new Date(d); o.setDate(o.getDate() + n); return o }
+const lendemain = (iso) => dateToIso(addDays(new Date(iso + 'T00:00:00'), 1))
+const unAnApres = (iso) => {
+  const d = new Date(iso + 'T00:00:00')
+  d.setFullYear(d.getFullYear() + 1)
+  return dateToIso(addDays(d, -1))
+}
+
+ok('reprise = lendemain de la fin du congé', lendemain('2026-09-10') === '2026-09-11', lendemain('2026-09-10'))
+ok('lendemain passe le changement de mois', lendemain('2026-09-30') === '2026-10-01', lendemain('2026-09-30'))
+ok('lendemain passe le changement d’année', lendemain('2026-12-31') === '2027-01-01', lendemain('2026-12-31'))
+ok('renouvellement : un an moins un jour', unAnApres('2026-07-01') === '2027-06-30', unAnApres('2026-07-01'))
+ok('renouvellement sur année bissextile', unAnApres('2027-03-01') === '2028-02-29', unAnApres('2027-03-01'))
+// La méthode fautive : toISOString() recule d'un jour dès que le fuseau est en avance
+const fautif = (iso) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) }
+const decalage = new Date().getTimezoneOffset() < 0
+ok(decalage ? 'la méthode par toISOString aurait bien été fautive ici'
+            : 'fuseau non décalé : les deux méthodes coïncident',
+   decalage ? fautif('2026-09-10') !== '2026-09-11' : fautif('2026-09-10') === '2026-09-11',
+   `toISOString donne ${fautif('2026-09-10')}`)
+
 console.log(`\n=== ${P} réussis, ${F} échoués ===`)
-process.exit(F?1:0)
+process.exit(F ? 1 : 0)

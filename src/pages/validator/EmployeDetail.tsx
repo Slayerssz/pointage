@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import { formatDateFr, todayIso } from '../../lib/dates'
+import { addDays, dateToIso, formatDateFr, todayIso } from '../../lib/dates'
 import {
   formatDH,
   useCongesEmploye,
@@ -201,19 +201,17 @@ function ContratsPanel({
   )
 }
 
-/** Le jour suivant une date ISO. */
+/** Le jour suivant une date ISO. Calcul en dates locales : toISOString()
+ *  ferait reculer d'un jour au Maroc (UTC+1). */
 function lendemain(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+  return dateToIso(addDays(new Date(iso + 'T00:00:00'), 1))
 }
 
-/** Même date, un an plus tard. */
+/** La veille du même jour, un an plus tard. */
 function unAnApres(iso: string): string {
   const d = new Date(iso + 'T00:00:00')
   d.setFullYear(d.getFullYear() + 1)
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
+  return dateToIso(addDays(d, -1))
 }
 
 function ContratForm({

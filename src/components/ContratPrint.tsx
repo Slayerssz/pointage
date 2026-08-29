@@ -1,22 +1,23 @@
 import { formatDateFr } from '../lib/dates'
 import { formatDH } from '../lib/paie'
-import type { Contrat, Employee } from '../lib/types'
+import { modeleDe } from '../lib/modeles'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
+import DocumentCadre, { Signatures, type Bloc } from './DocumentCadre'
+import type { Contrat, Employee } from '../lib/types'
 
 /**
- * MODÈLE DE CONTRAT — c'est ce document qui est imprimé / enregistré en PDF.
+ * CONTRAT DE TRAVAIL
  *
- * ⚠️ Pour utiliser VOTRE modèle : tout le texte se trouve dans ce seul
- * fichier. Remplacez les paragraphes ci-dessous par les vôtres ; les
- * valeurs entre accolades ({employee.nom_prenom}, {c.salaire_mensuel}…)
- * se remplissent automatiquement depuis la fiche employé et le contrat.
+ * Le contenu — les clauses — est le même pour tout le monde : c'est du
+ * droit, il ne se décline pas. En revanche la mise en page change d'une
+ * société à l'autre (voir src/lib/modeles.ts), pour que deux contrats
+ * du groupe ne se ressemblent pas. Tout est en noir et blanc.
  *
- * L'impression passe par le navigateur : « Imprimer » → « Enregistrer au
- * format PDF ». La mise en page A4 est déjà réglée plus bas.
+ * Pour reprendre la main sur le texte : il est intégralement ci-dessous.
  */
 export default function ContratPrint({
-  contrat,
+  contrat: c,
   employee,
   entreprise,
   onClose,
@@ -26,180 +27,216 @@ export default function ContratPrint({
   entreprise: string
   onClose: () => void
 }) {
-  const c = contrat
-
-  // Échap pour fermer
+  const modele = modeleDe(entreprise)
   useFermerSurEchap(onClose)
-
-  // Pendant l'affichage : seul le document part à l'impression
-  // (règles dans src/index.css, section « Impression d'un document »).
   useModeImpression()
   const { pret, imprimer } = useImpression(0)
 
-  const dureeTexte =
-    c.date_fin == null
-      ? 'à durée indéterminée'
-      : `à durée déterminée, du ${formatDateFr(c.date_debut)} au ${formatDateFr(c.date_fin)}`
+  const heures = c.heures_par_jour ?? employee.heures_par_jour ?? 8
+  const salaire = c.salaire_mensuel ?? employee.salaire
+  const journalier = salaire != null ? Number(salaire) / 26 : null
+  const essai = Number(c.periode_essai_jours ?? 0)
+  const duree = c.date_fin
+    ? `à durée déterminée, du ${formatDateFr(c.date_debut)} au ${formatDateFr(c.date_fin)}`
+    : 'à durée indéterminée'
 
-  const salaireJour =
-    c.salaire_mensuel != null ? Number(c.salaire_mensuel) / 26 : null
+  // Le bloc « identité » : repris tel quel par toutes les mises en page
+  const identite: [string, string][] = [
+    ['Nom et prénom', employee.nom_prenom],
+    ['N° de C.I.N.', employee.cin ?? '—'],
+    ['N° C.N.S.S.', employee.cnss ?? '—'],
+    ['Date de naissance', employee.date_naissance ? formatDateFr(employee.date_naissance) : '—'],
+    ['Adresse', [employee.adresse, employee.ville].filter(Boolean).join(', ') || '—'],
+    ['Matricule', employee.matricule != null ? String(employee.matricule) : '—'],
+  ]
+
+  // Les conditions, telles qu'elles apparaissent dans le modèle « tableau »
+  const conditions: [string, string][] = [
+    ['Nature du contrat', c.type_contrat],
+    ['Date de début', formatDateFr(c.date_debut)],
+    ['Date de fin', c.date_fin ? formatDateFr(c.date_fin) : 'Durée indéterminée'],
+    ['Poste occupé', c.poste || employee.qualification || '—'],
+    ['Lieu de travail', c.lieu_travail || '—'],
+    ['Période d’essai', essai > 0 ? `${essai} jours` : 'Sans période d’essai'],
+    ['Durée journalière', `${heures} heures`],
+    ['Salaire mensuel brut', formatDH(salaire)],
+    ['Mode de règlement', c.mode_reglement || employee.mode_reglement || 'Virement bancaire'],
+  ]
+
+  // Les clauses. Même fond pour toutes les sociétés.
+  const clauses: Bloc[] = [
+    {
+      titre: 'Engagement',
+      corps: (
+        <>
+          L’Employeur engage le Salarié, qui accepte, dans le cadre d’un contrat de travail{' '}
+          {duree}, prenant effet le <strong>{formatDateFr(c.date_debut)}</strong>. Le Salarié
+          déclare être libre de tout engagement antérieur.
+        </>
+      ),
+    },
+    {
+      titre: 'Fonction',
+      corps: (
+        <>
+          Le Salarié est engagé en qualité de{' '}
+          <strong>{c.poste || employee.qualification || '—'}</strong>. Il exécutera les tâches
+          relevant de cette fonction, ainsi que celles que l’Employeur pourra lui confier dans
+          la limite de sa qualification.
+        </>
+      ),
+    },
+    {
+      titre: 'Lieu de travail',
+      corps: (
+        <>
+          Le Salarié exercera ses fonctions à <strong>{c.lieu_travail || '—'}</strong>.
+          L’Employeur se réserve la faculté de l’affecter à tout autre site selon les nécessités
+          du service, sans que cette mutation constitue une modification du présent contrat.
+        </>
+      ),
+    },
+    ...(essai > 0
+      ? [{
+          titre: 'Période d’essai',
+          corps: (
+            <>
+              Le présent contrat est assorti d’une période d’essai de{' '}
+              <strong>{essai} jours</strong>, renouvelable une fois dans les conditions prévues
+              par la loi. Durant cette période, chacune des parties peut rompre le contrat sans
+              préavis ni indemnité.
+            </>
+          ),
+        } as Bloc]
+      : []),
+    {
+      titre: 'Durée du travail',
+      corps: (
+        <>
+          La durée journalière de travail est fixée à <strong>{heures} heures</strong> par jour
+          travaillé, répartie selon le planning établi par l’Employeur, dans le respect de la
+          durée légale du travail.
+        </>
+      ),
+    },
+    {
+      titre: 'Rémunération',
+      corps: (
+        <>
+          En contrepartie de son travail, le Salarié percevra un salaire mensuel brut de{' '}
+          <strong>{formatDH(salaire)}</strong>
+          {journalier != null && (
+            <> pour un mois complet de vingt-six (26) journées de travail, soit{' '}
+              <strong>{formatDH(journalier)}</strong> par journée</>
+          )}
+          . Le salaire est réglé par{' '}
+          <strong>{c.mode_reglement || employee.mode_reglement || 'virement bancaire'}</strong>
+          {employee.rib ? <> sur le compte n° {employee.rib}</> : null}, à terme échu.
+        </>
+      ),
+    },
+    {
+      titre: 'Congés payés',
+      corps: (
+        <>
+          Le Salarié bénéficie des congés payés annuels dans les conditions fixées par le Code du
+          travail. Les dates sont arrêtées d’un commun accord, en fonction des nécessités du
+          service, et font l’objet d’un engagement écrit signé par le Salarié.
+        </>
+      ),
+    },
+    {
+      titre: 'Obligations du salarié',
+      corps: (
+        <>
+          Le Salarié s’engage à exécuter son travail avec soin et diligence, à respecter le
+          règlement intérieur et les consignes de sécurité, à porter la tenue réglementaire
+          fournie par l’Employeur, et à observer la discrétion la plus stricte sur tout ce dont
+          il aurait connaissance à l’occasion de ses fonctions.
+        </>
+      ),
+    },
+    {
+      titre: 'Rupture du contrat',
+      corps: c.date_fin ? (
+        <>
+          Le présent contrat prend fin de plein droit le{' '}
+          <strong>{formatDateFr(c.date_fin)}</strong>, sans qu’il soit besoin de préavis. Toute
+          rupture anticipée s’effectuera dans les conditions prévues par le Code du travail.
+        </>
+      ) : (
+        <>
+          Le présent contrat pourra être rompu par l’une ou l’autre des parties dans les
+          conditions de forme et de délai de préavis prévues par le Code du travail.
+        </>
+      ),
+    },
+    ...(c.observations
+      ? [{ titre: 'Dispositions particulières', corps: <>{c.observations}</> } as Bloc]
+      : []),
+  ]
+
+  const preambule = (
+    <>
+      <p style={{ marginBottom: '3mm' }}>
+        <strong>ENTRE LES SOUSSIGNÉS :</strong>
+      </p>
+      <p style={{ marginBottom: '3mm', textAlign: 'justify' }}>
+        <strong>{entreprise}</strong>, ci-après désignée « l’Employeur »,
+        {c.representant_employeur
+          ? <> représentée par <strong>{c.representant_employeur}</strong>,</>
+          : <> représentée par son représentant légal,</>}{' '}
+        d’une part,
+      </p>
+      <p style={{ marginBottom: '3mm' }}>ET</p>
+      <p style={{ textAlign: 'justify' }}>
+        <strong>{employee.nom_prenom}</strong>, ci-après désigné(e) « le Salarié », dont les
+        références figurent ci-dessous, d’autre part.
+      </p>
+    </>
+  )
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
-      {/* Barre d'actions — masquée à l'impression */}
       <BarreImpression
-        titre={`Contrat ${c.numero} — ${employee.nom_prenom}`}
+        titre={`Contrat ${c.numero ?? ''} — ${employee.nom_prenom}`}
         pret={pret}
         imprimer={imprimer}
         nomFichier={`Contrat_${c.numero ?? ''}_${employee.nom_prenom.replace(/\s+/g, '_')}`}
         onClose={onClose}
       />
 
-      <div className="document-imprimable mx-auto my-6 max-w-[210mm] bg-white p-[18mm] text-[11pt] leading-relaxed text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
-        {/* En-tête */}
-        <header className="mb-8 text-center">
-          <h1 className="text-lg font-bold uppercase tracking-wide">{entreprise}</h1>
-          <p className="mt-6 text-xl font-bold uppercase underline">
-            Contrat de travail {c.type_contrat === 'CDI' ? '' : `— ${c.type_contrat}`}
-          </p>
-          <p className="mt-1 text-sm">N° {c.numero}</p>
-        </header>
-
-        {/* Parties */}
-        <section className="mb-6">
-          <p className="mb-3 font-bold">ENTRE LES SOUSSIGNÉS :</p>
-          <p className="mb-3">
-            <strong>{entreprise}</strong>, ci-après désignée « l’Employeur »,
-            {c.representant_employeur ? (
-              <> représentée par <strong>{c.representant_employeur}</strong>,</>
-            ) : (
-              <> représentée par son représentant légal,</>
-            )}{' '}
-            d’une part,
-          </p>
-          <p className="mb-2">ET</p>
-          <p>
-            <strong>{employee.nom_prenom}</strong>
-            {employee.cin ? <>, titulaire de la C.I.N. n° <strong>{employee.cin}</strong></> : null}
-            {employee.date_naissance ? <>, né(e) le {formatDateFr(employee.date_naissance)}</> : null}
-            {employee.adresse || employee.ville ? (
-              <>, demeurant à {[employee.adresse, employee.ville].filter(Boolean).join(', ')}</>
-            ) : null}
-            {employee.cnss ? <>, immatriculé(e) à la CNSS sous le n° {employee.cnss}</> : null}
-            , ci-après désigné(e) « le Salarié », d’autre part.
-          </p>
-        </section>
-
-        <p className="mb-6 font-bold">IL A ÉTÉ CONVENU CE QUI SUIT :</p>
-
-        <Article n={1} titre="Engagement">
-          L’Employeur engage le Salarié, qui accepte, dans le cadre d’un contrat de travail{' '}
-          {dureeTexte}, à compter du <strong>{formatDateFr(c.date_debut)}</strong>.
-        </Article>
-
-        <Article n={2} titre="Fonction">
-          Le Salarié est engagé en qualité de{' '}
-          <strong>{c.poste || employee.qualification || '—'}</strong>. Il s’engage à exécuter les
-          tâches qui lui sont confiées avec soin et diligence, et à respecter le règlement intérieur
-          de l’Employeur.
-        </Article>
-
-        <Article n={3} titre="Lieu de travail">
-          Le Salarié exercera ses fonctions à <strong>{c.lieu_travail || '—'}</strong>. L’Employeur
-          se réserve la possibilité de l’affecter à tout autre site selon les nécessités du service.
-        </Article>
-
-        {Number(c.periode_essai_jours) > 0 && (
-          <Article n={4} titre="Période d’essai">
-            Le présent contrat est assorti d’une période d’essai de{' '}
-            <strong>{c.periode_essai_jours} jours</strong>, pendant laquelle chacune des parties
-            peut y mettre fin sans préavis ni indemnité, conformément aux dispositions du Code du
-            travail.
-          </Article>
-        )}
-
-        <Article n={Number(c.periode_essai_jours) > 0 ? 5 : 4} titre="Durée du travail">
-          La durée journalière de travail est fixée à{' '}
-          <strong>{c.heures_par_jour ?? employee.heures_par_jour ?? 8} heures</strong> par jour
-          travaillé, dans le respect de la durée légale du travail.
-        </Article>
-
-        <Article n={Number(c.periode_essai_jours) > 0 ? 6 : 5} titre="Rémunération">
-          En contrepartie de son travail, le Salarié percevra un salaire mensuel brut de{' '}
-          <strong>{formatDH(c.salaire_mensuel ?? employee.salaire)}</strong>
-          {salaireJour != null && (
+      <div className="document-imprimable">
+        <DocumentCadre
+          modele={modele}
+          entreprise={entreprise}
+          titre="Contrat de travail"
+          sousTitre={c.type_contrat === 'CDI' ? undefined : c.type_contrat}
+          reference={c.numero ?? undefined}
+          preambule={preambule}
+          identite={identite}
+          titreIdentite="Le Salarié"
+          conditions={conditions}
+          titreConditions="Conditions d’engagement"
+          blocs={clauses}
+          conclusion={
             <>
-              , correspondant à une base de 26 jours travaillés, soit{' '}
-              <strong>{formatDH(salaireJour)}</strong> par journée de travail
+              Fait à <strong>{c.signe_a || '—'}</strong>, le{' '}
+              <strong>{c.signe_le ? formatDateFr(c.signe_le) : '—'}</strong>, en deux
+              exemplaires originaux, dont un remis à chacune des parties.
             </>
-          )}
-          . Le salaire est payé par{' '}
-          <strong>{c.mode_reglement || employee.mode_reglement || 'virement bancaire'}</strong>
-          {employee.rib ? <> sur le compte n° {employee.rib}</> : null}.
-        </Article>
-
-        <Article n={Number(c.periode_essai_jours) > 0 ? 7 : 6} titre="Congés">
-          Le Salarié bénéficie des congés payés annuels dans les conditions prévues par le Code du
-          travail, après accord préalable de l’Employeur sur les dates.
-        </Article>
-
-        <Article n={Number(c.periode_essai_jours) > 0 ? 8 : 7} titre="Rupture du contrat">
-          {c.date_fin == null ? (
-            <>
-              Le présent contrat pourra être rompu par l’une ou l’autre des parties dans les
-              conditions et selon les délais de préavis prévus par le Code du travail.
-            </>
-          ) : (
-            <>
-              Le présent contrat prend fin de plein droit le{' '}
-              <strong>{formatDateFr(c.date_fin)}</strong>, sans qu’il soit nécessaire de donner un
-              préavis. Toute rupture anticipée s’effectuera dans les conditions prévues par le Code
-              du travail.
-            </>
-          )}
-        </Article>
-
-        {c.observations && (
-          <Article n={Number(c.periode_essai_jours) > 0 ? 9 : 8} titre="Dispositions particulières">
-            {c.observations}
-          </Article>
-        )}
-
-        <p className="mt-8">
-          Fait à <strong>{c.signe_a || '—'}</strong>, le{' '}
-          <strong>{c.signe_le ? formatDateFr(c.signe_le) : '—'}</strong>, en deux exemplaires
-          originaux, dont un remis à chacune des parties.
-        </p>
-
-        {/* Signatures */}
-        <div className="mt-14 flex justify-between gap-8">
-          <div className="w-1/2 text-center">
-            <p className="mb-16 font-semibold">L’Employeur</p>
-            <p className="border-t border-black pt-1 text-sm">
-              {c.representant_employeur || entreprise}
-            </p>
-          </div>
-          <div className="w-1/2 text-center">
-            <p className="mb-16 font-semibold">Le Salarié</p>
-            <p className="border-t border-black pt-1 text-sm">
-              {employee.nom_prenom}
-              <br />
-              <span className="text-xs">(lu et approuvé)</span>
-            </p>
-          </div>
-        </div>
+          }
+          signatures={
+            <Signatures
+              modele={modele}
+              gauche={{ role: 'L’Employeur', nom: c.representant_employeur || entreprise }}
+              droite={{ role: 'Le Salarié', nom: employee.nom_prenom, mention: 'lu et approuvé' }}
+            />
+          }
+        />
       </div>
-    </div>
-  )
-}
 
-function Article({ n, titre, children }: { n: number; titre: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-4 break-inside-avoid">
-      <p className="mb-1 font-bold">
-        Article {n} — {titre}
-      </p>
-      <p className="text-justify">{children}</p>
-    </section>
+      <style>{`@media print { @page { size: A4 portrait; margin: 14mm; } }`}</style>
+    </div>
   )
 }
