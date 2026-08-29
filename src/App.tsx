@@ -13,6 +13,7 @@ import OrganisationsPage from './pages/admin/OrganisationsPage'
 import SitesPage from './pages/validator/SitesPage'
 import PaiePage from './pages/paie/PaiePage'
 import BulletinsPage from './pages/paie/BulletinsPage'
+import VerrouMotDePasse from './components/VerrouMotDePasse'
 import { Spinner } from './components/ui'
 import type { UserRole } from './lib/types'
 
@@ -56,7 +57,7 @@ function CompanyIndexRedirect() {
   const { companyId } = useParams()
   const target =
     profile?.role === 'admin'
-      ? 'analytics'
+      ? 'employes'
       : profile?.role === 'validator' || profile?.role === 'rh'
         ? 'employes'
         : profile?.role === 'paie'
@@ -150,7 +151,12 @@ export default function App() {
                 path="analytics"
                 element={
                   <RequireRole roles={['admin']}>
-                    <AnalyticsPage />
+                    <VerrouMotDePasse
+                      titre="Analytics"
+                      explication="Cet écran affiche l’ensemble des effectifs et des chiffres de l’entreprise. Ressaisissez votre mot de passe pour l’ouvrir, même si la session est déjà ouverte."
+                    >
+                      <AnalyticsPage />
+                    </VerrouMotDePasse>
                   </RequireRole>
                 }
               />

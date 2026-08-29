@@ -60,10 +60,16 @@ await db.exec(`
 create schema if not exists auth;
 create schema if not exists extensions;
 create schema if not exists storage;
+-- Imitation fidèle de bcrypt : le sel est embarqué dans le haché, si bien
+-- que crypt(motdepasse, haché) redonne le haché quand le mot de passe est bon.
 create or replace function extensions.gen_salt(t text) returns text
   language sql immutable as $f$ select 'sel'; $f$;
 create or replace function extensions.crypt(pw text, s text) returns text
-  language sql immutable as $f$ select md5(pw || s); $f$;
+  language sql immutable as $f$
+    select (case when position('$' in s) > 0 then split_part(s, '$', 1) else s end)
+           || '$' ||
+           md5(pw || (case when position('$' in s) > 0 then split_part(s, '$', 1) else s end));
+  $f$;
 create table auth.users (
   instance_id uuid, id uuid primary key, aud text, role text, email text,
   encrypted_password text, email_confirmed_at timestamptz, raw_app_meta_data jsonb,
@@ -100,7 +106,7 @@ const ORDRE = [
   'BLOC_4_SECURITE_URGENT.sql', 'BLOC_5_gestion_comptes.sql', 'BLOC_6_supprimer_employe.sql',
   'BLOC_7_sites_principaux.sql', 'BLOC_8_dossier_employe.sql', 'BLOC_9_dette_simple.sql',
   'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
-  'BLOC_12_matricule.sql',
+  'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -554,6 +560,28 @@ await db.query(`update public.employees
                  where departement is null and qualification is not null`)
 ok('la reprise renseigne le département des fiches existantes',
    (await q1(`select departement from public.employees where id=$1`, [eRH])).departement === 'SECURITE')
+
+section('Verrou par mot de passe')
+// Le mot de passe est haché : on crée un compte via la fonction officielle
+// pour disposer d'un vrai hachage, puis on vérifie les deux cas.
+await connecte(admin)
+await q1(`select public.admin_creer_utilisateur('verrou1','SecretBien1','Test','validator')`)
+const idVerrou = (await q1(`select user_id from public.profiles where username='verrou1'`)).user_id
+await connecte(idVerrou)
+ok('le bon mot de passe déverrouille',
+   (await q1(`select public.verifier_mon_mot_de_passe('SecretBien1') as v`)).v === true)
+ok('un mauvais mot de passe est refusé',
+   (await q1(`select public.verifier_mon_mot_de_passe('MauvaisMdp') as v`)).v === false)
+ok('un mot de passe vide est refusé',
+   (await q1(`select public.verifier_mon_mot_de_passe('') as v`)).v === false)
+await connecte(null)
+ok('un visiteur non connecté est refusé',
+   (await q1(`select public.verifier_mon_mot_de_passe('SecretBien1') as v`)).v === false)
+await connecte(admin)
+// On ne peut pas tester le mot de passe de quelqu'un d'autre : la fonction
+// ne regarde que le compte connecté.
+ok('la fonction ne teste que son propre compte',
+   (await q1(`select public.verifier_mon_mot_de_passe('SecretBien1') as v`)).v === false)
 
 // ══════════════════════════════════════ 12. SUPPRESSIONS PROTÉGÉES ═════
 

@@ -73,7 +73,6 @@ export default function Layout() {
   const tabs =
     profile?.role === 'admin'
       ? [
-          { to: `/c/${companyId}/analytics`, label: 'Analytics', icon: ICONS.analytics },
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
           { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
           { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
@@ -81,6 +80,8 @@ export default function Layout() {
           { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           { to: `/c/${companyId}/entreprises`, label: 'Entreprises', icon: ICONS.entreprises },
           { to: `/c/${companyId}/utilisateurs`, label: 'Utilisateurs', icon: ICONS.users },
+          // Analytics en dernier : c'est l'écran le plus sensible
+          { to: `/c/${companyId}/analytics`, label: 'Analytics', icon: ICONS.analytics },
         ]
       : profile?.role === 'validator'
         ? [
