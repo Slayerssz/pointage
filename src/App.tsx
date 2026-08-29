@@ -57,7 +57,7 @@ function CompanyIndexRedirect() {
   const target =
     profile?.role === 'admin'
       ? 'analytics'
-      : profile?.role === 'validator'
+      : profile?.role === 'validator' || profile?.role === 'rh'
         ? 'employes'
         : profile?.role === 'paie'
           ? 'paie'
@@ -117,7 +117,7 @@ export default function App() {
               <Route
                 path="employes"
                 element={
-                  <RequireRole roles={['validator', 'admin']}>
+                  <RequireRole roles={['validator', 'admin', 'rh']}>
                     <EmployesPage />
                   </RequireRole>
                 }

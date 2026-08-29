@@ -88,12 +88,14 @@ export default function Layout() {
             { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
             { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           ]
-        : profile?.role === 'paie'
-          ? [
-              { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
-              { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
-            ]
-          : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
+        : profile?.role === 'rh'
+          ? [{ to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes }]
+          : profile?.role === 'paie'
+            ? [
+                { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
+                { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
+              ]
+            : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
 
   const navItem = (tab: (typeof tabs)[number]) => (
     <NavLink
@@ -145,7 +147,9 @@ export default function Layout() {
                   ? 'validateur'
                   : profile?.role === 'paie'
                     ? 'paie'
-                    : 'agent'}
+                    : profile?.role === 'rh'
+                      ? 'personnel'
+                      : 'agent'}
               )
             </span>
           </p>

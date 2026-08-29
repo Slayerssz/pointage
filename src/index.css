@@ -42,6 +42,15 @@ body {
     break-before: page;
   }
 
+  /* La fiche officielle occupe la page entière, sans marge du navigateur */
+  body.impression .fiche {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0;
+    padding: 14mm 16mm;
+    box-shadow: none;
+  }
+
   @page {
     size: A4;
     margin: 16mm;

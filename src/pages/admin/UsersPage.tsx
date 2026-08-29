@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { formatDateFr } from '../../lib/dates'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 
-type Role = 'agent' | 'validator' | 'admin' | 'paie'
+type Role = 'agent' | 'validator' | 'admin' | 'paie' | 'rh'
 
 interface AdminUser {
   user_id: string
@@ -22,12 +22,14 @@ const ROLE_LABEL: Record<Role, string> = {
   agent: 'Pointeur (terrain)',
   validator: 'Bureau (validateur)',
   paie: 'Responsable de paie',
+  rh: 'Personnel (RH)',
   admin: 'Administrateur',
 }
 const ROLE_TONE: Record<Role, 'blue' | 'green' | 'amber' | 'slate'> = {
   agent: 'blue',
   validator: 'green',
   paie: 'slate',
+  rh: 'blue',
   admin: 'amber',
 }
 
@@ -287,6 +289,7 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
         <option value="agent">Pointeur (terrain, prend les photos)</option>
         <option value="validator">Bureau (valide les pointages, gère les employés et les sites)</option>
         <option value="paie">Paie (calcule et valide la paie, bulletins de présence)</option>
+        <option value="rh">Personnel (consulte, ajoute, modifie et imprime les employés)</option>
         <option value="admin">Administrateur (tout + entreprises + utilisateurs)</option>
       </select>
 

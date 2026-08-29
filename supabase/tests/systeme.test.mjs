@@ -2,7 +2,7 @@
  * TEST COMPLET DU SYSTÈME
  *
  * Rejoue, dans un PostgreSQL embarqué (PGlite), exactement ce que vous
- * exécutez dans Supabase : les migrations d'origine, puis les BLOCS 1 à 9
+ * exécutez dans Supabase : les migrations d'origine, puis les BLOCS 1 à 11
  * du dossier `supabase/mise_a_jour`. Puis déroule le système de bout en
  * bout : rôles, sécurité, pointage, contrats, congés, paie, comptes.
  *
@@ -99,6 +99,7 @@ const ORDRE = [
   'BLOC_1_paie_contrats.sql', 'BLOC_2_role_paie.sql', 'BLOC_3_droits_verrouillage.sql',
   'BLOC_4_SECURITE_URGENT.sql', 'BLOC_5_gestion_comptes.sql', 'BLOC_6_supprimer_employe.sql',
   'BLOC_7_sites_principaux.sql', 'BLOC_8_dossier_employe.sql', 'BLOC_9_dette_simple.sql',
+  'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -500,6 +501,40 @@ ok('mot de passe réinitialisé (jamais lisible, seulement remplacé)',
 const liste = await rows(`select * from public.admin_liste_utilisateurs()`)
 ok('la liste des comptes indique actif et supprimable',
    liste.length > 0 && 'actif' in liste[0] && 'supprimable' in liste[0])
+
+section('Rôle « personnel » (RH)')
+const rh = await creerCompte('rh1', 'rh')
+await connecte(rh)
+const eRH = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,salaire,departement)
+   values($1,$2,'AJOUTE PAR RH',3000,'NETTOYAGE') returning id`, [co, aRiad])).id
+ok('le personnel peut ajouter un employé', !!eRH)
+await db.query(`update public.employees set ville='RABAT' where id=$1`, [eRH])
+ok('le personnel peut modifier un employé',
+   (await q1(`select ville from public.employees where id=$1`, [eRH])).ville === 'RABAT')
+await refuse('le personnel ne peut pas supprimer un employé',
+  `select public.supprimer_employe($1)`, [eRH], REFUS)
+await refuse('le personnel ne touche pas au pointage',
+  `select public.marquer_present($1,current_date,'X')`, [eRH], REFUS)
+await refuse('le personnel ne touche pas à la paie',
+  `select public.valider_paie(gen_random_uuid())`, [], REFUS)
+await refuse('le personnel ne crée pas de site',
+  `select public.creer_site($1,'X')`, [co], REFUS)
+await refuse('le personnel ne gère pas les comptes',
+  `select public.admin_liste_utilisateurs()`, [], REFUS)
+// La reprise s'applique aux employés déjà en base au moment du BLOC 11.
+// Ici la base est vierge à l'installation : on vérifie donc la règle elle-même.
+ok('« AGENT DE NETTOYAGE » donne le département « NETTOYAGE »',
+   (await q1(`select nullif(trim(regexp_replace(
+                upper('AGENT DE NETTOYAGE'), '^AGENT( DE| D''''| )?', '', 'i')), '') as d`)).d
+   === 'NETTOYAGE')
+await db.query(`update public.employees set qualification='AGENT DE SECURITE', departement=null where id=$1`, [eRH])
+await db.query(`update public.employees
+                   set departement = nullif(trim(regexp_replace(
+                         upper(qualification), '^AGENT( DE| D''''| )?', '', 'i')), '')
+                 where departement is null and qualification is not null`)
+ok('la reprise renseigne le département des fiches existantes',
+   (await q1(`select departement from public.employees where id=$1`, [eRH])).departement === 'SECURITE')
 
 // ══════════════════════════════════════ 12. SUPPRESSIONS PROTÉGÉES ═════
 

@@ -77,6 +77,8 @@ export default function EmployesPage() {
   const [principalFilter, setPrincipalFilter] = useState('')
   const { profile } = useAuth()
   const estAdmin = profile?.role === 'admin'
+  // Le rôle « personnel » se limite aux fiches : ni dossier, ni suppression.
+  const estRH = profile?.role === 'rh'
   // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.
   const [toutesEntreprises, setToutesEntreprises] = useState(false)
   const [editing, setEditing] = useState<Employee | null>(null)
@@ -102,7 +104,7 @@ export default function EmployesPage() {
       let query = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
           { count: 'exact' },
         )
         .order('matricule', { ascending: true, nullsFirst: false })
@@ -157,7 +159,7 @@ export default function EmployesPage() {
       let q = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
         )
         .order('matricule', { ascending: true, nullsFirst: false })
         .limit(500)
@@ -461,6 +463,7 @@ export default function EmployesPage() {
           companyId={companyId}
           employee={editing}
           entreprise={company?.name ?? ''}
+          ficheSeule={estRH}
           onImprimerContrat={(contrat, employee) => setImpression({ contrat, employee })}
           onClose={() => {
             setEditing(null)
@@ -506,12 +509,15 @@ function EmployeeFormModal({
   companyId,
   employee,
   entreprise,
+  ficheSeule,
   onImprimerContrat,
   onClose,
 }: {
   companyId: string
   employee: Employee | null
   entreprise: string
+  /** Rôle « personnel » : la fiche seule, sans dossier ni suppression. */
+  ficheSeule?: boolean
   onImprimerContrat: (contrat: Contrat, employee: Employee) => void
   onClose: () => void
 }) {
@@ -530,6 +536,7 @@ function EmployeeFormModal({
     date_naissance: employee?.date_naissance ?? '',
     date_embauche: employee?.date_embauche ?? '',
     qualification: employee?.qualification ?? 'AGENT DE SECURITE',
+    departement: employee?.departement ?? '',
     telephone: employee?.telephone ?? '',
     adresse: employee?.adresse ?? '',
     ville: employee?.ville ?? '',
@@ -563,6 +570,7 @@ function EmployeeFormModal({
         date_naissance: form.date_naissance || null,
         date_embauche: form.date_embauche || null,
         qualification: form.qualification.trim() || null,
+        departement: form.departement.trim().toUpperCase() || null,
         telephone: form.telephone.trim() || null,
         adresse: form.adresse.trim() || null,
         ville: form.ville.trim().toUpperCase() || null,
@@ -626,7 +634,7 @@ function EmployeeFormModal({
             : 'Laissez le matricule vide : le prochain numéro disponible sera attribué automatiquement.'}
         </p>
 
-        {employee && (
+        {employee && !ficheSeule && (
           <div className="mb-5 flex gap-1 rounded-xl bg-slate-100 p-1">
             {([
               { code: 'fiche', label: 'Fiche' },
@@ -645,7 +653,7 @@ function EmployeeFormModal({
           </div>
         )}
 
-        {employee && vue === 'dossier' && (
+        {employee && !ficheSeule && vue === 'dossier' && (
           <EmployeDetail
             employee={employee}
             entreprise={entreprise}
@@ -680,6 +688,10 @@ function EmployeeFormModal({
                 <option key={q} value={q}>{q}</option>
               ))}
             </select>
+          ))}
+          {field('Département', (
+            <input type="text" value={form.departement} onChange={(e) => set('departement')(e.target.value)}
+                   className={inputCls} placeholder="ex. NETTOYAGE, SÉCURITÉ" />
           ))}
           {field('CIN', (
             <input type="text" value={form.cin} onChange={(e) => set('cin')(e.target.value)} className={inputCls} />
@@ -782,7 +794,7 @@ function EmployeeFormModal({
         )}
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-          {employee && vue === 'fiche' && (
+          {employee && vue === 'fiche' && !ficheSeule && (
             <SupprimerEmploye employee={employee} onDeleted={onClose} />
           )}
           <button

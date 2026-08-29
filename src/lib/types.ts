@@ -1,4 +1,4 @@
-export type UserRole = 'agent' | 'validator' | 'admin' | 'paie'
+export type UserRole = 'agent' | 'validator' | 'admin' | 'paie' | 'rh'
 export type PointageStatus = 'pending' | 'validated' | 'refused'
 
 export interface Profile {
@@ -41,6 +41,8 @@ export interface Employee {
   date_naissance: string | null
   date_embauche: string | null
   qualification: string | null
+  /** Branche d'activité (NETTOYAGE, SÉCURITÉ…), distincte du poste. */
+  departement: string | null
   adresse: string | null
   ville: string | null
   mode_reglement: string | null

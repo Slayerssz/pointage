@@ -1,18 +1,31 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { computeAge, formatDateFr, jourDeReposLabel } from '../lib/dates'
-import { formatDH } from '../lib/paie'
+import { formatDateFr } from '../lib/dates'
+import { enteteDe } from '../lib/entetes'
 import type { Employee } from '../lib/types'
 
 /**
- * FICHE D'EMPLOYÉ imprimable — une par page.
+ * FICHE D'INFORMATIONS PERSONNELLES
  *
- * Contient l'identité, l'état civil, le poste et le salaire.
- * Ni contrat ni bloc de signature : la fiche est un document de
- * référence interne, pas une pièce à signer. Les DETTES n'y figurent
- * jamais non plus.
+ * Reprend le modèle officiel : en-tête et couleur de l'entreprise,
+ * emplacement photo, matricule, les neuf champs, puis la liste des
+ * pièces administratives à fournir. Une fiche par page.
  */
+
+const PIECES = [
+  'COPIE DE LA CIN',
+  'CERTIFICAT DE BONNE CONDUITE',
+  'CERTIFICAT MÉDICAL D’APTITUDE AU TRAVAIL',
+]
+
+/** Le département : saisi, sinon déduit de la qualification. */
+function departementDe(e: Employee): string {
+  if (e.departement) return e.departement
+  if (!e.qualification) return ''
+  return e.qualification.toUpperCase().replace(/^AGENT(\s+D['’]|\s+DE\s+|\s+)?/i, '').trim()
+}
+
 export default function FichePrint({
   employees,
   entreprise,
@@ -24,6 +37,8 @@ export default function FichePrint({
   sites: { id: string; name: string }[]
   onClose: () => void
 }) {
+  const entete = enteteDe(entreprise)
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -49,7 +64,7 @@ export default function FichePrint({
     },
   })
 
-  const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? '—'
+  const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? ''
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
@@ -57,7 +72,7 @@ export default function FichePrint({
         <p className="text-sm font-medium text-white">
           {employees.length === 1
             ? `Fiche — ${employees[0].nom_prenom}`
-            : `${employees.length} fiches d’employé`}
+            : `${employees.length} fiches d’informations personnelles`}
         </p>
         <div className="flex gap-2">
           <button
@@ -76,95 +91,141 @@ export default function FichePrint({
       </div>
 
       <div className="document-imprimable">
-        {employees.map((e, i) => {
+        {employees.map((e) => {
           const photo = e.photo_path ? photos?.get(e.photo_path) : undefined
+          const champs: [string, string][] = [
+            ['Nom et Prénom', e.nom_prenom],
+            ['N° Carte Nationale', e.cin ?? ''],
+            ['Adresse', e.adresse ?? ''],
+            ['Ville', e.ville ?? ''],
+            ['Date de Naissance', e.date_naissance ? formatDateFr(e.date_naissance) : ''],
+            ['Département', departementDe(e)],
+            ['Qualification', e.qualification ?? ''],
+            ['Site', siteName(e.site_id)],
+            ['Date d’embauche', e.date_embauche ? formatDateFr(e.date_embauche) : ''],
+          ]
+
           return (
             <article
               key={e.id}
-              className={`mx-auto my-6 max-w-[210mm] bg-white p-[16mm] text-[10.5pt] leading-relaxed text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none ${
-                i < employees.length - 1 ? 'print:break-after-page' : ''
-              }`}
+              className="fiche mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
+              style={{ width: '190mm', padding: '12mm 14mm', color: '#1a1a1a' }}
             >
-              <header className="mb-6 flex items-start justify-between gap-6 border-b-2 border-black pb-4">
-                <div>
-                  <h1 className="text-base font-bold uppercase tracking-wide">{entreprise}</h1>
-                  <p className="mt-1 text-lg font-bold uppercase">Fiche d’employé</p>
-                  <p className="mt-1 text-sm">
-                    Matricule n° <strong>{e.matricule ?? '—'}</strong>
+              {/* En-tête de l'entreprise */}
+              <header className="text-center">
+                {entete.logo ? (
+                  <img
+                    src={entete.logo}
+                    alt={entreprise}
+                    style={{ height: '26mm', margin: '0 auto', objectFit: 'contain' }}
+                  />
+                ) : (
+                  <p
+                    className="font-bold uppercase tracking-wide"
+                    style={{ color: entete.accent, fontSize: '15pt' }}
+                  >
+                    {entreprise}
                   </p>
-                </div>
-                <div className="h-28 w-24 shrink-0 overflow-hidden border border-black bg-white">
-                  {photo ? (
-                    <img src={photo} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-center text-[8pt] text-slate-400">
-                      Photo
-                    </div>
-                  )}
-                </div>
+                )}
               </header>
 
-              <Bloc titre="Identité">
-                <Ligne label="Nom et prénom" valeur={e.nom_prenom} fort />
-                <Ligne label="C.I.N." valeur={e.cin ?? '—'} />
-                <Ligne label="N° CNSS" valeur={e.cnss ?? '—'} />
-                <Ligne
-                  label="Date de naissance"
-                  valeur={
-                    e.date_naissance
-                      ? `${formatDateFr(e.date_naissance)} (${computeAge(e.date_naissance)} ans)`
-                      : '—'
-                  }
-                />
-                <Ligne label="Situation familiale" valeur={e.situation_familiale ?? '—'} />
-                <Ligne label="Nombre d’enfants" valeur={String(e.nombre_enfants ?? 0)} />
-                <Ligne label="Téléphone" valeur={e.telephone ?? '—'} />
-                <Ligne label="Adresse" valeur={[e.adresse, e.ville].filter(Boolean).join(', ') || '—'} />
-              </Bloc>
+              {/* Bandeau du titre, encadré de deux filets */}
+              <div className="flex items-center" style={{ margin: '7mm 0 6mm' }}>
+                <span style={{ flex: 1, height: 1, background: entete.accent, opacity: 0.45 }} />
+                <span
+                  className="font-bold uppercase"
+                  style={{
+                    background: entete.accent, color: '#fff',
+                    padding: '2.6mm 7mm', fontSize: '12.5pt', letterSpacing: '.02em',
+                    margin: '0 4mm', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Fiche d’informations personnelles
+                </span>
+                <span style={{ flex: 1, height: 1, background: entete.accent, opacity: 0.45 }} />
+              </div>
 
-              <Bloc titre="Poste">
-                <Ligne label="Qualification" valeur={e.qualification ?? '—'} fort />
-                <Ligne label="Site d’affectation" valeur={siteName(e.site_id)} />
-                <Ligne label="Date d’embauche" valeur={formatDateFr(e.date_embauche)} />
-                <Ligne label="Jour de repos" valeur={jourDeReposLabel(e.jour_de_repos)} />
-                <Ligne label="Heures par jour" valeur={e.heures_par_jour != null ? `${e.heures_par_jour} h` : '—'} />
-                <Ligne
-                  label="Statut"
-                  valeur={e.actif ? 'En poste' : `Sorti le ${formatDateFr(e.date_sortie)}`}
-                />
-              </Bloc>
+              {/* Photo à gauche, matricule au centre */}
+              <div className="flex items-start" style={{ gap: '10mm', marginBottom: '9mm' }}>
+                <div
+                  className="flex shrink-0 flex-col items-center justify-center"
+                  style={{
+                    width: '32mm', height: '40mm', border: '1px solid #d4d4d4',
+                    borderRadius: '3mm', overflow: 'hidden',
+                  }}
+                >
+                  {photo ? (
+                    <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#c9c9c9" strokeWidth="1.5"
+                           style={{ width: '9mm', height: '9mm' }}>
+                        <path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
+                        <circle cx="12" cy="12.5" r="3.2" />
+                      </svg>
+                      <span style={{ color: entete.accent, fontSize: '8pt', letterSpacing: '.08em',
+                                     marginTop: '3mm', fontWeight: 600 }}>
+                        PHOTO
+                      </span>
+                    </>
+                  )}
+                </div>
 
-              <Bloc titre="Rémunération">
-                <Ligne label="Salaire mensuel" valeur={formatDH(e.salaire)} fort />
-                <Ligne label="Mode de règlement" valeur={e.mode_reglement ?? '—'} />
-                <Ligne label="Banque" valeur={e.banque ?? '—'} />
-                <Ligne label="RIB" valeur={e.rib ?? '—'} />
-              </Bloc>
+                <div className="flex-1 text-center" style={{ paddingTop: '6mm' }}>
+                  <p className="uppercase" style={{ color: entete.accent, fontSize: '13pt',
+                                                    letterSpacing: '.05em', fontWeight: 600 }}>
+                    Matricule N°{' '}
+                    <span style={{ color: '#1a1a1a', fontWeight: 700 }}>
+                      {e.matricule != null ? String(e.matricule).padStart(3, '0') : '—'}
+                    </span>
+                  </p>
+                  <span style={{ display: 'block', height: 2, background: entete.accent,
+                                 opacity: 0.75, margin: '2mm auto 0', width: '58mm' }} />
+                </div>
+              </div>
 
+              {/* Les neuf champs */}
+              <dl>
+                {champs.map(([label, valeur]) => (
+                  <div key={label} className="flex items-baseline" style={{ marginBottom: '4.6mm' }}>
+                    <dt style={{ width: '52mm', color: entete.accent, fontWeight: 600, fontSize: '10.5pt' }}>
+                      {label}
+                    </dt>
+                    <dd style={{ width: '6mm', color: entete.accent }}>:</dd>
+                    <dd className="uppercase" style={{ fontWeight: 700, fontSize: '10.5pt', flex: 1 }}>
+                      {valeur || ' '}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              {/* Pièces à fournir */}
+              <p
+                className="text-center uppercase"
+                style={{
+                  color: entete.accent, fontWeight: 600, fontSize: '12pt',
+                  letterSpacing: '.03em', textDecoration: 'underline',
+                  textUnderlineOffset: '2mm', margin: '10mm 0 6mm',
+                }}
+              >
+                Pièces administratives à fournir
+              </p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {PIECES.map((p) => (
+                  <li key={p} className="flex items-baseline" style={{ marginBottom: '3.5mm' }}>
+                    <span style={{ color: entete.accent, marginRight: '4mm', fontSize: '11pt' }}>•</span>
+                    <span className="uppercase" style={{ color: entete.accent, fontWeight: 600, fontSize: '10pt' }}>
+                      {p}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </article>
           )
         })}
       </div>
-    </div>
-  )
-}
 
-function Bloc({ titre, children }: { titre: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-5 break-inside-avoid">
-      <h2 className="mb-2 border-b border-black text-[9pt] font-bold uppercase tracking-widest">
-        {titre}
-      </h2>
-      <dl>{children}</dl>
-    </section>
-  )
-}
-
-function Ligne({ label, valeur, fort }: { label: string; valeur: string; fort?: boolean }) {
-  return (
-    <div className="flex gap-3 border-b border-slate-200 py-1">
-      <dt className="w-52 shrink-0 text-slate-600">{label}</dt>
-      <dd className={fort ? 'font-semibold' : ''}>{valeur}</dd>
+      <style>{`@media print { @page { size: A4 portrait; margin: 0; } }`}</style>
     </div>
   )
 }
