@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { formatDateFr } from '../lib/dates'
 import { enteteDe } from '../lib/entetes'
+import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
+import BarreImpression from './BarreImpression'
 import type { Employee } from '../lib/types'
 
 /**
@@ -38,57 +39,56 @@ export default function FichePrint({
   onClose: () => void
 }) {
   const entete = enteteDe(entreprise)
+  useFermerSurEchap(onClose)
+  useModeImpression()
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  useEffect(() => {
-    document.body.classList.add('impression')
-    return () => document.body.classList.remove('impression')
-  }, [])
-
-  // Une seule requête pour toutes les photos des fiches à imprimer
+  // Les photos sont téléchargées puis converties en données locales :
+  // ainsi elles s'impriment et s'exportent en PDF sans dépendre d'une
+  // URL distante, qui bloquerait la capture.
   const chemins = employees.map((e) => e.photo_path).filter((p): p is string => Boolean(p))
-  const { data: photos } = useQuery({
+  const { data: photos, isLoading: photosEnCours } = useQuery({
     queryKey: ['photos-fiches', chemins],
     enabled: chemins.length > 0,
     queryFn: async (): Promise<Map<string, string>> => {
-      const { data, error } = await supabase.storage.from('photos').createSignedUrls(chemins, 3600)
-      if (error) throw error
       const m = new Map<string, string>()
-      for (const r of data) if (r.path && r.signedUrl) m.set(r.path, r.signedUrl)
+      await Promise.all(chemins.map(async (chemin) => {
+        const { data, error } = await supabase.storage.from('photos').download(chemin)
+        if (error || !data) return
+        const b64 = await new Promise<string>((r) => {
+          const fr = new FileReader()
+          fr.onload = () => r(String(fr.result))
+          fr.readAsDataURL(data)
+        })
+        m.set(chemin, b64)
+      }))
       return m
     },
   })
+
+  // Le logo, plus une photo par fiche qui en possède une
+  const nbImages = (entete.logo ? employees.length : 0) +
+    (photosEnCours ? 0 : employees.filter((e) => e.photo_path && photos?.get(e.photo_path)).length)
+  const { pret, imprimer } = useImpression(photosEnCours ? 0 : nbImages)
 
   const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? ''
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-slate-900 px-4 py-3 print:hidden">
-        <p className="text-sm font-medium text-white">
-          {employees.length === 1
+      <BarreImpression
+        titre={
+          employees.length === 1
             ? `Fiche — ${employees[0].nom_prenom}`
-            : `${employees.length} fiches d’informations personnelles`}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => window.print()}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Imprimer / Enregistrer en PDF
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
+            : `${employees.length} fiches d’informations personnelles`
+        }
+        pret={pret && !photosEnCours}
+        imprimer={imprimer}
+        nomFichier={
+          employees.length === 1
+            ? `Fiche_${employees[0].nom_prenom.replace(/\s+/g, '_')}`
+            : `Fiches_${entreprise.replace(/\s+/g, '_')}`
+        }
+        onClose={onClose}
+      />
 
       <div className="document-imprimable">
         {employees.map((e) => {
@@ -109,7 +109,7 @@ export default function FichePrint({
             <article
               key={e.id}
               className="fiche mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
-              style={{ width: '190mm', padding: '12mm 14mm', color: '#1a1a1a' }}
+              style={{ width: '186mm', padding: '10mm 12mm', color: '#1a1a1a' }}
             >
               {/* En-tête de l'entreprise */}
               <header className="text-center">
@@ -225,7 +225,7 @@ export default function FichePrint({
         })}
       </div>
 
-      <style>{`@media print { @page { size: A4 portrait; margin: 0; } }`}</style>
+      <style>{`@media print { @page { size: A4 portrait; margin: 12mm; } }`}</style>
     </div>
   )
 }

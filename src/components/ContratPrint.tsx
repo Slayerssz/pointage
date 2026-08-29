@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
 import { formatDateFr } from '../lib/dates'
 import { formatDH } from '../lib/paie'
 import type { Contrat, Employee } from '../lib/types'
+import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
+import BarreImpression from './BarreImpression'
 
 /**
  * MODÈLE DE CONTRAT — c'est ce document qui est imprimé / enregistré en PDF.
@@ -28,18 +29,12 @@ export default function ContratPrint({
   const c = contrat
 
   // Échap pour fermer
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useFermerSurEchap(onClose)
 
   // Pendant l'affichage : seul le document part à l'impression
   // (règles dans src/index.css, section « Impression d'un document »).
-  useEffect(() => {
-    document.body.classList.add('impression')
-    return () => document.body.classList.remove('impression')
-  }, [])
+  useModeImpression()
+  const { pret, imprimer } = useImpression(0)
 
   const dureeTexte =
     c.date_fin == null
@@ -52,25 +47,13 @@ export default function ContratPrint({
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
       {/* Barre d'actions — masquée à l'impression */}
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-slate-900 px-4 py-3 print:hidden">
-        <p className="text-sm font-medium text-white">
-          Contrat {c.numero} — {employee.nom_prenom}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => window.print()}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Imprimer / Enregistrer en PDF
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
+      <BarreImpression
+        titre={`Contrat ${c.numero} — ${employee.nom_prenom}`}
+        pret={pret}
+        imprimer={imprimer}
+        nomFichier={`Contrat_${c.numero ?? ''}_${employee.nom_prenom.replace(/\s+/g, '_')}`}
+        onClose={onClose}
+      />
 
       <div className="document-imprimable mx-auto my-6 max-w-[210mm] bg-white p-[18mm] text-[11pt] leading-relaxed text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
         {/* En-tête */}

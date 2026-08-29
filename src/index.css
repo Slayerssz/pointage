@@ -18,6 +18,14 @@ body {
    sorti du flux pour occuper seul la ou les pages.
    ------------------------------------------------------------------ */
 @media print {
+  /* Sans cela, les navigateurs suppriment les aplats de couleur : le
+     bandeau de l'en-tête sortirait blanc sur blanc, donc illisible. */
+  body.impression .document-imprimable,
+  body.impression .document-imprimable * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   body.impression * {
     visibility: hidden;
   }
@@ -42,22 +50,27 @@ body {
     break-before: page;
   }
 
-  /* La fiche officielle occupe la page entière, sans marge du navigateur */
+  /* Chaque document se cale sur la zone imprimable définie par son
+     propre @page : pas de largeur ni de hauteur imposées, sinon le
+     contenu déborde et le navigateur ajoute des pages vides. */
   body.impression .fiche {
-    width: 210mm;
-    min-height: 297mm;
+    width: auto;
+    min-height: 0;
+    max-width: none;
     margin: 0;
-    padding: 14mm 16mm;
+    padding: 0;
     box-shadow: none;
-  }
-
-  @page {
-    size: A4;
-    margin: 16mm;
   }
 
   html,
   body {
     background: #fff !important;
+  }
+
+  /* Ne jamais couper un bloc en deux entre deux pages */
+  body.impression .document-imprimable img,
+  body.impression .document-imprimable header,
+  body.impression .document-imprimable table {
+    break-inside: avoid;
   }
 }

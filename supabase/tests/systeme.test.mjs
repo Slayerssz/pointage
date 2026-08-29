@@ -100,6 +100,7 @@ const ORDRE = [
   'BLOC_4_SECURITE_URGENT.sql', 'BLOC_5_gestion_comptes.sql', 'BLOC_6_supprimer_employe.sql',
   'BLOC_7_sites_principaux.sql', 'BLOC_8_dossier_employe.sql', 'BLOC_9_dette_simple.sql',
   'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
+  'BLOC_12_matricule.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -235,6 +236,24 @@ ok('situation familiale et nombre d’enfants enregistrés',
   Number((await q1(`select nombre_enfants from public.employees where id=$1`, [ePlein])).nombre_enfants) === 3)
 await refuse('situation familiale hors liste refusée',
   `update public.employees set situation_familiale='Pacsé' where id=$1`, [ePlein], /check|contrainte|violates/i)
+
+// Le matricule ne recule pas et ne se réutilise pas
+const hautNum = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,matricule)
+   values($1,$2,'NUMERO ELEVE',1200) returning matricule`, [co, aPort])).matricule
+ok('un matricule imposé est accepté', Number(hautNum) === 1200)
+const apres = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom)
+   values($1,$2,'SUIVANT') returning matricule`, [co, aPort])).matricule
+ok('le suivant repart du plus haut, pas du premier trou (1201)',
+   Number(apres) === 1201, `obtenu ${apres}`)
+await db.query(`delete from public.employees where matricule=$1 and company_id=$2`, [apres, co])
+const apres2 = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom)
+   values($1,$2,'ENCORE APRES') returning matricule`, [co, aPort])).matricule
+ok('un numéro libéré n’est pas réattribué (1202)', Number(apres2) === 1202, `obtenu ${apres2}`)
+await db.query(`delete from public.employees where matricule in ($1,$2) and company_id=$3`,
+               [1200, apres2, co])
 
 ok('tout le personnel d’un site principal se lit d’un coup',
   Number((await q1(`select count(*) as c from public.employees e

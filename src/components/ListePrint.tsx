@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
 import { formatDateFr } from '../lib/dates'
 import type { Employee, SitePrincipal } from '../lib/types'
+import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
+import BarreImpression from './BarreImpression'
 
 /**
  * LISTE DU PERSONNEL — un tableau, pas une fiche par personne.
@@ -25,16 +26,10 @@ export default function ListePrint({
   intitule?: string
   onClose: () => void
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useFermerSurEchap(onClose)
 
-  useEffect(() => {
-    document.body.classList.add('impression')
-    return () => document.body.classList.remove('impression')
-  }, [])
+  useModeImpression()
+  const { pret, imprimer } = useImpression(0)
 
   // Regrouper par annexe, dans l'ordre alphabétique
   const parSite = new Map<string, Employee[]>()
@@ -54,25 +49,14 @@ export default function ListePrint({
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-slate-900 px-4 py-3 print:hidden">
-        <p className="text-sm font-medium text-white">
-          Liste du personnel — {employees.length} employé(s), {groupes.length} site(s)
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => window.print()}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Imprimer / Enregistrer en PDF
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
+      <BarreImpression
+        titre={`Liste du personnel — ${employees.length} employé(s), ${groupes.length} site(s)`}
+        pret={pret}
+        imprimer={imprimer}
+        nomFichier={`Liste_${entreprise.replace(/\s+/g, '_')}`}
+        orientation="landscape"
+        onClose={onClose}
+      />
 
       {/* A4 paysage : le tableau a besoin de largeur */}
       <div className="document-imprimable mx-auto my-6 max-w-[297mm] bg-white p-[12mm] text-[9pt] leading-snug text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
