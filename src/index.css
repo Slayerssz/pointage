@@ -11,63 +11,70 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Impression d'un document (contrat de travail)
+   Impression d'un document
 
-   Quand la fenêtre d'impression est ouverte, <body> reçoit la classe
-   « impression » : tout est masqué sauf le document lui-même, qui est
-   sorti du flux pour occuper seul la ou les pages.
+   Le document est sorti de l'application et rattaché au <body>
+   (voir PortailImpression). À l'impression, on escamote complètement
+   tout le reste : masquer par `visibility` ne suffit pas, les éléments
+   garderaient leur place et ajouteraient des pages blanches.
    ------------------------------------------------------------------ */
 @media print {
-  /* Sans cela, les navigateurs suppriment les aplats de couleur : le
-     bandeau de l'en-tête sortirait blanc sur blanc, donc illisible. */
-  body.impression .document-imprimable,
-  body.impression .document-imprimable * {
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+  }
+
+  /* Tout disparaît, sauf le document */
+  body.impression > *:not(.zone-impression) {
+    display: none !important;
+  }
+
+  body.impression .zone-impression {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Les aplats de couleur doivent s'imprimer : sans cela le bandeau de
+     l'en-tête sortirait blanc sur blanc. */
+  body.impression .zone-impression,
+  body.impression .zone-impression * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  body.impression * {
-    visibility: hidden;
-  }
-
-  body.impression .document-imprimable,
-  body.impression .document-imprimable * {
-    visibility: visible;
+  /* Le cadre plein écran redevient un simple bloc */
+  body.impression .zone-impression > div {
+    position: static !important;
+    overflow: visible !important;
+    background: none !important;
   }
 
   body.impression .document-imprimable {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
+    position: static !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Une fiche par page lorsqu'on en imprime plusieurs */
+  /* Chaque document se cale sur la zone imprimable de son propre @page */
+  body.impression .document-imprimable > article {
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Une page par document lorsqu'on en imprime plusieurs */
   body.impression .document-imprimable > article + article {
     break-before: page;
   }
 
-  /* Chaque document se cale sur la zone imprimable définie par son
-     propre @page : pas de largeur ni de hauteur imposées, sinon le
-     contenu déborde et le navigateur ajoute des pages vides. */
-  body.impression .fiche {
-    width: auto;
-    min-height: 0;
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
-  }
-
-  html,
-  body {
-    background: #fff !important;
-  }
-
-  /* Ne jamais couper un bloc en deux entre deux pages */
   body.impression .document-imprimable img,
   body.impression .document-imprimable header,
   body.impression .document-imprimable table {

@@ -16,6 +16,7 @@ export default function BarreImpression({
   imprimer,
   nomFichier,
   orientation = 'portrait',
+  genererPdf,
   onClose,
 }: {
   titre: string
@@ -23,6 +24,8 @@ export default function BarreImpression({
   imprimer: () => void
   nomFichier: string
   orientation?: 'portrait' | 'landscape'
+  /** Générateur sur mesure ; à défaut, on photographie la page. */
+  genererPdf?: () => Promise<void>
   onClose: () => void
 }) {
   const [enCours, setEnCours] = useState(false)
@@ -32,7 +35,8 @@ export default function BarreImpression({
     setEnCours(true)
     setErreur(null)
     try {
-      await enregistrerPdf(nomFichier, orientation)
+      if (genererPdf) await genererPdf()
+      else await enregistrerPdf(nomFichier, orientation)
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e))
     } finally {

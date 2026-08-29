@@ -3,7 +3,9 @@ import { supabase } from '../lib/supabase'
 import { formatDateFr } from '../lib/dates'
 import { enteteDe } from '../lib/entetes'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
+import { genererFichePdf } from '../lib/fichePdf'
 import BarreImpression from './BarreImpression'
+import PortailImpression from './PortailImpression'
 import type { Employee } from '../lib/types'
 
 /**
@@ -73,6 +75,7 @@ export default function FichePrint({
   const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? ''
 
   return (
+    <PortailImpression>
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
       <BarreImpression
         titre={
@@ -86,6 +89,18 @@ export default function FichePrint({
           employees.length === 1
             ? `Fiche_${employees[0].nom_prenom.replace(/\s+/g, '_')}`
             : `Fiches_${entreprise.replace(/\s+/g, '_')}`
+        }
+        genererPdf={() =>
+          genererFichePdf({
+            employees,
+            entreprise,
+            sites,
+            photos,
+            nomFichier:
+              employees.length === 1
+                ? `Fiche_${employees[0].nom_prenom.replace(/\s+/g, '_')}`
+                : `Fiches_${entreprise.replace(/\s+/g, '_')}`,
+          })
         }
         onClose={onClose}
       />
@@ -227,5 +242,6 @@ export default function FichePrint({
 
       <style>{`@media print { @page { size: A4 portrait; margin: 12mm; } }`}</style>
     </div>
+    </PortailImpression>
   )
 }

@@ -2,6 +2,7 @@ import { formatDateFr } from '../lib/dates'
 import type { Employee, SitePrincipal } from '../lib/types'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
+import PortailImpression from './PortailImpression'
 
 /**
  * LISTE DU PERSONNEL — un tableau, pas une fiche par personne.
@@ -48,6 +49,7 @@ export default function ListePrint({
   )
 
   return (
+    <PortailImpression>
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
       <BarreImpression
         titre={`Liste du personnel — ${employees.length} employé(s), ${groupes.length} site(s)`}
@@ -141,5 +143,6 @@ export default function ListePrint({
       {/* Cette liste s'imprime en paysage, contrairement aux autres documents */}
       <style>{`@media print { @page { size: A4 landscape; margin: 10mm; } }`}</style>
     </div>
+    </PortailImpression>
   )
 }

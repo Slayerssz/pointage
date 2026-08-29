@@ -3,6 +3,7 @@ import { formatDH } from '../lib/paie'
 import { modeleDe } from '../lib/modeles'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
+import PortailImpression from './PortailImpression'
 import DocumentCadre, { Signatures, type Bloc } from './DocumentCadre'
 import type { Contrat, Employee } from '../lib/types'
 
@@ -197,6 +198,7 @@ export default function ContratPrint({
   )
 
   return (
+    <PortailImpression>
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
       <BarreImpression
         titre={`Contrat ${c.numero ?? ''} — ${employee.nom_prenom}`}
@@ -238,5 +240,6 @@ export default function ContratPrint({
 
       <style>{`@media print { @page { size: A4 portrait; margin: 14mm; } }`}</style>
     </div>
+    </PortailImpression>
   )
 }

@@ -3,6 +3,7 @@ import { gardeLabel } from '../lib/gardes'
 import { modeleDe } from '../lib/modeles'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
+import PortailImpression from './PortailImpression'
 import DocumentCadre, { Signatures, type Bloc } from './DocumentCadre'
 import type { Conge, Employee } from '../lib/types'
 
@@ -95,6 +96,7 @@ export default function EngagementPrint({
   ]
 
   return (
+    <PortailImpression>
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
       <BarreImpression
         titre={`Engagement de congé — ${employee.nom_prenom}`}
@@ -132,5 +134,6 @@ export default function EngagementPrint({
 
       <style>{`@media print { @page { size: A4 portrait; margin: 14mm; } }`}</style>
     </div>
+    </PortailImpression>
   )
 }
