@@ -190,7 +190,7 @@ export default function FichePrint({
                   <p className="uppercase" style={{ color: entete.accent, fontSize: '13pt',
                                                     letterSpacing: '.05em', fontWeight: 600 }}>
                     Matricule N°{' '}
-                    <span style={{ color: '#1a1a1a', fontWeight: 700 }}>
+                    <span style={{ fontWeight: 700 }}>
                       {e.matricule != null ? String(e.matricule).padStart(3, '0') : '—'}
                     </span>
                   </p>

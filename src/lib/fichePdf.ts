@@ -136,9 +136,9 @@ export async function genererFichePdf(opts: {
     const xDepart = centreDroite - (lLibelle + lNumero) / 2
     const yTexte = yPhoto + 12
 
+    // Libellé et numéro dans la même couleur que l'en-tête de la société
     doc.setTextColor(...accent)
     doc.text('MATRICULE N° ', xDepart, yTexte)
-    doc.setTextColor(20, 20, 20)
     doc.text(mat, xDepart + lLibelle, yTexte)
 
     // Filet centré sur le même axe que le texte
