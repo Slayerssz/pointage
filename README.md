@@ -127,6 +127,57 @@ Donnez cette adresse aux agents. Sur leur téléphone, ils peuvent aussi **insta
 
 ---
 
+---
+
+## L'application de bureau (Windows / macOS)
+
+C'est volontairement une **enveloppe**, pas une deuxième application : au
+lancement, elle ouvre le site déjà en ligne.
+
+L'intérêt est exactement celui recherché : **quand vous mettez le site à jour,
+il n'y a rien à réinstaller sur les postes.** Vercel publie la nouvelle version,
+et l'application l'affiche au lancement suivant. Vous ne relancez la
+construction ci-dessous que si vous touchez à l'enveloppe elle-même — le nom,
+l'icône, la taille de la fenêtre — ce qui n'arrive quasiment jamais.
+
+### Construire les installateurs
+
+1. Sur GitHub, onglet **Actions**
+2. À gauche, **« Application de bureau »**
+3. Bouton **« Run workflow »** → **Run workflow**
+4. Au bout d'une dizaine de minutes, les fichiers sont en bas de la page,
+   sous **Artifacts** :
+   - `pointage-Windows` → `.exe` (installateur) et `.msi`
+   - `pointage-macOS` → `.dmg`
+
+Distribuez ces fichiers aux postes. Une seule installation, ensuite tout se
+met à jour tout seul.
+
+### Si l'adresse du site change
+
+Une seule ligne à modifier, dans `src-tauri/fallback/index.html` :
+
+```js
+var SITE = 'https://pointage-blond.vercel.app';
+```
+
+Puis relancez la construction.
+
+### Sans connexion
+
+L'application affiche « Pas de connexion » avec un bouton **Réessayer** : les
+données vivent sur le serveur, jamais sur le poste.
+
+### Avertissement à la première ouverture
+
+Les installateurs ne sont pas signés (la signature coûte un certificat annuel) :
+
+- **Windows** : « Windows a protégé votre ordinateur » → *Informations
+  complémentaires* → *Exécuter quand même*
+- **macOS** : clic droit sur l'application → *Ouvrir* → *Ouvrir*
+
+Une seule fois, à la première ouverture.
+
 ## Bon à savoir
 
 - **Onglet Pointage (bureau)** : grille de la semaine (Lun → Dim). À la validation, le bureau choisit le **type de garde** :

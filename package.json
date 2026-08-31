@@ -9,7 +9,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test:db": "node supabase/tests/systeme.test.mjs",
-    "test": "tsc -b --noEmit && oxlint && node supabase/tests/systeme.test.mjs && node supabase/tests/filtres-paie.test.mjs"
+    "test": "tsc -b --noEmit && oxlint && node supabase/tests/systeme.test.mjs && node supabase/tests/filtres-paie.test.mjs",
+    "app:icones": "npx --yes @tauri-apps/cli@^2 icon src-tauri/icone-source.png",
+    "app:dev": "npx --yes @tauri-apps/cli@^2 dev",
+    "app:build": "npm run app:icones && npx --yes @tauri-apps/cli@^2 build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.6",

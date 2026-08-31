@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointage — Groupe Triple A</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: #0f172a; color: #e2e8f0;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    text-align: center; padding: 2rem;
+  }
+  .boite { max-width: 26rem; }
+  svg.logo { width: 3.5rem; height: 3.5rem; margin-bottom: 1.5rem; }
+  h1 { font-size: 1.15rem; font-weight: 600; margin: 0 0 .5rem; }
+  p  { font-size: .9rem; color: #94a3b8; margin: 0 0 1.5rem; line-height: 1.6; }
+  .rond {
+    width: 2rem; height: 2rem; margin: 0 auto;
+    border: 2px solid #334155; border-top-color: #34d399;
+    border-radius: 50%; animation: t .8s linear infinite;
+  }
+  @keyframes t { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .rond { animation-duration: 3s; } }
+  button {
+    background: #059669; color: #fff; border: 0; border-radius: .6rem;
+    padding: .65rem 1.4rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { background: #047857; }
+  button:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+  .cache { display: none; }
+  code { color: #64748b; font-size: .78rem; }
+</style>
+</head>
+<body>
+  <div class="boite">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#1e293b"/>
+      <path d="M18 34 L28 44 L47 22" fill="none" stroke="#34d399"
+            stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+
+    <div id="chargement">
+      <h1>Ouverture de Pointage…</h1>
+      <p>Connexion au serveur.</p>
+      <div class="rond"></div>
+    </div>
+
+    <div id="hors-ligne" class="cache">
+      <h1>Pas de connexion</h1>
+      <p>
+        Pointage a besoin d’Internet : les données sont sur le serveur, pas sur ce poste.
+        Vérifiez la connexion, puis réessayez.
+      </p>
+      <button id="reessayer" type="button">Réessayer</button>
+      <p style="margin-top:1.5rem"><code id="adresse"></code></p>
+    </div>
+  </div>
+
+<script>
+  // L'adresse du site en ligne. C'est le SEUL endroit à changer si elle bouge.
+  var SITE = 'https://pointage-blond.vercel.app';
+
+  var chargement = document.getElementById('chargement');
+  var horsLigne  = document.getElementById('hors-ligne');
+  document.getElementById('adresse').textContent = SITE;
+
+  function montrerHorsLigne() {
+    chargement.classList.add('cache');
+    horsLigne.classList.remove('cache');
+  }
+
+  function ouvrir() {
+    horsLigne.classList.add('cache');
+    chargement.classList.remove('cache');
+
+    if (navigator.onLine === false) { montrerHorsLigne(); return; }
+
+    // On vérifie que le serveur répond avant de basculer : sinon l'utilisateur
+    // tomberait sur la page d'erreur brute du navigateur.
+    var abandon = new AbortController();
+    var minuteur = setTimeout(function () { abandon.abort(); }, 8000);
+
+    fetch(SITE, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: abandon.signal })
+      .then(function () {
+        clearTimeout(minuteur);
+        window.location.replace(SITE);
+      })
+      .catch(function () {
+        clearTimeout(minuteur);
+        montrerHorsLigne();
+      });
+  }
+
+  document.getElementById('reessayer').addEventListener('click', ouvrir);
+  window.addEventListener('online', ouvrir);
+  ouvrir();
+</script>
+</body>
+</html>
