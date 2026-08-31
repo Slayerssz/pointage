@@ -5,10 +5,10 @@
  * Les logos sont dans `public/entetes/` — ils ne pèsent donc pas sur
  * l'application, le navigateur les met en cache.
  *
- * Pour ajouter une entreprise : déposez son logo dans `public/entetes/`
- * et ajoutez une ligne ci-dessous. Une entreprise absente de cette liste
- * s'imprime avec son nom en toutes lettres et un gris neutre — la fiche
- * reste correcte, elle n'a simplement pas encore son logo.
+ * Les dix sociétés du groupe y figurent. Pour en ajouter une : déposez
+ * son logo dans `public/entetes/` et ajoutez une ligne ci-dessous. Une
+ * société absente de cette liste s'imprime avec son nom en toutes lettres
+ * et un gris neutre — la fiche reste correcte, sans logo.
  */
 
 export interface Entete {
@@ -27,6 +27,11 @@ const ENTETES: Record<string, Entete> = {
   'BO':                   { logo: '/entetes/bo.png',                  accent: '#0c6aa4' },
   'TRIMAX':               { logo: '/entetes/trimax.png',              accent: '#171b32' },
   'VIGILMA GARD MAROC':   { logo: '/entetes/vigilma-gard-maroc.png',  accent: '#63656a' },
+  'DUO MULTI SERVICE':    { logo: '/entetes/duo-multi-service.png',   accent: '#a8070c' },
+  'NORD PLANET':          { logo: '/entetes/nord-planet.png',        accent: '#006f9d' },
+  'SERCLEAN NEGOCE':      { logo: '/entetes/serclean-negoce.png',    accent: '#2c2667' },
+  // Le logo porte « MEGAINTER », la base « MEGANTER » : c'est bien la même société.
+  'MEGANTER SERVICE MAROC': { logo: '/entetes/meganter-service-maroc.png', accent: '#616364' },
 }
 
 /** En-tête neutre, pour une entreprise dont le logo n'a pas encore été fourni. */

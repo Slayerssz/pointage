@@ -16,13 +16,17 @@ export default function ListePrint({
   entreprise,
   sites,
   principaux,
+  entreprises,
   intitule,
   onClose,
 }: {
   employees: Employee[]
   entreprise: string
-  sites: { id: string; name: string; site_principal_id: string | null }[]
+  sites: { id: string; name: string; site_principal_id: string | null; company_id?: string }[]
   principaux: SitePrincipal[]
+  /** Renseigné en vue « toutes les entreprises » : la société de chaque site
+   *  est alors rappelée, sinon la liste mélangerait les sociétés en silence. */
+  entreprises?: { id: string; name: string }[]
   /** Ce qui a été filtré, rappelé sous le titre. */
   intitule?: string
   onClose: () => void
@@ -44,6 +48,11 @@ export default function ListePrint({
     const sp = sites.find((s) => s.id === id)?.site_principal_id
     return sp ? (principaux.find((p) => p.id === sp)?.name ?? null) : null
   }
+  const nomEntreprise = (siteId: string) => {
+    if (!entreprises) return null
+    const cid = sites.find((s) => s.id === siteId)?.company_id
+    return cid ? (entreprises.find((c) => c.id === cid)?.name ?? null) : null
+  }
   const groupes = [...parSite.entries()].sort((a, b) =>
     nomSite(a[0]).localeCompare(nomSite(b[0]), 'fr'),
   )
@@ -63,7 +72,9 @@ export default function ListePrint({
       {/* A4 paysage : le tableau a besoin de largeur */}
       <div className="document-imprimable mx-auto my-6 max-w-[297mm] bg-white p-[12mm] text-[9pt] leading-snug text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
         <header className="mb-5 border-b-2 border-black pb-3 text-center">
-          <h1 className="text-base font-bold uppercase tracking-wide">{entreprise}</h1>
+          <h1 className="text-base font-bold uppercase tracking-wide">
+            {entreprises ? 'TOUTES LES ENTREPRISES' : entreprise}
+          </h1>
           <p className="mt-1 text-lg font-bold uppercase">Liste du personnel</p>
           {intitule && <p className="mt-1 text-[10pt]">{intitule}</p>}
           <p className="mt-1 text-[8pt] text-slate-600">
@@ -73,10 +84,14 @@ export default function ListePrint({
 
         {groupes.map(([siteId, liste]) => {
           const principal = nomPrincipal(siteId)
+          const societe = nomEntreprise(siteId)
           return (
             <section key={siteId} className="mb-6 break-inside-avoid">
               <h2 className="mb-1.5 flex items-baseline justify-between gap-3 border-b border-black pb-1">
                 <span className="text-[11pt] font-bold uppercase">
+                  {societe && (
+                    <span className="mr-2 text-[9pt] font-normal">{societe} ·</span>
+                  )}
                   {nomSite(siteId)}
                   {principal && (
                     <span className="ml-2 text-[9pt] font-normal normal-case text-slate-600">

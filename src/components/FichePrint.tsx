@@ -225,12 +225,13 @@ export default function FichePrint({
               >
                 Pièces administratives à fournir
               </p>
+              {/* La liste des pièces reste en noir chez toutes les sociétés */}
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {PIECES.map((p) => (
-                  <li key={p} className="flex items-baseline" style={{ marginBottom: '3.5mm' }}>
-                    <span style={{ color: entete.accent, marginRight: '4mm', fontSize: '11pt' }}>•</span>
-                    <span className="uppercase" style={{ color: entete.accent, fontWeight: 600, fontSize: '10pt' }}>
-                      {p}
+                {PIECES.map((piece) => (
+                  <li key={piece} className="flex items-baseline" style={{ marginBottom: '3.5mm' }}>
+                    <span style={{ color: '#1a1a1a', marginRight: '4mm', fontSize: '11pt' }}>•</span>
+                    <span className="uppercase" style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '10pt' }}>
+                      {piece}
                     </span>
                   </li>
                 ))}

@@ -118,6 +118,15 @@ for (const b of ORDRE) {
   }
 }
 
+// On relève l'état de la sécurité au niveau ligne AVANT de la désactiver :
+// c'est l'état réel de votre base qui nous intéresse, pas celui du test.
+const sansRlsInstall = (await db.query(`
+  select c.relname from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r'
+    and c.relname <> 'matricule_compteur'
+    and not c.relrowsecurity`)).rows.map((r) => r.relname)
+
 // RLS désactivée pour le test : ce sont les contrôles DANS les fonctions
 // qu'on vérifie (PGlite n'a pas les rôles PostgREST).
 for (const t of ['companies', 'sites', 'sites_principaux', 'employees', 'profiles',
@@ -222,7 +231,9 @@ const creerEmploye = async (nom, siteId, opts = {}) => (await q1(
      (company_id, site_id, nom_prenom, salaire, heures_par_jour, mode_reglement,
       banque, jour_de_repos, situation_familiale, nombre_enfants, dette, cin)
    values ($1,$2,$3,$4,8,$5,$6,7,$7,$8,$9,$10) returning id`,
-  [co, siteId, nom, opts.salaire ?? 5200, opts.mode ?? 'Virement', opts.banque ?? 'CIH',
+  // Attention : `??` laisserait passer null. On distingue « non fourni » de « null ».
+  [co, siteId, nom, 'salaire' in opts ? opts.salaire : 5200,
+   opts.mode ?? 'Virement', opts.banque ?? 'CIH',
    opts.situation ?? 'Célibataire', opts.enfants ?? 0, opts.dette ?? 0, opts.cin ?? null])).id
 
 const ePlein = await creerEmploye('PLEIN MOIS', aRiad, { cin: 'AA1' })
@@ -614,6 +625,67 @@ ok('supprimer un site principal conserve ses annexes',
    !!(await q1(`select 1 from public.sites where id=$1`, [aRiad])))
 ok('… en les détachant simplement',
    (await q1(`select site_principal_id from public.sites where id=$1`, [aRiad])).site_principal_id === null)
+
+// ═══════════════════════════════════════════ 13. CAS LIMITES ═════
+
+section('Cas limites')
+await connecte(admin)
+
+ok('toutes les tables ont la sécurité au niveau ligne activée',
+   sansRlsInstall.length === 0, sansRlsInstall.join(', '))
+
+// Un employé sans salaire ne casse pas la paie
+const eZero = await creerEmploye('SANS SALAIRE', aRiad, { salaire: null, cin: 'ZS1' })
+await connecte(bureau)
+await q1(`select public.marquer_present($1,'2026-04-02'::date,'X')`, [eZero])
+const perAvril = (await q1(`select public.valider_pointage_mois($1,2026,4) as id`, [co])).id
+const lZero = await q1(`select * from public.lignes_paie where periode_id=$1 and employee_id=$2`,
+                       [perAvril, eZero])
+ok('un employé sans salaire donne 0, sans erreur', Number(lZero.net_a_payer) === 0)
+
+// Un employé sans heures par jour : pas d'heures calculées, mais pas de plantage
+await db.query(`update public.employees set heures_par_jour = null where id=$1`, [eZero])
+await connecte(paie)
+await q1(`select public.generer_lignes_paie($1)`, [perAvril])
+const lZero2 = await q1(`select heures_effectuees from public.lignes_paie
+                         where periode_id=$1 and employee_id=$2`, [perAvril, eZero])
+ok('sans heures par jour, les heures restent vides', lZero2.heures_effectuees === null)
+
+// Retenue négative refusée
+await connecte(paie)
+await refuse('une retenue négative est refusée',
+  `select public.maj_ligne_paie($1,-5,0,0,null)`, [lZero.id], /négatif/i)
+
+// Un congé à l'envers
+await connecte(bureau)
+await refuse('un congé dont la fin précède le début est refusé',
+  `select public.creer_conge($1,'2026-05-10'::date,'2026-05-01'::date,'C',null)`,
+  [eZero], /après la date de début/i)
+
+// Un type de garde inventé
+await refuse('un type de garde inconnu est refusé',
+  `select public.marquer_present($1,'2026-05-04'::date,'ZZZ')`, [eZero], /invalide/i)
+
+// Deux entreprises ne peuvent pas porter le même nom
+await connecte(admin)
+await refuse('deux entreprises ne peuvent pas porter le même nom',
+  `select public.admin_creer_entreprise('Groupe Triple A')`, [], /déjà ce nom/i)
+
+// Deux annexes du même nom dans la même société
+await connecte(bureau)
+await refuse('deux annexes ne peuvent pas porter le même nom',
+  `select public.creer_site($1,'PORT')`, [co], /existe déjà/i)
+
+// Le matricule reste unique dans une société
+await refuse('deux employés ne peuvent pas avoir le même matricule',
+  `insert into public.employees(company_id,site_id,nom_prenom,matricule)
+   values($1,$2,'DOUBLON',$3)`,
+  [co, aRiad, Number((await q1(`select matricule from public.employees where id=$1`, [ePlein])).matricule)],
+  /unique|duplicat/i)
+
+// On ne peut pas clôturer un mois qui n'a pas commencé
+await refuse('impossible de clôturer un mois à venir',
+  `select public.valider_pointage_mois($1,2099,1)`, [co], /pas encore commencé/i)
 
 // ═══════════════════════════════════════════════════════ RÉSULTAT ═════
 

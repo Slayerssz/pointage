@@ -9,7 +9,7 @@ import {
   retirementStatus,
   todayIso,
 } from '../../lib/dates'
-import { useEmployeFiltres, useSites, useSitesPrincipaux } from '../../lib/queries'
+import { useEmployeFiltres, useSites, useSitesPrincipaux, useTousLesSites } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
 import { useContratsCourants, formatDH } from '../../lib/paie'
@@ -38,10 +38,22 @@ const QUALIFICATIONS = [
 
 export default function EmployesPage() {
   const { companyId } = useParams()
+  const { profile } = useAuth()
+  const estAdmin = profile?.role === 'admin'
+  // Le rôle « personnel » se limite aux fiches : ni dossier, ni suppression.
+  const estRH = profile?.role === 'rh'
+  // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.
+  const [toutesEntreprises, setToutesEntreprises] = useState(false)
   const { data: sites } = useSites(companyId)
   const { data: filtres } = useEmployeFiltres(companyId)
   const { data: contrats } = useContratsCourants(companyId)
   const { data: principaux } = useSitesPrincipaux(companyId)
+  // En vue « toutes les entreprises », l'employé imprimé peut appartenir à
+  // une autre société : il faut alors ses sites et son en-tête à elle.
+  const { data: tousLesSites } = useTousLesSites(Boolean(estAdmin && toutesEntreprises))
+  const sitesImpression = estAdmin && toutesEntreprises ? (tousLesSites ?? sites ?? []) : (sites ?? [])
+  const entrepriseDe = (emp: Employee) =>
+    entreprises?.find((c) => c.id === emp.company_id)?.name ?? company?.name ?? ''
   const { data: company } = useQuery({
     queryKey: ['company', companyId],
     enabled: Boolean(companyId),
@@ -75,12 +87,7 @@ export default function EmployesPage() {
   const [statutFilter, setStatutFilter] = useState('actif')
   const [contratFilter, setContratFilter] = useState('')
   const [principalFilter, setPrincipalFilter] = useState('')
-  const { profile } = useAuth()
-  const estAdmin = profile?.role === 'admin'
-  // Le rôle « personnel » se limite aux fiches : ni dossier, ni suppression.
-  const estRH = profile?.role === 'rh'
-  // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.
-  const [toutesEntreprises, setToutesEntreprises] = useState(false)
+
   const [editing, setEditing] = useState<Employee | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -475,8 +482,8 @@ export default function EmployesPage() {
       {fiche && (
         <FichePrint
           employees={[fiche]}
-          entreprise={company?.name ?? ''}
-          sites={sites ?? []}
+          entreprise={entrepriseDe(fiche)}
+          sites={sitesImpression}
           onClose={() => setFiche(null)}
         />
       )}
@@ -485,8 +492,9 @@ export default function EmployesPage() {
         <ListePrint
           employees={liste}
           entreprise={company?.name ?? ''}
-          sites={sites ?? []}
+          sites={sitesImpression}
           principaux={principaux ?? []}
+          entreprises={estAdmin && toutesEntreprises ? (entreprises ?? []) : undefined}
           intitule={intituleListe || undefined}
           onClose={() => setListe(null)}
         />

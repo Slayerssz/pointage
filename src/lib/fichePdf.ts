@@ -188,12 +188,14 @@ export async function genererFichePdf(opts: {
     doc.line((P.l - lSous) / 2, y + 1.8, (P.l + lSous) / 2, y + 1.8)
     y += 11
 
+    // La liste des pièces reste en noir, quelle que soit la société :
+    // c'est une liste à cocher, pas un élément d'identité visuelle.
     doc.setFontSize(9.5)
-    PIECES.forEach((p) => {
-      doc.setFillColor(...accent)
+    PIECES.forEach((piece) => {
+      doc.setFillColor(20, 20, 20)
       doc.circle(P.marge + 2, y - 1.2, 0.7, 'F')
-      doc.setFont('helvetica', 'bold').setTextColor(...accent)
-      doc.text(p, P.marge + 7, y)
+      doc.setFont('helvetica', 'bold').setTextColor(20, 20, 20)
+      doc.text(piece, P.marge + 7, y)
       y += 7.5
     })
   })

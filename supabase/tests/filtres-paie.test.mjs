@@ -93,5 +93,38 @@ ok(decalage ? 'la méthode par toISOString aurait bien été fautive ici'
    decalage ? fautif('2026-09-10') !== '2026-09-11' : fautif('2026-09-10') === '2026-09-11',
    `toISOString donne ${fautif('2026-09-10')}`)
 
+
+// ── En-têtes : chaque société doit retrouver le sien ─────────────────────
+const cle = (n) => (n ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim()
+const ENTETES = {
+  'EDEN VERT SERVICE': '#366d81', 'AL SAFAE EL MAGHREB': '#0f2155',
+  'GROUPE TRIPLE A': '#94040d', 'BO': '#0c6aa4', 'TRIMAX': '#171b32',
+  'VIGILMA GARD MAROC': '#63656a', 'DUO MULTI SERVICE': '#a8070c',
+  'NORD PLANET': '#006f9d', 'SERCLEAN NEGOCE': '#2c2667',
+  'MEGANTER SERVICE MAROC': '#616364',
+}
+const parCle = new Map(Object.entries(ENTETES).map(([k, v]) => [cle(k), v]))
+const enteteDe = (n) => parCle.get(cle(n)) ?? null
+
+const SOCIETES = Object.keys(ENTETES)
+ok('les dix sociétés ont un en-tête', SOCIETES.every((s) => enteteDe(s) !== null))
+ok('les dix accents sont distincts', new Set(Object.values(ENTETES)).size === 10)
+ok('la casse et les accents n’empêchent pas la correspondance',
+   enteteDe('groupe triple a') === '#94040d' && enteteDe('Éden Vert Service') === '#366d81')
+ok('une société inconnue retombe sur l’en-tête neutre', enteteDe('SOCIETE INEXISTANTE') === null)
+
+// Le point qui posait problème : imprimer un employé d'une AUTRE société
+const employes = [
+  { nom: 'A', company_id: 'c1' },
+  { nom: 'B', company_id: 'c2' },
+]
+const societes = [{ id: 'c1', name: 'GROUPE TRIPLE A' }, { id: 'c2', name: 'EDEN VERT SERVICE' }]
+const entrepriseDe = (e) => societes.find((c) => c.id === e.company_id)?.name ?? ''
+ok('la fiche prend l’en-tête de la société de l’employé, pas celle affichée',
+   enteteDe(entrepriseDe(employes[1])) === '#366d81',
+   enteteDe(entrepriseDe(employes[1])))
+ok('… et non celle du premier employé', enteteDe(entrepriseDe(employes[0])) !== enteteDe(entrepriseDe(employes[1])))
+
 console.log(`\n=== ${P} réussis, ${F} échoués ===`)
 process.exit(F ? 1 : 0)

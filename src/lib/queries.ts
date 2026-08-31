@@ -42,6 +42,23 @@ export function useSitesPrincipaux(companyId: string | undefined) {
   })
 }
 
+/** Tous les sites de toutes les sociétés — pour la vue « toutes les
+ *  entreprises », où un employé peut venir de n'importe laquelle. */
+export function useTousLesSites(enabled: boolean) {
+  return useQuery({
+    queryKey: ['sites', 'toutes'],
+    enabled,
+    queryFn: async (): Promise<Site[]> => {
+      const { data, error } = await supabase
+        .from('sites')
+        .select('id, company_id, name, pointage_actif, site_principal_id')
+        .order('name')
+      if (error) throw error
+      return data as Site[]
+    },
+  })
+}
+
 export type SiteEmployee = Pick<
   Employee,
   'id' | 'nom_prenom' | 'matricule' | 'qualification' | 'jour_de_repos'
