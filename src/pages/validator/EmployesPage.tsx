@@ -18,6 +18,7 @@ import type { Contrat, Employee, SituationFamiliale } from '../../lib/types'
 import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
+import ApercuEmploye from '../../components/ApercuEmploye'
 import ListePrint from '../../components/ListePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
@@ -67,6 +68,8 @@ export default function EmployesPage() {
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
   // Fiche individuelle (une personne) et liste du personnel (la sélection)
   const [fiche, setFiche] = useState<Employee | null>(null)
+  // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
+  const [apercu, setApercu] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
   const [chargementListe, setChargementListe] = useState(false)
   const { data: entreprises } = useQuery({
@@ -340,13 +343,15 @@ export default function EmployesPage() {
                 return (
                   <tr
                     key={emp.id}
-                    className={
+                    onClick={() => setApercu(emp)}
+                    title="Voir toutes ses informations"
+                    className={`cursor-pointer transition hover:brightness-[0.97] ${
                       isGone
                         ? 'bg-slate-50 text-slate-400'
                         : isRetired
                           ? 'bg-red-50'
                           : fondContrat || 'bg-white'
-                    }
+                    }`}
                   >
                     <td className="fige-gauche px-4 py-3.5">
                       <div className="flex items-start gap-3">
@@ -473,7 +478,10 @@ export default function EmployesPage() {
                       {formatGardes(emp.jours_travailles)}
                     </td>
 
-                    <td className="fige-droite px-4 py-3.5 text-right">
+                    <td
+                      className="fige-droite px-4 py-3.5 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex justify-end gap-1.5">
                         <button
                           onClick={() => setFiche(emp)}
@@ -511,6 +519,22 @@ export default function EmployesPage() {
             setEditing(null)
             setAdding(false)
           }}
+        />
+      )}
+
+      {apercu && (
+        <ApercuEmploye
+          employee={apercu}
+          entreprise={entrepriseDe(apercu)}
+          siteNom={sitesImpression.find((s) => s.id === apercu.site_id)?.name ?? null}
+          contratCourant={contrats?.get(apercu.id) ?? null}
+          sitePrincipalNom={(() => {
+            const sp = sitesImpression.find((s) => s.id === apercu.site_id)?.site_principal_id
+            return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
+          })()}
+          onFiche={() => { setFiche(apercu); setApercu(null) }}
+          onModifier={() => { setEditing(apercu); setApercu(null) }}
+          onClose={() => setApercu(null)}
         />
       )}
 
