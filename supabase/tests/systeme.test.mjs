@@ -107,7 +107,7 @@ const ORDRE = [
   'BLOC_7_sites_principaux.sql', 'BLOC_8_dossier_employe.sql', 'BLOC_9_dette_simple.sql',
   'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
   'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
-  'BLOC_14_analytics_paie.sql',
+  'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -163,6 +163,8 @@ const SENSIBLES = [
   ['apercu_suppression_employe',`select public.apercu_suppression_employe(gen_random_uuid())`],
   ['maj_parametres_paie',       `select public.maj_parametres_paie(gen_random_uuid(),26,true,true,8)`],
   ['analytics_paie',            `select public.analytics_paie(null,2026)`],
+  ['bulletin_paie',             `select public.bulletin_paie(gen_random_uuid())`],
+  ['maj_bareme_igr',            `select public.maj_bareme_igr('[]'::jsonb)`],
 ]
 let ouvertes = 0
 for (const [nom, sql] of SENSIBLES) {
@@ -554,6 +556,117 @@ const libre = (await q1(
     limit 1`, [ePlein])).j
 await q1(`select public.marquer_present($1,$2::date,'X')`, [ePlein, libre])
 ok('le pointage redevient modifiable après réouverture', true)
+
+// ══════════════════════════════════ 9 ter. BULLETIN DE PAIE ═════
+
+section('Bulletin de paie (virements uniquement)')
+await connecte(paie)
+
+const bp = (await q1(`select public.bulletin_paie($1) as b`, [periode])).b
+ok('le bulletin renvoie une liste', Array.isArray(bp), typeof bp)
+
+// Seuls les employés payés par virement y figurent.
+const virements = await rows(
+  `select employee_id, nom_prenom, salaire_brut, cnss from public.lignes_paie
+    where periode_id=$1 and lower(coalesce(mode_reglement,'')) like 'vir%'`, [periode])
+const autres = await rows(
+  `select employee_id from public.lignes_paie
+    where periode_id=$1 and lower(coalesce(mode_reglement,'')) not like 'vir%'`, [periode])
+ok('le bulletin ne contient que les employés payés par virement',
+   bp.length === virements.length && bp.length > 0,
+   `${bp.length} bulletins pour ${virements.length} virements`)
+ok('aucun employé payé en espèces n’a de bulletin',
+   autres.length > 0 && !bp.some((b) => autres.some((a) => a.employee_id === b.employe.id)),
+   `${autres.length} non-virements ignorés`)
+
+const b0 = bp[0]
+const lig = (code) => b0.lignes.find((l) => l.code === code)
+const brut = Number(lig('001').gain)
+
+ok('la ligne SALAIRE BRUT porte le salaire de base et les jours payés',
+   lig('001').libelle === 'SALAIRE BRUT' && Number(lig('001').base) > 0
+     && Number(lig('001').taux) > 0, JSON.stringify(lig('001')))
+
+const cnss = Number(lig('068').retenue)
+ok('C.N.S.S. = brut × 4,48 %', cnss === Math.round(brut * 4.48) / 100,
+   `${cnss} vs ${Math.round(brut * 4.48) / 100}`)
+ok('la C.N.S.S. est une retenue, jamais un gain', lig('068').gain === null)
+
+const amo = Number(lig('069').retenue)
+ok('A.M.O. = brut × 2,26 %', amo === Math.round(brut * 2.26) / 100,
+   `${amo} vs ${Math.round(brut * 2.26) / 100}`)
+
+// Barème vide au départ : aucun taux n'est inventé, l'I.G.R. reste à zéro.
+ok('sans barème saisi, l’I.G.R. vaut 0', Number(lig('070').retenue) === 0)
+ok('… et le bulletin le signale quand le brut dépasse le seuil',
+   b0.bareme_igr_absent === (brut >= 6000), `brut ${brut}, drapeau ${b0.bareme_igr_absent}`)
+
+const net = Number(b0.lignes.find((l) => l.libelle === 'GAIN NET').gain)
+ok('GAIN NET = brut − C.N.S.S. − A.M.O. − I.G.R.',
+   net === Math.round((brut - cnss - amo) * 100) / 100, `${net}`)
+ok('le pied reprend le même net à payer', Number(b0.pied.net_a_payer) === net)
+ok('le pied porte 191 heures salariales', Number(b0.pied.heures_salariales) === 191)
+ok('le pied porte les jours travaillés', Number(b0.pied.jours_travailles) > 0)
+ok('le cumul C.N.S.S. du premier mois validé = la C.N.S.S. du mois',
+   Number(b0.pied.cumul_cnss) === cnss, `${b0.pied.cumul_cnss} vs ${cnss}`)
+ok('le cumul I.G.R. est à zéro sans barème', Number(b0.pied.cumul_igr) === 0)
+
+// Ce que le bulletin ne doit PAS contenir (les lignes barrées de la photo)
+const libelles = b0.lignes.map((l) => l.libelle).join(' | ')
+ok('pas de seconde ligne SALAIRE BRUT en double',
+   b0.lignes.filter((l) => l.libelle === 'SALAIRE BRUT').length === 1, libelles)
+ok('ni Cumul B.Imp. ni C.I.M.R. ni Décompte Monétaire',
+   !/B\.?Imp|C\.?I\.?M\.?R|Décompte/i.test(JSON.stringify(b0)))
+
+// Un barème saisi : l'I.G.R. se met à calculer.
+await connecte(admin)
+const nTranches = Number(await q1(
+  `select public.maj_bareme_igr($1::jsonb) as n`,
+  [JSON.stringify([
+    { salaire_min: 0,    salaire_max: 5999.99, taux: 0,  somme_a_deduire: 0 },
+    { salaire_min: 6000, salaire_max: null,    taux: 10, somme_a_deduire: 100 },
+  ])]).then((r) => r.n))
+ok('l’administrateur enregistre un barème de 2 tranches', nTranches === 2, String(nTranches))
+await connecte(paie)
+await refuse('la paie ne modifie pas le barème I.G.R.',
+  `select public.maj_bareme_igr('[]'::jsonb)`, [], REFUS)
+const bp2 = (await q1(`select public.bulletin_paie($1) as b`, [periode])).b
+const c0 = bp2.find((x) => x.ligne_id === b0.ligne_id)
+const baseImp = Math.round((brut - cnss - amo) * 100) / 100
+const igrAttendu = brut >= 6000 ? Math.max(0, Math.round((baseImp * 10 - 10000) ) / 100) : 0
+ok('avec un barème, l’I.G.R. suit la tranche',
+   Number(c0.lignes.find((l) => l.code === '070').retenue)
+     === (brut >= 6000 ? Math.round((baseImp * 0.10 - 100) * 100) / 100 : 0),
+   `brut ${brut}, base ${baseImp}, igr ${c0.lignes.find((l) => l.code === '070').retenue}`)
+ok('le drapeau « barème absent » retombe une fois le barème saisi',
+   c0.bareme_igr_absent === false)
+void igrAttendu
+
+// Filtrer sur un seul employé
+const bpUn = (await q1(`select public.bulletin_paie($1,$2) as b`,
+  [periode, b0.employe.id])).b
+ok('on peut demander le bulletin d’un seul employé',
+   bpUn.length === 1 && bpUn[0].employe.id === b0.employe.id, String(bpUn.length))
+
+// Le bulletin distingue le net fiscal du net réellement versé
+ok('le net réellement versé (primes/retenues internes) est exposé à part',
+   c0.net_verse !== undefined && c0.prime !== undefined
+     && c0.retenues_internes !== undefined)
+
+// Une période inconnue échoue proprement
+await refuse('une période inconnue est refusée clairement',
+  `select public.bulletin_paie(gen_random_uuid())`, [], /introuvable/i)
+
+// Le bureau n'a pas accès au bulletin de paie
+await connecte(bureau)
+await refuse('le bureau n’accède pas au bulletin de paie',
+  `select public.bulletin_paie($1)`, [periode], REFUS)
+await connecte(paie)
+
+// On remet le barème à vide pour ne pas perturber les tests suivants.
+await connecte(admin)
+await q1(`select public.maj_bareme_igr('[]'::jsonb)`)
+await connecte(paie)
 
 // ═══════════════════════════════════════════════ 10. BULLETIN & RESET ═
 

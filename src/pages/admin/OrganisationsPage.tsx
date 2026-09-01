@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { formatNombre, useParametresPaie } from '../../lib/paie'
 import type { Company } from '../../lib/types'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import BaremeIgr from '../../components/BaremeIgr'
 
 /**
  * Entreprises — réservé à l'administrateur.
@@ -102,6 +103,10 @@ export default function OrganisationsPage() {
           }}
         />
       )}
+
+      <div className="mt-8">
+        <BaremeIgr />
+      </div>
 
       {parametres && (
         <ParametresPaieModal company={parametres} onClose={() => setParametres(null)} />
