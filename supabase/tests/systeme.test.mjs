@@ -107,6 +107,7 @@ const ORDRE = [
   'BLOC_7_sites_principaux.sql', 'BLOC_8_dossier_employe.sql', 'BLOC_9_dette_simple.sql',
   'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
   'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
+  'BLOC_14_analytics_paie.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -161,6 +162,7 @@ const SENSIBLES = [
   ['supprimer_employe',         `select public.supprimer_employe(gen_random_uuid())`],
   ['apercu_suppression_employe',`select public.apercu_suppression_employe(gen_random_uuid())`],
   ['maj_parametres_paie',       `select public.maj_parametres_paie(gen_random_uuid(),26,true,true,8)`],
+  ['analytics_paie',            `select public.analytics_paie(null,2026)`],
 ]
 let ouvertes = 0
 for (const [nom, sql] of SENSIBLES) {
@@ -448,6 +450,88 @@ ok('la dette passe de 1 500 à 1 000',
    Number((await q1(`select dette from public.employees where id=$1`, [eDette])).dette) === 1000)
 await refuse('une paie validée est verrouillée',
   `select public.maj_ligne_paie($1,0,0,0,null)`, [lDette.id], /validée|réouverture/i)
+
+// ═══════════════════════════════════ 9 bis. ANALYTICS DE LA PAIE ═════
+
+section('Analytics : les montants versés')
+const apCo = (await q1(`select public.analytics_paie($1,2026) as a`, [co])).a
+
+ok('l’année est bien celle demandée', apCo.annee === 2026)
+
+const mars = apCo.par_mois.find((m) => m.mois === 3)
+ok('mars apparaît dans le détail mensuel', !!mars, JSON.stringify(apCo.par_mois))
+ok('mars est marqué comme paie validée', mars?.statut === 'paie_validee', mars?.statut)
+
+// Le net du mois doit retomber sur la somme des lignes, sans arrondi perdu.
+const netLignes = Number((await q1(
+  `select coalesce(sum(net_a_payer),0) as n from public.lignes_paie where periode_id=$1`,
+  [periode])).n)
+ok('le net du mois = la somme des lignes de paie',
+   Number(mars.net) === netLignes, `${mars.net} vs ${netLignes}`)
+
+ok('espèces + virements retombent sur le net du mois',
+   Number(mars.virement) + Number(mars.especes) === Number(mars.net),
+   JSON.stringify({ v: mars.virement, e: mars.especes, n: mars.net }))
+
+ok('le brut du mois = la somme des salaires bruts',
+   Number(mars.brut) === Number((await q1(
+     `select coalesce(sum(salaire_brut),0) as n from public.lignes_paie where periode_id=$1`,
+     [periode])).n), String(mars.brut))
+
+ok('le nombre d’employés payés correspond aux lignes',
+   Number(mars.employes) === Number((await q1(
+     `select count(*) as c from public.lignes_paie where periode_id=$1`, [periode])).c),
+   String(mars.employes))
+
+// Le cumul de l'année ne retient QUE les mois validés.
+ok('le cumul de l’année compte un mois validé', Number(apCo.annee_totaux.mois_validés) === 1,
+   String(apCo.annee_totaux.mois_validés))
+ok('le net cumulé de l’année = le net de mars',
+   Number(apCo.annee_totaux.net) === Number(mars.net),
+   `${apCo.annee_totaux.net} vs ${mars.net}`)
+ok('espèces + virements retombent sur le net de l’année',
+   Number(apCo.annee_totaux.virement) + Number(apCo.annee_totaux.especes)
+     === Number(apCo.annee_totaux.net))
+
+ok('la répartition par banque ne contient que des virements',
+   apCo.par_banque.reduce((s2, b) => s2 + Number(b.montant), 0)
+     === Number(apCo.annee_totaux.virement),
+   JSON.stringify(apCo.par_banque))
+
+ok('la répartition par site principal retombe sur le net',
+   apCo.par_site_principal.reduce((s2, x) => s2 + Number(x.montant), 0)
+     === Number(apCo.annee_totaux.net),
+   JSON.stringify(apCo.par_site_principal))
+
+ok('les dettes ouvertes sont remontées',
+   Number(apCo.dettes.total) === Number((await q1(
+     `select coalesce(sum(dette),0) as d from public.employees
+       where dette > 0 and actif and company_id=$1`, [co])).d), String(apCo.dettes.total))
+
+ok('la masse salariale théorique = la somme des salaires en poste',
+   Number(apCo.masse_mensuelle_theorique) === Number((await q1(
+     `select coalesce(sum(salaire),0) as s from public.employees where actif and company_id=$1`,
+     [co])).s), String(apCo.masse_mensuelle_theorique))
+
+// Une année sans paie ne doit pas casser : des zéros, pas une erreur.
+const vide = (await q1(`select public.analytics_paie($1,2019) as a`, [co])).a
+ok('une année sans paie renvoie des zéros, pas une erreur',
+   vide.par_mois.length === 0 && Number(vide.annee_totaux.net) === 0,
+   JSON.stringify(vide.annee_totaux))
+
+// Filtrage par entreprise : une autre entreprise ne voit pas cette paie.
+await connecte(admin)
+const co2 = (await q1(`select public.admin_creer_entreprise('CLOISON SARL') as id`)).id
+await connecte(paie)
+const apAutre = (await q1(`select public.analytics_paie($1,2026) as a`, [co2])).a
+ok('l’analytics d’une autre entreprise ne voit pas cette paie',
+   apAutre.par_mois.length === 0 && Number(apAutre.annee_totaux.net) === 0)
+
+// « Toutes les entreprises » doit au moins contenir celle-ci.
+const apTout = (await q1(`select public.analytics_paie(null,2026) as a`)).a
+ok('« toutes les entreprises » englobe le net de cette entreprise',
+   Number(apTout.annee_totaux.net) >= Number(apCo.annee_totaux.net),
+   `${apTout.annee_totaux.net} >= ${apCo.annee_totaux.net}`)
 
 section('Demande de réouverture')
 await connecte(paie)

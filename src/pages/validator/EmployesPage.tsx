@@ -305,36 +305,27 @@ export default function EmployesPage() {
 
       {data && lignes.length > 0 && (
         <div
-          className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm ${
+          className={`tableau-large rounded-2xl border border-slate-200 bg-white shadow-sm ${
             isPlaceholderData ? 'opacity-60' : ''
           }`}
         >
-          <table className="w-full min-w-[1900px] text-left text-sm">
+          <table className="w-full min-w-[1500px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3 font-medium">N°</th>
-                <th className="px-4 py-3 font-medium">Nom & Prénom</th>
+                <th className="fige-gauche px-4 py-3.5 font-medium">Employé</th>
                 {estAdmin && toutesEntreprises && (
-                  <th className="px-4 py-3 font-medium">Entreprise</th>
+                  <th className="px-4 py-3.5 font-medium">Entreprise</th>
                 )}
-                <th className="px-4 py-3 font-medium">Annexe</th>
-                <th className="px-4 py-3 font-medium">Âge</th>
-                <th className="px-4 py-3 font-medium">Naissance</th>
-                <th className="px-4 py-3 font-medium">Embauche</th>
-                <th className="px-4 py-3 font-medium">CIN</th>
-                <th className="px-4 py-3 font-medium">CNSS</th>
-                <th className="px-4 py-3 font-medium">Téléphone</th>
-                <th className="px-4 py-3 font-medium">Adresse</th>
-                <th className="px-4 py-3 font-medium">Ville</th>
-                <th className="px-4 py-3 font-medium">Repos</th>
-                <th className="px-4 py-3 font-medium">Contrat</th>
-                <th className="px-4 py-3 font-medium">Règlement</th>
-                <th className="px-4 py-3 font-medium">RIB</th>
-                <th className="px-4 py-3 font-medium">Banque</th>
-                <th className="px-4 py-3 text-right font-medium">Salaire</th>
-                <th className="px-4 py-3 text-right font-medium">H / jour</th>
-                <th className="px-4 py-3 text-right font-medium">Gardes</th>
-                <th className="sticky right-0 bg-white px-4 py-3" />
+                <th className="px-4 py-3.5 font-medium">Annexe</th>
+                <th className="px-4 py-3.5 font-medium">Identité</th>
+                <th className="px-4 py-3.5 font-medium">Contact</th>
+                <th className="px-4 py-3.5 font-medium">Dates</th>
+                <th className="px-4 py-3.5 font-medium">Repos</th>
+                <th className="px-4 py-3.5 font-medium">Contrat</th>
+                <th className="px-4 py-3.5 font-medium">Règlement</th>
+                <th className="px-4 py-3.5 text-right font-medium">Salaire</th>
+                <th className="px-4 py-3.5 text-right font-medium">Gardes</th>
+                <th className="fige-droite px-4 py-3.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -353,64 +344,90 @@ export default function EmployesPage() {
                       isGone
                         ? 'bg-slate-50 text-slate-400'
                         : isRetired
-                          ? 'bg-red-50/80'
-                          : fondContrat || undefined
+                          ? 'bg-red-50'
+                          : fondContrat || 'bg-white'
                     }
                   >
-                    <td className="px-4 py-3 font-medium text-slate-700">{emp.matricule ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'}`}>
-                          {emp.nom_prenom}
+                    <td className="fige-gauche px-4 py-3.5">
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-slate-600">
+                          {emp.matricule ?? '—'}
                         </span>
-                        {isGone && (
-                          <Chip tone="slate" title={emp.date_sortie ? `Sorti le ${formatDateFr(emp.date_sortie)}` : 'Sorti'}>
-                            Sorti{emp.date_sortie ? ` — ${formatDateFr(emp.date_sortie)}` : ''}
-                          </Chip>
-                        )}
-                        {retirement?.kind === 'retired' && (
-                          <Chip tone="red" title={`Né(e) le ${formatDateFr(emp.date_naissance)} — ${retirement.age} ans`}>
-                            Âge de retraite atteint
-                          </Chip>
-                        )}
-                        {retirement?.kind === 'approaching' && (
-                          <Chip
-                            tone={retirement.daysLeft <= 7 ? 'red' : 'amber'}
-                            title={`Né(e) le ${formatDateFr(emp.date_naissance)} — ${retirement.age} ans`}
-                          >
-                            {retirement.daysLeft === 0
-                              ? 'Retraite aujourd’hui'
-                              : `${retirement.daysLeft} jour${retirement.daysLeft > 1 ? 's' : ''} avant la retraite`}
-                          </Chip>
-                        )}
+                        <div className="min-w-0">
+                          <p className={`truncate font-medium ${isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'}`}>
+                            {emp.nom_prenom}
+                          </p>
+                          {emp.qualification && (
+                            <p className="truncate text-xs text-slate-500">{emp.qualification}</p>
+                          )}
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {isGone && (
+                              <Chip tone="slate" title={emp.date_sortie ? `Sorti le ${formatDateFr(emp.date_sortie)}` : 'Sorti'}>
+                                Sorti{emp.date_sortie ? ` — ${formatDateFr(emp.date_sortie)}` : ''}
+                              </Chip>
+                            )}
+                            {retirement?.kind === 'retired' && (
+                              <Chip tone="red" title={`Né(e) le ${formatDateFr(emp.date_naissance)} — ${retirement.age} ans`}>
+                                Retraite atteinte
+                              </Chip>
+                            )}
+                            {retirement?.kind === 'approaching' && (
+                              <Chip tone={retirement.daysLeft <= 7 ? 'red' : 'amber'}>
+                                {retirement.daysLeft === 0
+                                  ? 'Retraite aujourd’hui'
+                                  : `Retraite dans ${retirement.daysLeft} j`}
+                              </Chip>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      {emp.qualification && (
-                        <p className="text-xs text-slate-500">{emp.qualification}</p>
-                      )}
                     </td>
+
                     {estAdmin && toutesEntreprises && (
-                      <td className="max-w-40 truncate px-4 py-3 font-medium text-slate-700">
+                      <td className="max-w-40 truncate px-4 py-3.5 font-medium text-slate-700">
                         {entreprises?.find((c) => c.id === emp.company_id)?.name ?? '—'}
                       </td>
                     )}
-                    <td className="max-w-40 truncate px-4 py-3 text-slate-600">{siteCell(emp.site_id)}</td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {retirement ? `${retirement.age} ans` : '—'}
+
+                    <td className="max-w-44 truncate px-4 py-3.5 text-slate-600">{siteCell(emp.site_id)}</td>
+
+                    {/* Identité : CIN et CNSS ensemble */}
+                    <td className="px-4 py-3.5">
+                      <p className="text-slate-700">{emp.cin ?? '—'}</p>
+                      <p className="text-xs text-slate-500">
+                        {emp.cnss ? `CNSS ${emp.cnss}` : 'CNSS —'}
+                      </p>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{formatDateFr(emp.date_naissance)}</td>
-                    <td className="px-4 py-3 text-slate-600">{formatDateFr(emp.date_embauche)}</td>
-                    <td className="px-4 py-3 text-slate-600">{emp.cin ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{emp.cnss ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{emp.telephone ?? '—'}</td>
-                    <td className="max-w-56 truncate px-4 py-3 text-slate-600" title={emp.adresse ?? undefined}>
-                      {emp.adresse ?? '—'}
+
+                    {/* Contact : téléphone, puis ville et adresse */}
+                    <td className="max-w-52 px-4 py-3.5">
+                      <p className="truncate text-slate-700">{emp.telephone ?? '—'}</p>
+                      <p className="truncate text-xs text-slate-500" title={emp.adresse ?? undefined}>
+                        {[emp.ville, emp.adresse].filter(Boolean).join(' · ') || '—'}
+                      </p>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{emp.ville ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{jourDeReposLabel(emp.jour_de_repos)}</td>
-                    <td className="px-4 py-3">
+
+                    {/* Dates : naissance avec l'âge, puis embauche */}
+                    <td className="whitespace-nowrap px-4 py-3.5">
+                      <p className="text-slate-700">
+                        {formatDateFr(emp.date_naissance)}
+                        {retirement && (
+                          <span className="ml-1 text-xs text-slate-500">({retirement.age} ans)</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Embauche {formatDateFr(emp.date_embauche)}
+                      </p>
+                    </td>
+
+                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
+                      {jourDeReposLabel(emp.jour_de_repos)}
+                    </td>
+
+                    <td className="px-4 py-3.5">
                       {contrat ? (
                         <div>
-                          <p className="text-xs font-medium text-slate-700">
+                          <p className="whitespace-nowrap text-xs font-medium text-slate-700">
                             {contrat.type_contrat}
                             {contrat.date_fin && (
                               <span className="font-normal text-slate-500">
@@ -426,19 +443,37 @@ export default function EmployesPage() {
                         <span className="text-xs text-slate-400">Aucun contrat</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{emp.mode_reglement ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{emp.rib ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{emp.banque ?? '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
-                      {emp.salaire != null ? formatDH(emp.salaire) : '—'}
+
+                    {/* Règlement : mode, puis banque et RIB */}
+                    <td className="max-w-48 px-4 py-3.5">
+                      <p className="text-slate-700">{emp.mode_reglement ?? '—'}</p>
+                      {(emp.banque || emp.rib) && (
+                        <p className="truncate font-mono text-[11px] text-slate-500" title={emp.rib ?? undefined}>
+                          {[emp.banque, emp.rib].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
-                      {emp.heures_par_jour != null ? `${formatGardes(emp.heures_par_jour)} h` : '—'}
+
+                    {/* Salaire, avec les heures par jour en dessous */}
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right">
+                      <p className="font-medium tabular-nums text-slate-900">
+                        {emp.salaire != null ? formatDH(emp.salaire) : '—'}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {emp.heures_par_jour != null ? `${formatGardes(emp.heures_par_jour)} h / jour` : '— h'}
+                      </p>
+                      {Number(emp.dette) > 0 && (
+                        <p className="text-xs font-medium text-amber-700">
+                          dette {formatDH(emp.dette)}
+                        </p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-slate-900 tabular-nums">
+
+                    <td className="px-4 py-3.5 text-right font-medium tabular-nums text-slate-900">
                       {formatGardes(emp.jours_travailles)}
                     </td>
-                    <td className="sticky right-0 bg-inherit px-4 py-3 text-right">
+
+                    <td className="fige-droite px-4 py-3.5 text-right">
                       <div className="flex justify-end gap-1.5">
                         <button
                           onClick={() => setFiche(emp)}

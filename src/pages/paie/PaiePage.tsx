@@ -489,12 +489,11 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
       </div>
 
       {/* Tableau de paie */}
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="tableau-large rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full min-w-[1400px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-              <th className="px-3 py-3 font-medium">N°</th>
-              <th className="px-3 py-3 font-medium">Nom & Prénom</th>
+              <th className="fige-gauche px-3 py-3 font-medium">Employé</th>
               <th className="px-3 py-3 font-medium">Annexe</th>
               <th className="px-3 py-3 text-right font-medium">Salaire base</th>
               <th className="px-3 py-3 text-center font-medium">Gardes</th>
@@ -616,14 +615,22 @@ function LigneRow({
   const complet = Number(ligne.jours_payes) >= Number(ligne.jours_base)
 
   return (
-    <tr className={enregistrer.isError ? 'bg-red-50' : undefined}>
-      <td className="px-3 py-2 font-medium text-slate-700">{ligne.matricule ?? '—'}</td>
-      <td className="px-3 py-2">
-        <p className="font-medium text-slate-900">{ligne.nom_prenom}</p>
-        {ligne.qualification && <p className="text-xs text-slate-500">{ligne.qualification}</p>}
-        {enregistrer.isError && (
-          <p className="text-xs text-red-600">{(enregistrer.error as Error).message}</p>
-        )}
+    <tr className={enregistrer.isError ? 'bg-red-50' : 'bg-white'}>
+      <td className="fige-gauche px-3 py-2">
+        <div className="flex items-start gap-2">
+          <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-slate-600">
+            {ligne.matricule ?? '—'}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-slate-900">{ligne.nom_prenom}</p>
+            {ligne.qualification && (
+              <p className="truncate text-xs text-slate-500">{ligne.qualification}</p>
+            )}
+            {enregistrer.isError && (
+              <p className="text-xs text-red-600">{(enregistrer.error as Error).message}</p>
+            )}
+          </div>
+        </div>
       </td>
       <td className="max-w-40 px-3 py-2 text-slate-600">
         <p className="truncate">{ligne.site_nom ?? '—'}</p>

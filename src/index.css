@@ -11,6 +11,75 @@ body {
 }
 
 /* ------------------------------------------------------------------
+   Grands tableaux (Employés, Paie)
+
+   Sans hauteur limitée, la barre de défilement horizontale se retrouve
+   tout en bas d'un tableau très haut : il fallait descendre jusqu'au
+   dernier employé pour pouvoir aller vers la droite. On borne donc la
+   zone à la hauteur de l'écran — la barre reste visible en permanence —
+   et on fige l'en-tête ainsi que les colonnes d'identité.
+   ------------------------------------------------------------------ */
+.tableau-large {
+  overflow: auto;
+  max-height: calc(100vh - 15rem);
+  /* Le défilement ne « déborde » pas sur la page derrière */
+  overscroll-behavior: contain;
+  /* Barres toujours visibles sous macOS, où elles se cachent par défaut */
+  scrollbar-width: auto;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 767px) {
+  .tableau-large { max-height: calc(100vh - 12rem); }
+}
+
+/* Barres de défilement bien visibles, y compris sur les PC où le réglage
+   système les masque — c'est ce qui donnait l'impression qu'on ne pouvait
+   pas défiler. */
+.tableau-large::-webkit-scrollbar { width: 12px; height: 12px; }
+.tableau-large::-webkit-scrollbar-track { background: var(--color-slate-100); }
+.tableau-large::-webkit-scrollbar-thumb {
+  background: var(--color-slate-400);
+  border-radius: 6px;
+  border: 3px solid var(--color-slate-100);
+}
+.tableau-large::-webkit-scrollbar-thumb:hover { background: var(--color-slate-500); }
+.tableau-large::-webkit-scrollbar-corner { background: var(--color-slate-100); }
+
+/* En-tête figé en haut de la zone */
+.tableau-large thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-slate-50);
+}
+
+/* Colonnes figées : identité à gauche, actions à droite */
+.tableau-large .fige-gauche {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: inherit;
+}
+.tableau-large thead .fige-gauche { z-index: 4; background: var(--color-slate-50); }
+.tableau-large .fige-droite {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: inherit;
+}
+.tableau-large thead .fige-droite { z-index: 4; background: var(--color-slate-50); }
+
+/* Le trait qui marque la séparation avec la partie qui défile */
+.tableau-large .fige-gauche::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 1px;
+  background: var(--color-slate-200);
+}
+
+/* ------------------------------------------------------------------
    Impression d'un document
 
    Le document est sorti de l'application et rattaché au <body>

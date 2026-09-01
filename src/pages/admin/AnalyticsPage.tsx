@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { formatDateFr } from '../../lib/dates'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import AnalyticsPaie from '../../components/AnalyticsPaie'
 
 interface Dashboard {
   date: string
@@ -94,6 +95,9 @@ export default function AnalyticsPage() {
               <Stat label="Proche (≤ 30 jours)" value={data.retraite_proche} tone="amber" />
             </div>
           </Section>
+
+          {/* Paie — les montants réellement versés */}
+          <AnalyticsPaie companyId={scope === 'all' ? null : scope} />
 
           {/* Présences du jour */}
           <Section title={`Présences du jour (${formatDateFr(data.date)})`}>
