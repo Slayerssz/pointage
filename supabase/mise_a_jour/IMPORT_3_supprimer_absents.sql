@@ -624,7 +624,7 @@ select co.name as societe, e.matricule, e.nom_prenom, e.cin, s.name as site,
   from public.employees e
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
- where co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
+ where upper(trim(co.name)) in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
    and not exists (select 1 from public.import_rapprochement r
                     where r.employee_id = e.id)
  order by co.name, e.nom_prenom;
@@ -636,7 +636,7 @@ begin
   delete from public.employees e
    using public.companies co
    where co.id = e.company_id
-     and co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
+     and upper(trim(co.name)) in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
      and not exists (select 1 from public.import_rapprochement r
                       where r.employee_id = e.id);
   get diagnostics v_n = row_count;

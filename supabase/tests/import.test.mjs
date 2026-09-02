@@ -78,7 +78,10 @@ for (const t of ['companies','sites','employees','profiles','pointages','sites_p
 
 // ── L'état de départ : les dix sociétés, et quelques employés déjà saisis
 console.log('\n  ── Base de départ ──────────────────────────────────────')
-const SOC = ['EDEN VERT SERVICE','AL SAFAE EL MAGHREB','GROUPE TRIPLE A','BO','TRIMAX',
+// « Groupe Triple A » est volontairement en casse mixte : c'est ainsi
+// qu'elle est écrite en production, et tout le pipeline — import,
+// suppression, contrôle — doit la reconnaître malgré ça.
+const SOC = ['EDEN VERT SERVICE','AL SAFAE EL MAGHREB','Groupe Triple A','BO','TRIMAX',
              'VIGILMA GARD MAROC','DUO MULTI SERVICE','NORD PLANET','SERCLEAN NEGOCE','MEGANTER SERVICE MAROC']
 for (const s of SOC) await db.query(`insert into public.companies(name) values ($1)`, [s])
 const idCo = async (n) => (await q1(`select id from public.companies where name=$1`, [n])).id
@@ -105,7 +108,14 @@ const absentAvecPaie = (await q1(
   `insert into public.employees(company_id,site_id,nom_prenom,cin)
    values ($1,$2,'ANCIEN PAYE','ZZ111111') returning id`, [coBO, sBO])).id
 
-// e) un employé d'une société sans état : il ne doit surtout pas bouger
+// e) un intrus chez la société en casse mixte : à supprimer comme les autres
+const coGta = await idCo('Groupe Triple A')
+const sGta = (await q1(`insert into public.sites(company_id,name) values ($1,'VIEUX SITE GTA') returning id`, [coGta])).id
+const intrusGta = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,cin,matricule)
+   values ($1,$2,'INTRUS GTA','WW777777',99999) returning id`, [coGta, sGta])).id
+
+// f) un employé d'une société sans état : il ne doit surtout pas bouger
 const horsLot = (await q1(
   `insert into public.employees(company_id,site_id,nom_prenom,cin)
    values ($1,$2,'DUO PERSONNE','YY888888') returning id`, [coDuo, sDuo])).id
@@ -119,7 +129,7 @@ await db.query(
    values ($1,$2,'ANCIEN PAYE',4000,4000)`, [per, absentAvecPaie])
 
 const avant = Number((await q1(`select count(*) as c from public.employees`)).c)
-ok(`base de départ : ${avant} employés, ${SOC.length} sociétés`, avant === 5)
+ok(`base de départ : ${avant} employés, ${SOC.length} sociétés`, avant === 6)
 
 // ── 1. L'aperçu ne doit rien changer
 console.log('\n  ── 1. Aperçu ───────────────────────────────────────────')
@@ -127,7 +137,7 @@ await jouerScript('IMPORT_1_apercu.sql')
 ok('l’aperçu ne modifie aucun employé',
    Number((await q1(`select count(*) as c from public.employees`)).c) === avant)
 ok('l’aperçu ne crée aucun site',
-   Number((await q1(`select count(*) as c from public.sites`)).c) === 2)
+   Number((await q1(`select count(*) as c from public.sites`)).c) === 3)
 
 // ── 2. L'application
 console.log('\n  ── 2. Application ──────────────────────────────────────')
@@ -136,7 +146,7 @@ await jouerScript('IMPORT_2_appliquer.sql')
 const apres = Number((await q1(`select count(*) as c from public.employees`)).c)
 // 544 sur les états ; 3 étaient déjà en base et sont rapprochés (a, b et
 // un troisième non — a et b seulement), + les 2 non rapprochés conservés.
-ok(`544 employés importés (${apres} en base au total)`, apres === 544 + 3, String(apres))
+ok(`544 employés importés (${apres} en base au total)`, apres === 544 + 4, String(apres))
 
 const t = await q1(`select e.*, s.name as site, co.name as societe
                       from public.employees e
@@ -173,10 +183,10 @@ const parCo = await rows(`select co.name, count(*)::int as n from public.employe
                           group by co.name`)
 let effOk = true
 for (const [nom, n] of Object.entries(attendu)) {
-  const trouve = parCo.find((x) => x.name === nom)?.n ?? 0
+  const trouve = parCo.find((x) => x.name.toUpperCase() === nom)?.n ?? 0
   // BO porte en plus les deux fiches d'essai restées en base :
   // le « fantôme » et l'ancien salarié déjà passé en paie
-  const cible = nom === 'BO' ? n + 2 : n
+  const cible = nom === 'BO' ? n + 2 : nom === 'GROUPE TRIPLE A' ? n + 1 : n
   if (trouve !== cible) { effOk = false; console.log(`      ${nom}: ${trouve} au lieu de ${cible}`) }
 }
 ok('les effectifs par société correspondent aux totaux des PDF', effOk)
@@ -221,6 +231,9 @@ ok('… sa ligne de paie est partie en cascade',
    Number((await q1(`select count(*) as c from public.lignes_paie where employee_id=$1`,
                     [absentAvecPaie])).c) === 0)
 
+ok('l’intrus d’une société écrite en casse mixte est supprimé lui aussi',
+   (await rows(`select 1 from public.employees where id=$1`, [intrusGta])).length === 0)
+
 ok('l’employé de DUO (société sans état) n’est ni supprimé ni sorti',
    (await q1(`select actif from public.employees where id=$1`, [horsLot]))?.actif === true)
 
@@ -232,12 +245,12 @@ ok('il ne reste QUE les 544 des états (plus l’employé de Duo)',
 const effectifs = await rows(
   `select co.name, count(*) filter (where e.actif)::int as n
      from public.employees e join public.companies co on co.id=e.company_id
-    where co.name in ('BO','AL SAFAE EL MAGHREB','EDEN VERT SERVICE','GROUPE TRIPLE A',
+    where upper(co.name) in ('BO','AL SAFAE EL MAGHREB','EDEN VERT SERVICE','GROUPE TRIPLE A',
                       'NORD PLANET','SERCLEAN NEGOCE','TRIMAX','VIGILMA GARD MAROC')
     group by co.name`)
 let exact = true
 for (const [nom, n] of Object.entries(attendu)) {
-  const trouve = effectifs.find((x) => x.name === nom)?.n ?? 0
+  const trouve = effectifs.find((x) => x.name.toUpperCase() === nom)?.n ?? 0
   if (trouve !== n) { exact = false; console.log(`      ${nom}: ${trouve} en poste au lieu de ${n}`) }
 }
 ok('après suppression, chaque société a EXACTEMENT l’effectif de son état', exact)

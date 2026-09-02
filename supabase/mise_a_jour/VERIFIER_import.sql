@@ -6,6 +6,9 @@
 --  Rien n'est modifié.
 --
 --  Lisez la colonne « verdict » : s'il n'y a que des OK, l'import est bon.
+--
+--  Les noms de sociétés sont comparés en majuscules : « Groupe Triple A »
+--  en base et « GROUPE TRIPLE A » sur l'état désignent bien la même.
 -- ============================================================================
 
 with attendu (societe, employes, sites) as (
@@ -20,7 +23,7 @@ with attendu (societe, employes, sites) as (
     ('VIGILMA GARD MAROC', 83, 19)
 ),
 reel as (
-  select co.name as societe,
+  select upper(trim(co.name)) as societe,
          count(*) filter (where e.date_sortie is null)::int as employes,
          count(distinct e.site_id)::int                     as sites,
          count(*) filter (where e.date_sortie is not null)::int as sortis
@@ -37,14 +40,14 @@ controles as (
          coalesce(r.employes, 0)::text             as trouve,
          case when coalesce(r.employes, 0) = a.employes
               then 'OK' else 'PROBLÈME' end        as verdict
-    from attendu a left join reel r on r.societe = a.societe
+    from attendu a left join reel r on r.societe = upper(a.societe)
 
   union all
   -- 2. Chaque société doit avoir au moins les sites de son état
   select 2, 'Sites — ' || a.societe,
          '≥ ' || a.sites, coalesce(r.sites, 0)::text,
          case when coalesce(r.sites, 0) >= a.sites then 'OK' else 'PROBLÈME' end
-    from attendu a left join reel r on r.societe = a.societe
+    from attendu a left join reel r on r.societe = upper(a.societe)
 
   union all
   -- 3. Personne en trop dans les huit sociétés fournies
@@ -52,11 +55,11 @@ controles as (
          (select count(*)::text from public.employees e
             join public.companies co on co.id = e.company_id
            where e.date_sortie is null
-             and co.name in (select societe from attendu)),
+             and upper(trim(co.name)) in (select upper(societe) from attendu)),
          case when (select count(*) from public.employees e
                       join public.companies co on co.id = e.company_id
                      where e.date_sortie is null
-                       and co.name in (select societe from attendu))
+                       and upper(trim(co.name)) in (select upper(societe) from attendu))
                    = (select sum(employes) from attendu)
               then 'OK' else 'PROBLÈME' end
 
@@ -111,12 +114,12 @@ controles as (
          (select count(*)::text from public.employees e
             join public.companies co on co.id = e.company_id
            where e.date_sortie is null
-             and co.name in (select societe from attendu)
+             and upper(trim(co.name)) in (select upper(societe) from attendu)
              and coalesce(trim(e.departement), '') = ''),
          case when (select count(*) from public.employees e
                       join public.companies co on co.id = e.company_id
                      where e.date_sortie is null
-                       and co.name in (select societe from attendu)
+                       and upper(trim(co.name)) in (select upper(societe) from attendu)
                        and coalesce(trim(e.departement), '') = '') = 0
               then 'OK' else 'PROBLÈME' end
 
@@ -126,12 +129,12 @@ controles as (
          (select count(*)::text from public.employees e
             join public.companies co on co.id = e.company_id
            where e.date_sortie is null
-             and co.name in (select societe from attendu)
+             and upper(trim(co.name)) in (select upper(societe) from attendu)
              and lower(coalesce(e.mode_reglement, '')) like 'vir%'),
          case when (select count(*) from public.employees e
                       join public.companies co on co.id = e.company_id
                      where e.date_sortie is null
-                       and co.name in (select societe from attendu)
+                       and upper(trim(co.name)) in (select upper(societe) from attendu)
                        and lower(coalesce(e.mode_reglement, '')) like 'vir%') = 408
               then 'OK' else 'à vérifier' end
 
@@ -149,7 +152,7 @@ controles as (
   select 11, 'Duo + Meganter — employés conservés', 'inchangé',
          (select count(*)::text from public.employees e
             join public.companies co on co.id = e.company_id
-           where co.name in ('DUO MULTI SERVICE', 'MEGANTER SERVICE MAROC')),
+           where upper(trim(co.name)) in ('DUO MULTI SERVICE', 'MEGANTER SERVICE MAROC')),
          'pour information'
 
   union all

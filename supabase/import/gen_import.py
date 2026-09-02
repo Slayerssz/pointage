@@ -1,4 +1,14 @@
-"""Fabrique les trois scripts d'import à partir du registre analysé."""
+"""Fabrique les trois scripts d'import à partir du registre analysé.
+
+L'éditeur SQL de Supabase exécute les instructions une par une : une table
+« temporary ... on commit drop » disparaît donc aussitôt créée, et le
+begin/commit ne protège rien. D'où deux partis pris :
+
+  · la table de travail est une VRAIE table (public.import_etat), qui
+    survit d'une instruction à l'autre et se supprime explicitement ;
+  · toutes les écritures tiennent dans un seul bloc « do », donc une seule
+    instruction, donc atomique quoi qu'il arrive.
+"""
 import json, sys
 
 SP, DST = sys.argv[1], sys.argv[2]
@@ -33,9 +43,14 @@ for pdf, emps in d.items():
 corps = ',\n'.join(lignes)
 n = len(lignes)
 ns = len({(SOCIETES[p], e['site']) for p, v in d.items() for e in v})
-societes_sql = ', '.join(q(v) for v in sorted(set(SOCIETES.values())))
+# Les noms sont comparés en majuscules : « Groupe Triple A » en base doit
+# retrouver « GROUPE TRIPLE A » de l'état.
+societes_sql = ', '.join(q(v.upper()) for v in sorted(set(SOCIETES.values())))
 
-SOCLE = f"""create temporary table etat_recu (
+SOCLE = f"""drop view  if exists public.import_rapprochement;
+drop table if exists public.import_etat;
+
+create table public.import_etat (
   societe        text,
   site           text,
   departement    text,
@@ -48,18 +63,21 @@ SOCLE = f"""create temporary table etat_recu (
   mode_reglement text,
   ville          text,
   adresse        text
-) on commit drop;
+);
 
-insert into etat_recu
+-- Table de travail : personne d'autre que l'éditeur SQL n'y accède.
+alter table public.import_etat enable row level security;
+
+insert into public.import_etat
   (societe, site, departement, matricule, nom_prenom, cin, cnss,
    date_naissance, date_embauche, mode_reglement, ville, adresse)
 values
 {corps};
 
--- Un rapprochement se fait d'abord sur le C.I.N. — le seul identifiant qui
+-- Le rapprochement se fait d'abord sur le C.I.N. — le seul identifiant qui
 -- ne bouge pas — puis, à défaut, sur société+matricule, et en dernier
 -- recours sur société+nom.
-create temporary view rapprochement as
+create view public.import_rapprochement as
 select
   r.*,
   c.id as company_id,
@@ -73,8 +91,17 @@ select
       where e.company_id = c.id
         and upper(trim(e.nom_prenom)) = upper(trim(r.nom_prenom)) limit 1)
   ) as employee_id
-from etat_recu r
+from public.import_etat r
 left join public.companies c on upper(trim(c.name)) = upper(trim(r.societe));
+"""
+
+NETTOYAGE = """-- ═══════════════════════════════════════════════════════════════════════════
+--  MÉNAGE — à lancer quand vous avez fini avec les trois scripts.
+--  Tant que ces deux objets existent, vous pouvez relancer n'importe
+--  quelle requête « ▶ » sans recoller les 544 lignes.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- drop view  if exists public.import_rapprochement;
+-- drop table if exists public.import_etat;
 """
 
 ENTETE = f"""--  {n} employés · {len(d)} sociétés · {ns} sites · états du 02/09/2026
@@ -83,22 +110,23 @@ ENTETE = f"""--  {n} employés · {len(d)} sociétés · {ns} sites · états du
 {chr(10).join(f'--    {k:34} → {v}' for k, v in SOCIETES.items())}
 --
 --  ⚠ DUO MULTI SERVICE et MEGANTER SERVICE MAROC n'ont pas d'état dans cet
---    envoi : leurs employés ne sont donc PAS concernés, et il ne faut
---    surtout pas les sortir tant que leurs listes ne sont pas arrivées."""
+--    envoi : leurs employés ne sont concernés par aucun des trois scripts."""
 
 apercu = f"""-- ============================================================================
---  IMPORT DU REGISTRE — 1 sur 3 : APERÇU (ne modifie RIEN)
+--  IMPORT DU REGISTRE — 1 sur 3 : APERÇU (ne modifie aucun employé)
 --  ============================================================
 {ENTETE}
 --
---  Supabase → SQL Editor → coller → Run. L'éditeur n'affiche que le dernier
---  résultat : pour lire les autres, sélectionnez tout le bloc jusqu'à
---  « FIN DU SOCLE », puis la requête « ▶ » qui vous intéresse, et lancez.
+--  MODE D'EMPLOI
+--    1. Collez tout le fichier dans Supabase → SQL Editor et faites Run.
+--       Vous verrez le résultat de la DERNIÈRE requête (la n° 5).
+--    2. Pour lire les autres : sélectionnez à la souris la requête « ▶ »
+--       qui vous intéresse, et faites Run. La table de travail reste en
+--       place, inutile de recoller les 544 lignes.
+--    3. Quand vous avez fini, lancez le MÉNAGE en bas de fichier.
 --
---  Rien n'est écrit : le script se termine par un rollback.
+--  Aucun employé, site ou pointage n'est touché : ce script ne fait que lire.
 -- ============================================================================
-
-begin;
 
 {SOCLE}
 -- ─────────────────────────────── FIN DU SOCLE ───────────────────────────────
@@ -106,18 +134,18 @@ begin;
 
 -- ▶ 1. Une société de l'état sans correspondance en base ? (doit être vide)
 select distinct 'société introuvable en base' as alerte, societe
-  from rapprochement where company_id is null;
+  from public.import_rapprochement where company_id is null;
 
 -- ▶ 2. Combien de créations, combien de mises à jour, par société
 select societe,
        count(*)                                        as sur_l_etat,
        count(*) filter (where employee_id is null)     as a_creer,
        count(*) filter (where employee_id is not null) as a_mettre_a_jour
-  from rapprochement group by societe order by societe;
+  from public.import_rapprochement group by societe order by societe;
 
 -- ▶ 3. Les sites qui n'existent pas encore et seront créés
 select r.societe, r.site as site_a_creer, count(*) as employes
-  from rapprochement r
+  from public.import_rapprochement r
   left join public.sites s on s.company_id = r.company_id
                           and upper(trim(s.name)) = upper(trim(r.site))
  where s.id is null and r.company_id is not null
@@ -127,7 +155,7 @@ select r.societe, r.site as site_a_creer, count(*) as employes
 select e.nom_prenom, e.matricule,
        co.name as societe_actuelle, r.societe as societe_etat,
        s.name  as site_actuel,      r.site    as site_etat
-  from rapprochement r
+  from public.import_rapprochement r
   join public.employees e on e.id = r.employee_id
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
@@ -136,27 +164,31 @@ select e.nom_prenom, e.matricule,
  order by r.societe, e.nom_prenom;
 
 -- ▶ 5. Les employés EN BASE absents de tous les états reçus.
---     Le script d'application ne les touche pas. À vous de trancher :
---     départ réel, oubli, ou société dont l'état n'est pas encore arrivé.
+--     Ce sont eux que le script 3 supprimera. Duo et Meganter y figurent
+--     forcément — leurs états ne sont pas arrivés — mais le script 3 ne
+--     les regarde pas.
 select co.name as societe, e.matricule, e.nom_prenom, e.cin,
        s.name as site, e.actif
   from public.employees e
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
- where not exists (select 1 from rapprochement r where r.employee_id = e.id)
+ where not exists (select 1 from public.import_rapprochement r
+                    where r.employee_id = e.id)
  order by co.name, e.nom_prenom;
 
-rollback;
-"""
+
+{NETTOYAGE}"""
 
 appliquer = f"""-- ============================================================================
 --  IMPORT DU REGISTRE — 2 sur 3 : APPLIQUER
 --  ============================================================
 {ENTETE}
 --
---  Supabase → SQL Editor → coller → Run. À lancer APRÈS avoir lu l'aperçu.
---  Tout est dans une seule transaction : à la moindre erreur, rien ne passe.
---  Le relancer deux fois ne crée pas de doublon.
+--  Collez tout le fichier dans Supabase → SQL Editor et faites Run.
+--  À lancer APRÈS avoir lu l'aperçu. Le relancer ne crée pas de doublon.
+--
+--  Toutes les écritures tiennent dans un seul bloc « do » : elles passent
+--  ensemble, ou pas du tout.
 --
 --  CE QUE LE SCRIPT FAIT
 --    · crée les sites manquants (il n'en supprime jamais)
@@ -166,7 +198,7 @@ appliquer = f"""-- =============================================================
 --    · remet en poste un employé marqué « sorti » qui reparaît sur l'état
 --
 --  CE QUE LE SCRIPT NE FAIT PAS
---    · il ne supprime rien et ne sort personne tout seul
+--    · il ne supprime rien et ne sort personne (c'est le script 3)
 --    · il ne touche ni au salaire, ni à la dette, ni aux pointages, ni aux
 --      contrats, ni aux congés déjà saisis
 --    · il n'écrase pas une qualification, une adresse ou une ville déjà
@@ -175,157 +207,206 @@ appliquer = f"""-- =============================================================
 --      qu'à remplir une fiche encore vide.
 -- ============================================================================
 
-begin;
-
 {SOCLE}
 -- ─────────────────────────────── FIN DU SOCLE ───────────────────────────────
 
 
--- Refus net si une société de l'état n'existe pas en base : mieux vaut
--- s'arrêter que d'importer la moitié du registre.
 do $bloc$
-declare v_manquantes text;
+declare
+  v_manquantes text;
+  v_sites int;
+  v_maj   int;
+  v_neufs int;
 begin
+  -- Refus net si une société de l'état n'existe pas en base : mieux vaut
+  -- s'arrêter que d'importer la moitié du registre.
   select string_agg(distinct societe, ', ') into v_manquantes
-    from rapprochement where company_id is null;
+    from public.import_rapprochement where company_id is null;
   if v_manquantes is not null then
     raise exception 'Sociétés introuvables en base : %. Import interrompu.', v_manquantes;
   end if;
+
+  -- 1. Les sites manquants
+  insert into public.sites (company_id, name)
+  select distinct r.company_id, r.site
+    from public.import_rapprochement r
+   where r.company_id is not null and r.site is not null
+     and not exists (select 1 from public.sites s
+                      where s.company_id = r.company_id
+                        and upper(trim(s.name)) = upper(trim(r.site)));
+  get diagnostics v_sites = row_count;
+
+  -- 2. Les employés déjà connus.
+  --    « actif » est calculé par un déclencheur à partir de date_sortie :
+  --    pour remettre quelqu'un en poste, il faut vider date_sortie.
+  --    Le matricule n'est repris que s'il est libre dans la société —
+  --    un doublon ferait échouer tout le script.
+  update public.employees e
+     set company_id     = r.company_id,
+         site_id        = s.id,
+         departement    = r.departement,
+         nom_prenom     = r.nom_prenom,
+         cin            = coalesce(nullif(r.cin, ''), e.cin),
+         cnss           = coalesce(nullif(r.cnss, ''), e.cnss),
+         date_naissance = coalesce(r.date_naissance, e.date_naissance),
+         date_embauche  = coalesce(r.date_embauche, e.date_embauche),
+         mode_reglement = coalesce(nullif(r.mode_reglement, ''), e.mode_reglement),
+         ville          = coalesce(nullif(e.ville, ''), nullif(r.ville, '')),
+         adresse        = coalesce(nullif(e.adresse, ''), nullif(r.adresse, '')),
+         date_sortie    = null,
+         matricule      = case
+                            when e.matricule = r.matricule then e.matricule
+                            when not exists (select 1 from public.employees x
+                                              where x.company_id = r.company_id
+                                                and x.matricule  = r.matricule
+                                                and x.id <> e.id)
+                              then r.matricule
+                            else e.matricule
+                          end
+    from public.import_rapprochement r
+    join public.sites s on s.company_id = r.company_id
+                       and upper(trim(s.name)) = upper(trim(r.site))
+   where e.id = r.employee_id;
+  get diagnostics v_maj = row_count;
+
+  -- 3. Les nouveaux. Si le matricule de l'état est déjà pris dans la
+  --    société, on laisse le déclencheur en attribuer un libre.
+  insert into public.employees
+    (company_id, site_id, matricule, nom_prenom, cin, cnss,
+     date_naissance, date_embauche, mode_reglement, ville, adresse,
+     departement, qualification)
+  select r.company_id, s.id,
+         case when exists (select 1 from public.employees x
+                            where x.company_id = r.company_id
+                              and x.matricule  = r.matricule)
+              then null else r.matricule end,
+         r.nom_prenom, nullif(r.cin, ''), nullif(r.cnss, ''),
+         r.date_naissance, r.date_embauche, nullif(r.mode_reglement, ''),
+         nullif(r.ville, ''), nullif(r.adresse, ''),
+         r.departement,
+         -- la colonne « Qualification » des PDF est coupée à huit
+         -- caractères ; on la reconstruit depuis le département, complet
+         case r.departement
+           when 'NETTOYAGE'      then 'AGENT DE NETTOYAGE'
+           when 'SECURITE'       then 'AGENT DE SECURITE'
+           when 'GARDIENNAGE'    then 'GARDIEN'
+           when 'JARDINAGE'      then 'JARDINIER'
+           when 'JARDINIER'      then 'JARDINIER'
+           when 'ACCUEIL'        then 'AGENT D''ACCUEIL'
+           when 'ADMINISTRATIF'  then 'ADMINISTRATIF'
+           when 'ADMINISTRATIVE' then 'ADMINISTRATIF'
+           else r.departement
+         end
+    from public.import_rapprochement r
+    join public.sites s on s.company_id = r.company_id
+                       and upper(trim(s.name)) = upper(trim(r.site))
+   where r.employee_id is null;
+  get diagnostics v_neufs = row_count;
+
+  -- 4. Le compteur repart au-dessus du plus grand matricule attribué,
+  --    pour qu'aucun numéro ne soit redistribué plus tard.
+  update public.matricule_compteur
+     set dernier = greatest(dernier, (select coalesce(max(matricule), 0)
+                                        from public.employees));
+
+  raise notice 'Import : % site(s) créé(s), % employé(s) mis à jour, % créé(s).',
+    v_sites, v_maj, v_neufs;
 end $bloc$;
 
--- 1. Les sites manquants
-insert into public.sites (company_id, name)
-select distinct r.company_id, r.site
-  from rapprochement r
- where r.company_id is not null and r.site is not null
-   and not exists (select 1 from public.sites s
-                    where s.company_id = r.company_id
-                      and upper(trim(s.name)) = upper(trim(r.site)));
 
--- 2. Les employés déjà connus.
---    « actif » est calculé par un déclencheur à partir de date_sortie :
---    pour remettre quelqu'un en poste, il faut vider date_sortie.
---    Le matricule n'est repris que s'il est libre dans la société —
---    un doublon ferait échouer tout le script.
-update public.employees e
-   set company_id     = r.company_id,
-       site_id        = s.id,
-       departement    = r.departement,
-       nom_prenom     = r.nom_prenom,
-       cin            = coalesce(nullif(r.cin, ''), e.cin),
-       cnss           = coalesce(nullif(r.cnss, ''), e.cnss),
-       date_naissance = coalesce(r.date_naissance, e.date_naissance),
-       date_embauche  = coalesce(r.date_embauche, e.date_embauche),
-       mode_reglement = coalesce(nullif(r.mode_reglement, ''), e.mode_reglement),
-       ville          = coalesce(nullif(e.ville, ''), nullif(r.ville, '')),
-       adresse        = coalesce(nullif(e.adresse, ''), nullif(r.adresse, '')),
-       date_sortie    = null,
-       matricule      = case
-                          when e.matricule = r.matricule then e.matricule
-                          when not exists (select 1 from public.employees x
-                                            where x.company_id = r.company_id
-                                              and x.matricule  = r.matricule
-                                              and x.id <> e.id)
-                            then r.matricule
-                          else e.matricule
-                        end
-  from rapprochement r
-  join public.sites s on s.company_id = r.company_id
-                     and upper(trim(s.name)) = upper(trim(r.site))
- where e.id = r.employee_id;
-
--- 3. Les nouveaux. Si le matricule de l'état est déjà pris dans la société,
---    on laisse le déclencheur en attribuer un libre plutôt que d'échouer.
-insert into public.employees
-  (company_id, site_id, matricule, nom_prenom, cin, cnss,
-   date_naissance, date_embauche, mode_reglement, ville, adresse,
-   departement, qualification)
-select r.company_id, s.id,
-       case when exists (select 1 from public.employees x
-                          where x.company_id = r.company_id
-                            and x.matricule  = r.matricule)
-            then null else r.matricule end,
-       r.nom_prenom, nullif(r.cin, ''), nullif(r.cnss, ''),
-       r.date_naissance, r.date_embauche, nullif(r.mode_reglement, ''),
-       nullif(r.ville, ''), nullif(r.adresse, ''),
-       r.departement,
-       -- la colonne « Qualification » des PDF est coupée à huit caractères ;
-       -- on la reconstruit depuis le département, lui complet
-       case r.departement
-         when 'NETTOYAGE'      then 'AGENT DE NETTOYAGE'
-         when 'SECURITE'       then 'AGENT DE SECURITE'
-         when 'GARDIENNAGE'    then 'GARDIEN'
-         when 'JARDINAGE'      then 'JARDINIER'
-         when 'JARDINIER'      then 'JARDINIER'
-         when 'ACCUEIL'        then 'AGENT D''ACCUEIL'
-         when 'ADMINISTRATIF'  then 'ADMINISTRATIF'
-         when 'ADMINISTRATIVE' then 'ADMINISTRATIF'
-         else r.departement
-       end
-  from rapprochement r
-  join public.sites s on s.company_id = r.company_id
-                     and upper(trim(s.name)) = upper(trim(r.site))
- where r.employee_id is null;
-
--- 4. Le compteur repart au-dessus du plus grand matricule attribué, pour
---    qu'aucun numéro ne soit redistribué plus tard.
-update public.matricule_compteur
-   set dernier = greatest(dernier, (select coalesce(max(matricule), 0)
-                                      from public.employees));
-
--- 5. Le bilan, affiché avant de valider
+-- ▶ Le bilan
 select co.name as societe,
        count(*) filter (where e.date_sortie is null) as en_poste,
+       count(*) filter (where e.date_sortie is not null) as sortis,
        count(*) as total,
        count(distinct e.site_id) as sites
   from public.employees e
   join public.companies co on co.id = e.company_id
  group by co.name order by co.name;
 
-commit;
-"""
+
+{NETTOYAGE}"""
 
 sortie = f"""-- ============================================================================
---  IMPORT DU REGISTRE — 3 sur 3 : SORTIR CEUX QUI NE FIGURENT PLUS
+--  IMPORT DU REGISTRE — 3 sur 3 : SUPPRIMER CEUX QUI NE FIGURENT PLUS
 --  ============================================================
---  ⚠ FACULTATIF. À ne lancer QU'APRÈS avoir lu la liste 5 de l'aperçu, et
---    JAMAIS avant d'avoir reçu les états de DUO MULTI SERVICE et MEGANTER
---    SERVICE MAROC. Ce script ne touche qu'aux huit sociétés fournies ; les
---    deux autres sont épargnées, mais relisez quand même la liste.
+--  Après ce script, le registre des HUIT sociétés fournies contient
+--  exactement les {n} personnes de vos états, et personne d'autre.
 --
---  Un employé « sorti » n'est pas supprimé : il reste au registre avec sa
---  date de sortie, ses pointages et son historique de paie.
+--  ⚠ IRRÉVERSIBLE, et sans exception : une fiche supprimée emporte avec
+--    elle ses pointages, ses contrats, ses congés, ses documents et ses
+--    lignes de paie. C'est voulu — le contenu actuel de la base est du
+--    jeu d'essai. Le jour où la base portera de vraies paies, il faudra
+--    revoir ce script : effacer un bulletin déjà édité fausserait un mois
+--    validé, et c'est une pièce que la C.N.S.S. peut réclamer.
+--
+--  MODE D'EMPLOI
+--    1. Lancez d'abord IMPORT_1 (aperçu) puis IMPORT_2 (application).
+--    2. Collez ce fichier et faites Run : il commence par créer la table
+--       de travail, PUIS supprime, PUIS affiche le bilan.
+--    3. Pour voir qui va partir AVANT de supprimer, lancez d'abord le
+--       socle seul (jusqu'à « FIN DU SOCLE »), puis la requête « ▶ » ;
+--       lancez le bloc « do » ensuite.
+--
+--  DUO MULTI SERVICE et MEGANTER SERVICE MAROC ne sont PAS concernés.
 -- ============================================================================
-
-begin;
 
 {SOCLE}
 -- ─────────────────────────────── FIN DU SOCLE ───────────────────────────────
 
 
--- Qui va sortir, exactement — lisez avant de valider
-select co.name as societe, e.matricule, e.nom_prenom, e.cin, s.name as site
+-- ▶ Qui va disparaître, et ce qui part avec (à lancer seul, avant le bloc do)
+select co.name as societe, e.matricule, e.nom_prenom, e.cin, s.name as site,
+       (select count(*) from public.pointages p   where p.employee_id = e.id) as pointages,
+       (select count(*) from public.lignes_paie l where l.employee_id = e.id) as lignes_de_paie,
+       (select count(*) from public.contrats c    where c.employee_id = e.id) as contrats,
+       (select count(*) from public.conges g      where g.employee_id = e.id) as conges
   from public.employees e
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
- where e.date_sortie is null
-   and co.name in ({societes_sql})
-   and not exists (select 1 from rapprochement r where r.employee_id = e.id)
+ where upper(trim(co.name)) in ({societes_sql})
+   and not exists (select 1 from public.import_rapprochement r
+                    where r.employee_id = e.id)
  order by co.name, e.nom_prenom;
 
-update public.employees e
-   set date_sortie = current_date
-  from public.companies co
- where co.id = e.company_id
-   and e.date_sortie is null
-   and co.name in ({societes_sql})
-   and not exists (select 1 from rapprochement r where r.employee_id = e.id);
 
-commit;
+do $bloc$
+declare v_n int;
+begin
+  delete from public.employees e
+   using public.companies co
+   where co.id = e.company_id
+     and upper(trim(co.name)) in ({societes_sql})
+     and not exists (select 1 from public.import_rapprochement r
+                      where r.employee_id = e.id);
+  get diagnostics v_n = row_count;
+  raise notice '% employé(s) supprimé(s).', v_n;
+end $bloc$;
+
+
+-- ▶ Le bilan : « en_poste » doit retomber exactement sur vos états
+select co.name as societe,
+       count(*) filter (where e.date_sortie is null) as en_poste,
+       count(*) as total
+  from public.employees e
+  join public.companies co on co.id = e.company_id
+ group by co.name order by co.name;
+
+
+{NETTOYAGE}
+-- ═══════════════════════════════════════════════════════════════════════════
+--  FACULTATIF — les annexes devenues vides. Le script n'y touche pas :
+--  un site vide aujourd'hui peut resservir demain.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- select co.name as societe, s.name as site_vide
+--   from public.sites s
+--   join public.companies co on co.id = s.company_id
+--  where not exists (select 1 from public.employees e where e.site_id = s.id)
+--  order by co.name, s.name;
 """
 
 for nom, txt in [('IMPORT_1_apercu.sql', apercu),
                  ('IMPORT_2_appliquer.sql', appliquer),
-                 ('IMPORT_3_sorties_facultatif.sql', sortie)]:
+                 ('IMPORT_3_supprimer_absents.sql', sortie)]:
     open(f'{DST}/{nom}', 'w').write(txt)
     print(f'{nom:34} {len(txt.splitlines()):5} lignes')

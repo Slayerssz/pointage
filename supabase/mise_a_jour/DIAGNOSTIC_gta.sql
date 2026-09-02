@@ -10,15 +10,18 @@
 --  réellement écrites, avec leur effectif.
 -- ============================================================================
 
-select co.name                                   as nom_en_base,
-       '[' || co.name || ']'                     as avec_les_espaces,
-       length(co.name)                           as longueur,
-       count(e.id) filter (where e.id is not null) as employes,
-       count(distinct s.id)                      as sites
+-- Chaque compte se fait dans sa propre sous-requête : joindre employés et
+-- sites dans la même ligne les multiplierait l'un par l'autre.
+select co.name                              as nom_en_base,
+       '[' || co.name || ']'                as avec_les_espaces,
+       length(co.name)                      as longueur,
+       (select count(*) from public.employees e
+         where e.company_id = co.id and e.date_sortie is null) as en_poste,
+       (select count(*) from public.employees e
+         where e.company_id = co.id)                           as employes_total,
+       (select count(*) from public.sites s
+         where s.company_id = co.id)                           as sites
   from public.companies co
-  left join public.employees e on e.company_id = co.id
-  left join public.sites s     on s.company_id = co.id
- group by co.name
  order by co.name;
 
 -- ─────────────────────────────────────────────────────────────────────────
