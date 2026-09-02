@@ -24,8 +24,14 @@ export default function PanneauDocument({
   children: ReactNode
   actions: ReactNode
 }) {
+  // « Taille réelle » : la page aux dimensions de l'impression, avec
+  // défilement. Utile pour relire une ligne en arabe.
+  const [tailleReelle, setTailleReelle] = useState(false)
+
+  // Le formulaire garde une largeur de lecture ; tout le reste va au
+  // document, qui doit rester lisible sans qu'on plisse les yeux.
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
       <div className="min-w-0 rounded-xl border border-slate-200 p-4">
         {enTete}
         {children}
@@ -33,11 +39,21 @@ export default function PanneauDocument({
       </div>
 
       <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-100 p-3">
-        <p className="mb-2 text-xs font-medium tracking-wide text-slate-500 uppercase">
-          Aperçu du document
-        </p>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+            Aperçu du document
+          </p>
+          {modele && (
+            <button
+              onClick={() => setTailleReelle((x) => !x)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {tailleReelle ? 'Ajuster à la largeur' : 'Taille réelle'}
+            </button>
+          )}
+        </div>
         {modele ? (
-          <PageAEchelle>
+          <PageAEchelle tailleReelle={tailleReelle}>
             <ContratDocument modele={modele} valeurs={valeurs} />
           </PageAEchelle>
         ) : (
@@ -55,7 +71,9 @@ export default function PanneauDocument({
  * exactement la hauteur qu'elle occupe une fois réduite — sinon la mise
  * à l'échelle laisserait un grand vide sous le document.
  */
-function PageAEchelle({ children }: { children: ReactNode }) {
+function PageAEchelle({
+  children, tailleReelle,
+}: { children: ReactNode; tailleReelle: boolean }) {
   const boite = useRef<HTMLDivElement>(null)
   const page = useRef<HTMLDivElement>(null)
   const [echelle, setEchelle] = useState(1)
@@ -67,7 +85,7 @@ function PageAEchelle({ children }: { children: ReactNode }) {
     const el = boite.current
     if (!el) return
     const mesurer = () => {
-      const e = Math.min(1, el.clientWidth / LARGEUR)
+      const e = tailleReelle ? 1 : Math.min(1, el.clientWidth / LARGEUR)
       setEchelle(e)
       if (page.current) setHauteur(page.current.scrollHeight * e)
     }
@@ -76,10 +94,10 @@ function PageAEchelle({ children }: { children: ReactNode }) {
     ro.observe(el)
     if (page.current) ro.observe(page.current)
     return () => ro.disconnect()
-  }, [LARGEUR])
+  }, [LARGEUR, tailleReelle])
 
   return (
-    <div ref={boite} className="overflow-hidden">
+    <div ref={boite} className={tailleReelle ? 'overflow-x-auto' : 'overflow-hidden'}>
       <div style={{ height: hauteur || undefined }}>
         <div
           ref={page}

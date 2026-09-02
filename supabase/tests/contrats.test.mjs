@@ -109,6 +109,12 @@ ok('les valeurs connues d’avance remplissent aussi le formulaire',
 const panneau = fs.readFileSync(new URL('../../src/components/PanneauDocument.tsx', import.meta.url), 'utf8')
 ok('la page est mise à l’échelle sans être déformée', panneau.includes('transform: `scale('))
 ok('… et ne laisse pas de vide sous elle', panneau.includes('height: hauteur'))
+ok('la page peut se lire à sa taille d’impression', panneau.includes('tailleReelle'))
+ok('le formulaire garde une largeur fixe, le reste va au document',
+   panneau.includes('lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]'))
+ok('la fenêtre s’élargit quand le document est à côté',
+   fs.readFileSync(new URL('../../src/pages/validator/EmployesPage.tsx', import.meta.url), 'utf8')
+     .includes("max-w-[104rem]"))
 
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)

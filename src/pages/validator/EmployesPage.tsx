@@ -728,7 +728,11 @@ function EmployeeFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        // Le dossier montre le document à côté du formulaire : une page A4
+        // réduite de moitié dans une boîte de 48rem devient illisible.
+        className={`max-h-[94vh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-xl ${
+          employee && !ficheSeule && vue === 'dossier' ? 'max-w-[104rem]' : 'max-w-3xl'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-1 text-lg font-semibold text-slate-900">
