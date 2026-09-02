@@ -68,6 +68,32 @@ for (const [quoi, phrase] of [
   ['l’orthographe MEGAINTER du papier', 'MEGAINTER SERVICE MAROC'],
 ]) ok(quoi + ' est reprise', src.includes(phrase))
 
+console.log('\n  ── Engagement de congé ────────────────────────────────')
+const eng = fs.readFileSync(new URL('../../src/lib/engagementConge.ts', import.meta.url), 'utf8')
+ok('l’engagement est en arabe', eng.includes("langue: 'ar'"))
+ok('le titre est « التزام »', eng.includes("titre: 'التزام'"))
+for (const [quoi, phrase] of [
+  ['la formule d’ouverture', 'انا الموقع اسفله'],
+  ['la mention de la carte nationale', 'الحامل لبطاقة التعريف الوطنية رقم'],
+  ['la déclaration sur l’honneur', 'أصرح بشرفي وأنا في كامل قواي العقلية'],
+  ['le congé annuel', 'استفدت من عطلتي السنوية'],
+  ['les dates de début et de fin', 'التي تبدأ من {{debut}} وتنتهي يوم {{fin}}'],
+  ['la signature', "gauche: 'التوقيع'"],
+]) ok(quoi + ' est reprise', eng.includes(phrase))
+ok('la société et son siège sont préremplis', eng.includes('defauts:'))
+
+console.log('\n  ── Les modèles générés maison ont disparu ─────────────')
+for (const f of ['src/components/ContratPrint.tsx', 'src/components/EngagementPrint.tsx',
+                 'src/lib/modeles.ts', 'src/components/DocumentCadre.tsx']) {
+  ok(`${f} supprimé`, !fs.existsSync(new URL('../../' + f, import.meta.url)))
+}
+
+console.log('\n  ── Identité légale des sociétés ───────────────────────')
+const soc = fs.readFileSync(new URL('../../src/lib/societes.ts', import.meta.url), 'utf8')
+for (const s2 of SOCIETES) ok(`${s2} a un siège`, soc.includes(`'${s2}'`) || s2 === 'BO')
+ok('les sièges arabes existent pour les sociétés qui éditent en arabe',
+   soc.includes('siegeAr'))
+
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)
 console.log('═'.repeat(66))

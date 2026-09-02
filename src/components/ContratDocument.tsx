@@ -96,15 +96,19 @@ export default function ContratDocument({
           breakInside: 'avoid',
         }}
       >
-        <div style={{ width: '70mm' }}>
-          <p className="font-bold">{modele.gauche}</p>
-        </div>
-        <div style={{ width: '70mm', textAlign: 'end' }}>
-          <p className="font-bold">{modele.droite}</p>
-          {modele.mentionSignature && (
-            <p style={{ fontSize: '9pt', marginTop: '2mm' }}>{modele.mentionSignature}</p>
-          )}
-        </div>
+        {modele.gauche && (
+          <div style={{ width: '70mm' }}>
+            <p className="font-bold">{modele.gauche}</p>
+          </div>
+        )}
+        {modele.droite && (
+          <div style={{ width: '70mm', textAlign: 'end' }}>
+            <p className="font-bold">{modele.droite}</p>
+            {modele.mentionSignature && (
+              <p style={{ fontSize: '9pt', marginTop: '2mm' }}>{modele.mentionSignature}</p>
+            )}
+          </div>
+        )}
       </div>
     </article>
   )

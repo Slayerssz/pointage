@@ -14,7 +14,7 @@ import { TYPES_ABSENCE, gardeLabel } from '../../lib/gardes'
 import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
 import { Chip, DateInputFr, ErrorNote, Spinner } from '../../components/ui'
 import DocumentsSignes from '../../components/DocumentsSignes'
-import EngagementPrint from '../../components/EngagementPrint'
+import EngagementConge from '../../components/EngagementConge'
 import { useDocuments } from '../../lib/documents'
 
 const inputCls =
@@ -600,7 +600,7 @@ function CongesPanel({
       </ul>
 
       {engagement && (
-        <EngagementPrint
+        <EngagementConge
           conge={engagement}
           employee={employee}
           entreprise={entreprise}

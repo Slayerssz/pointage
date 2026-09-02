@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatDateFr } from '../lib/dates'
-import { modeleContrat, type ChampContrat } from '../lib/contratsModeles'
+import { modeleContrat, type ChampContrat, type ModeleContrat } from '../lib/contratsModeles'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
@@ -8,24 +8,54 @@ import ContratDocument from './ContratDocument'
 import type { Employee } from '../lib/types'
 
 /**
- * RÉDIGER UN CONTRAT.
+ * RÉDIGER UN CONTRAT — le modèle de la société de l'employé.
+ */
+export default function ContratRedaction({
+  employee, entreprise, onClose,
+}: { employee: Employee; entreprise: string; onClose: () => void }) {
+  const modele = modeleContrat(entreprise)
+  return (
+    <RedactionDocument
+      modele={modele}
+      employee={employee}
+      entreprise={entreprise}
+      intitule="Contrat de travail"
+      prefixeFichier="Contrat"
+      onClose={onClose}
+    />
+  )
+}
+
+/**
+ * REMPLIR UN DOCUMENT, LA PAGE SOUS LES YEUX.
  *
  * À gauche les champs, à droite la page telle qu'elle sortira de
  * l'imprimante — elle se met à jour à chaque frappe, de sorte qu'on voit
  * ce qu'on signe avant de l'imprimer. Ce qui est déjà au dossier de
  * l'employé est prérempli ; le reste se saisit une fois.
+ *
+ * Sert au contrat comme à l'engagement de congé : c'est la même mécanique,
+ * seul le modèle change.
  */
-export default function ContratRedaction({
+export function RedactionDocument({
+  modele,
   employee,
   entreprise,
+  intitule,
+  prefixeFichier,
+  valeursInitiales,
   onClose,
 }: {
+  modele: ModeleContrat | null
   employee: Employee
   entreprise: string
+  intitule: string
+  prefixeFichier: string
+  /** Ce que l'appelant sait déjà — les dates d'un congé, par exemple. */
+  valeursInitiales?: Record<string, string>
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
-  const modele = modeleContrat(entreprise)
   const [valeurs, setValeurs] = useState<Record<string, string>>({})
   const [imprime, setImprime] = useState(false)
 
@@ -49,23 +79,23 @@ export default function ContratRedaction({
       salaire: employee.salaire != null ? String(employee.salaire) : '',
       ville: employee.ville ?? '',
     }
-    const initial: Record<string, string> = {}
+    const initial: Record<string, string> = { ...(modele.defauts ?? {}) }
     for (const c of modele.champs) {
       if (!c.depuis) continue
       if (enArabe && LATIN_SEULEMENT.includes(c.depuis)) continue
       initial[c.id] = depuis[c.depuis]
     }
-    setValeurs(initial)
-  }, [modele, employee])
+    setValeurs({ ...initial, ...(valeursInitiales ?? {}) })
+  }, [modele, employee, valeursInitiales])
 
   if (!modele) {
     return (
       <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
         <div className="max-w-md rounded-2xl bg-white p-5 text-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
-          <p className="font-semibold text-slate-900">Aucun modèle de contrat</p>
+          <p className="font-semibold text-slate-900">Aucun modèle</p>
           <p className="mt-1 text-slate-600">
-            {entreprise} n’a pas encore de modèle enregistré. Envoyez son contrat type
-            et il sera ajouté.
+            {entreprise} n’a pas encore de modèle enregistré pour ce document.
+            Envoyez-le et il sera ajouté.
           </p>
           <button onClick={onClose} className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
             Fermer
@@ -76,7 +106,15 @@ export default function ContratRedaction({
   }
 
   if (imprime) {
-    return <ContratImpression modele={modele} valeurs={valeurs} employee={employee} onClose={() => setImprime(false)} />
+    return (
+      <DocumentImpression
+        modele={modele}
+        valeurs={valeurs}
+        titre={`${intitule} — ${employee.nom_prenom}`}
+        nomFichier={`${prefixeFichier}_${employee.nom_prenom.replace(/\s+/g, '_')}`}
+        onClose={() => setImprime(false)}
+      />
+    )
   }
 
   const set = (id: string) => (v: string) => setValeurs((x) => ({ ...x, [id]: v }))
@@ -88,7 +126,7 @@ export default function ContratRedaction({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 bg-white px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
-            Contrat de travail — {employee.nom_prenom}
+            {intitule} — {employee.nom_prenom}
           </h2>
           <p className="text-xs text-slate-500">
             {entreprise} · {remplis} champ(s) sur {modele.champs.length}
@@ -119,7 +157,7 @@ export default function ContratRedaction({
           </p>
           {modele.langue === 'ar' && (
             <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Ce contrat se remplit <strong>en arabe</strong> : basculez le clavier.
+              Ce document se remplit <strong>en arabe</strong> : basculez le clavier.
               Le champ s’oriente tout seul selon ce que vous tapez. Le C.I.N., les
               dates et les montants restent en chiffres et lettres latins.
             </p>
@@ -206,29 +244,26 @@ function Apercu({ children }: { children: React.ReactNode }) {
 }
 
 /** La vue d'impression : la page seule, portée dans le corps du document. */
-function ContratImpression({
-  modele, valeurs, employee, onClose,
+function DocumentImpression({
+  modele, valeurs, titre, nomFichier, onClose,
 }: {
-  modele: NonNullable<ReturnType<typeof modeleContrat>>
+  modele: ModeleContrat
   valeurs: Record<string, string>
-  employee: Employee
+  titre: string
+  nomFichier: string
   onClose: () => void
 }) {
   useModeImpression()
   const { pret, imprimer } = useImpression(0)
-  const nom = useMemo(
-    () => `Contrat_${employee.nom_prenom.replace(/\s+/g, '_')}`,
-    [employee.nom_prenom],
-  )
 
   return (
     <PortailImpression>
       <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
         <BarreImpression
-          titre={`Contrat — ${employee.nom_prenom}`}
+          titre={titre}
           pret={pret}
           imprimer={imprimer}
-          nomFichier={nom}
+          nomFichier={nomFichier}
           onClose={onClose}
         />
         <div className="document-imprimable mx-auto my-6 shadow-xl print:my-0 print:shadow-none">

@@ -33,6 +33,8 @@ export interface ModeleContrat {
   langue: 'fr' | 'ar'
   champs: ChampContrat[]
   blocs: Bloc[]
+  /** Des valeurs connues d'avance, indépendantes de l'employé. */
+  defauts?: Record<string, string>
   /** Ce qui figure sous les deux signatures, s'il y a lieu. */
   mentionSignature?: string
   gauche: string
