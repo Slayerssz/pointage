@@ -39,6 +39,19 @@ const QUALIFICATIONS = [
   'SUPERVISEUR',
 ]
 
+/** Ce qu'un contrat déjà enregistré dicte à son document imprimé. */
+function valeursDuContrat(c: Contrat): Record<string, string> {
+  return {
+    debut: c.date_debut ? formatDateFr(c.date_debut) : '',
+    fin: c.date_fin ? formatDateFr(c.date_fin) : '',
+    salaire: c.salaire_mensuel != null ? String(c.salaire_mensuel) : '',
+    fonction: c.poste ?? '',
+    fait_a: c.signe_a ?? '',
+    fait_le: c.signe_le ? formatDateFr(c.signe_le) : '',
+    ...(c.champs_document ?? {}),
+  }
+}
+
 export default function EmployesPage() {
   const { companyId } = useParams()
   const { profile } = useAuth()
@@ -72,8 +85,6 @@ export default function EmployesPage() {
   const [fiche, setFiche] = useState<Employee | null>(null)
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
-  // Rédiger un contrat pour cette personne, sur le modèle de sa société.
-  const [contratPour, setContratPour] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
   // La sélection chargée, en attente du choix « complète ou simplifiée ».
   const [aImprimer, setAImprimer] = useState<Employee[] | null>(null)
@@ -541,7 +552,6 @@ export default function EmployesPage() {
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
           })()}
           onFiche={() => { setFiche(apercu); setApercu(null) }}
-          onContrat={() => { setContratPour(apercu); setApercu(null) }}
           onModifier={() => { setEditing(apercu); setApercu(null) }}
           onClose={() => setApercu(null)}
         />
@@ -591,17 +601,11 @@ export default function EmployesPage() {
         <ContratRedaction
           employee={impression.employee}
           entreprise={entrepriseDe(impression.employee)}
+          valeursContrat={valeursDuContrat(impression.contrat)}
           onClose={() => setImpression(null)}
         />
       )}
 
-      {contratPour && (
-        <ContratRedaction
-          employee={contratPour}
-          entreprise={entrepriseDe(contratPour)}
-          onClose={() => setContratPour(null)}
-        />
-      )}
     </div>
   )
 }

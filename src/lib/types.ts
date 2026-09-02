@@ -143,6 +143,9 @@ export interface Contrat {
   representant_employeur: string | null
   observations: string | null
   archive: boolean
+  /** Les mentions du document imprimé qui n'ont pas de colonne à elles :
+   *  numéro de marché, durée en toutes lettres, qualité en arabe… */
+  champs_document: Record<string, string> | null
   created_at: string
 }
 
@@ -173,6 +176,8 @@ export interface Conge {
   date_fin: string
   motif: string | null
   jours: number
+  /** Idem, pour l'engagement de congé signé par le salarié. */
+  champs_document: Record<string, string> | null
   created_at: string
 }
 

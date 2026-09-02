@@ -94,6 +94,22 @@ for (const s2 of SOCIETES) ok(`${s2} a un siège`, soc.includes(`'${s2}'`) || s2
 ok('les sièges arabes existent pour les sociétés qui éditent en arabe',
    soc.includes('siegeAr'))
 
+console.log('\n  ── La page se compose pendant la saisie ───────────────')
+const detail = fs.readFileSync(new URL('../../src/pages/validator/EmployeDetail.tsx', import.meta.url), 'utf8')
+ok('le contrat se rédige avec sa page à côté', detail.includes('<PanneauDocument'))
+ok('le congé aussi', (detail.match(/<PanneauDocument/g) ?? []).length >= 2)
+ok('les dates du congé alimentent l’engagement',
+   detail.includes('debut: dateDoc(f.debut)') && detail.includes('fin: dateDoc(f.fin)'))
+ok('la durée du congé se déduit des dates', detail.includes('${jours} يوما'))
+ok('les mentions saisies partent avec le congé', detail.includes('champsDocument: docLibre'))
+ok('… et avec le contrat', detail.includes('champs_document: docLibre'))
+ok('les valeurs connues d’avance remplissent aussi le formulaire',
+   detail.includes('modeleEngagement(entreprise).defauts'))
+
+const panneau = fs.readFileSync(new URL('../../src/components/PanneauDocument.tsx', import.meta.url), 'utf8')
+ok('la page est mise à l’échelle sans être déformée', panneau.includes('transform: `scale('))
+ok('… et ne laisse pas de vide sous elle', panneau.includes('height: hauteur'))
+
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)
 console.log('═'.repeat(66))

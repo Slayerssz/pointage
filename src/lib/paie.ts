@@ -205,7 +205,11 @@ export function useCongesEmploye(employeeId: string | undefined) {
 export function useCreerConge(employeeId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { debut: string; fin: string; type: string; motif: string }) => {
+    mutationFn: async (v: {
+      debut: string; fin: string; type: string; motif: string
+      /** Les mentions de l'engagement imprimé, saisies en même temps. */
+      champsDocument?: Record<string, string>
+    }) => {
       const { error } = await supabase.rpc('creer_conge', {
         p_employee_id: employeeId!,
         p_date_debut: v.debut,
@@ -214,6 +218,20 @@ export function useCreerConge(employeeId: string | undefined) {
         p_motif: v.motif || null,
       })
       if (error) throw error
+
+      // La fonction ne renvoie pas le congé créé : on retrouve celui qui vient
+      // d'être posé sur ces dates pour y attacher les mentions du document.
+      if (v.champsDocument && Object.keys(v.champsDocument).length > 0) {
+        const { error: e2 } = await supabase
+          .from('conges')
+          .update({ champs_document: v.champsDocument })
+          .eq('employee_id', employeeId!)
+          .eq('date_debut', v.debut)
+          .eq('date_fin', v.fin)
+        // Un échec ici ne doit pas faire croire que le congé n'est pas créé :
+        // il l'est. Seules les mentions de l'engagement manqueraient.
+        if (e2) console.warn('Mentions de l’engagement non enregistrées :', e2.message)
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['conges', employeeId] })

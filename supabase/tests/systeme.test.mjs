@@ -108,6 +108,7 @@ const ORDRE = [
   'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
   'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
   'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
+  'BLOC_16_champs_document.sql',
 ]
 for (const b of ORDRE) {
   try {

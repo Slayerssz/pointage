@@ -34,6 +34,9 @@ export default function EngagementConge({
       // « يوما » : jour(s), au singulier arabe qui suit les nombres
       duree: `${conge.jours} يوما`,
       annee: String(new Date(conge.date_debut + 'T00:00:00').getFullYear()),
+      // Ce qui avait été tapé à la création : le document se réimprime à
+      // l'identique, et non vidé de ses mentions arabes.
+      ...(conge.champs_document ?? {}),
     }),
     [conge],
   )

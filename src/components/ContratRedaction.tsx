@@ -11,8 +11,14 @@ import type { Employee } from '../lib/types'
  * RÉDIGER UN CONTRAT — le modèle de la société de l'employé.
  */
 export default function ContratRedaction({
-  employee, entreprise, onClose,
-}: { employee: Employee; entreprise: string; onClose: () => void }) {
+  employee, entreprise, valeursContrat, onClose,
+}: {
+  employee: Employee
+  entreprise: string
+  /** Ce que le contrat enregistré dicte : on réimprime ce qui a été signé. */
+  valeursContrat?: Record<string, string>
+  onClose: () => void
+}) {
   const modele = modeleContrat(entreprise)
   return (
     <RedactionDocument
@@ -21,6 +27,7 @@ export default function ContratRedaction({
       entreprise={entreprise}
       intitule="Contrat de travail"
       prefixeFichier="Contrat"
+      valeursInitiales={valeursContrat}
       onClose={onClose}
     />
   )

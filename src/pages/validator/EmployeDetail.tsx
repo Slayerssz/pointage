@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { addDays, dateToIso, formatDateFr, todayIso } from '../../lib/dates'
@@ -15,6 +15,10 @@ import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
 import { Chip, DateInputFr, ErrorNote, Spinner } from '../../components/ui'
 import DocumentsSignes from '../../components/DocumentsSignes'
 import EngagementConge from '../../components/EngagementConge'
+import PanneauDocument from '../../components/PanneauDocument'
+import { modeleContrat } from '../../lib/contratsModeles'
+import { modeleEngagement } from '../../lib/engagementConge'
+import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
 import { useDocuments } from '../../lib/documents'
 
 const inputCls =
@@ -66,7 +70,7 @@ export default function EmployeDetail({
       </div>
 
       {onglet === 'contrats' && (
-        <ContratsPanel employee={employee} onImprimer={onImprimerContrat} />
+        <ContratsPanel employee={employee} entreprise={entreprise} onImprimer={onImprimerContrat} />
       )}
       {onglet === 'conges' && <CongesPanel employee={employee} entreprise={entreprise} />}
       {onglet === 'dette' && <DettePanel employee={employee} />}
@@ -78,9 +82,11 @@ export default function EmployeDetail({
 
 function ContratsPanel({
   employee,
+  entreprise,
   onImprimer,
 }: {
   employee: Employee
+  entreprise: string
   onImprimer: (c: Contrat) => void
 }) {
   const { data: contrats, isLoading } = useContratsEmploye(employee.id)
@@ -97,6 +103,7 @@ function ContratsPanel({
       {(nouveau || edite || renouvele) && (
         <ContratForm
           employee={employee}
+          entreprise={entreprise}
           contrat={edite}
           renouvelle={renouvele}
           onClose={() => {
@@ -216,16 +223,19 @@ function unAnApres(iso: string): string {
 
 function ContratForm({
   employee,
+  entreprise,
   contrat,
   renouvelle,
   onClose,
 }: {
   employee: Employee
+  entreprise: string
   contrat: Contrat | null
   renouvelle?: Contrat | null
   onClose: () => void
 }) {
   const qc = useQueryClient()
+  const modele = modeleContrat(entreprise)
   // Un renouvellement reprend tout l'ancien contrat, mais enchaîne les dates :
   // début = lendemain de l'ancienne fin, fin = un an plus tard.
   const base = contrat ?? renouvelle ?? null
@@ -251,6 +261,30 @@ function ContratForm({
   })
   const set = (k: keyof typeof f) => (v: string | boolean) => setF((p) => ({ ...p, [k]: v }))
 
+  // Les mentions du document que le formulaire ne couvre pas : le numéro du
+  // marché, la durée en toutes lettres… On les conserve avec le contrat,
+  // faute de quoi une réimpression donnerait un autre document.
+  const [docLibre, setDocLibre] = useState<Record<string, string>>(() => ({
+    ...(modeleContrat(entreprise)?.defauts ?? {}),
+    ...((contrat?.champs_document ?? renouvelle?.champs_document ?? {}) as Record<string, string>),
+  }))
+
+  // Ce que le formulaire alimente tout seul sur le document.
+  const COUVERTS = ['nom', 'cin', 'naissance', 'adresse', 'debut', 'fin',
+                    'salaire', 'fonction', 'fait_a', 'fait_le']
+  const valeursDoc: Record<string, string> = {
+    ...(modele?.defauts ?? {}),
+    ...valeursEmploye(employee, modele),
+    debut: dateDoc(f.date_debut),
+    fin: dateDoc(f.date_fin),
+    salaire: f.salaire_mensuel,
+    fonction: f.poste,
+    fait_a: f.signe_a,
+    fait_le: dateDoc(f.signe_le),
+    ...docLibre,
+  }
+  const aSaisir = champsASaisir(modele, COUVERTS)
+
   const save = useMutation({
     mutationFn: async () => {
       if (!f.date_debut) throw new Error('La date de début est obligatoire.')
@@ -274,6 +308,7 @@ function ContratForm({
         representant_employeur: f.representant_employeur.trim() || null,
         observations: f.observations.trim() || null,
         archive: f.archive,
+        champs_document: docLibre,
       }
       if (contrat) {
         const { error } = await supabase.from('contrats').update(payload).eq('id', contrat.id)
@@ -298,22 +333,52 @@ function ContratForm({
   })
 
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <p className="mb-4 text-sm font-semibold text-slate-900">
-        {contrat
-          ? `Modifier le contrat ${contrat.numero ?? ''}`
-          : renouvelle
-            ? `Renouveler le contrat ${renouvelle.numero ?? ''}`
-            : 'Nouveau contrat'}
-      </p>
-      {renouvelle && (
-        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-          Tout est repris de l’ancien contrat. Vérifiez la <strong>date de fin</strong> et le
-          <strong> salaire</strong>, puis enregistrez : l’ancien contrat sera archivé
-          automatiquement.
-        </p>
-      )}
-
+    <PanneauDocument
+      modele={modele}
+      valeurs={valeursDoc}
+      enTete={
+        <>
+          <p className="mb-4 text-sm font-semibold text-slate-900">
+            {contrat
+              ? `Modifier le contrat ${contrat.numero ?? ''}`
+              : renouvelle
+                ? `Renouveler le contrat ${renouvelle.numero ?? ''}`
+                : 'Nouveau contrat'}
+          </p>
+          {renouvelle && (
+            <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Tout est repris de l’ancien contrat. Vérifiez la <strong>date de fin</strong> et le
+              <strong> salaire</strong>, puis enregistrez : l’ancien contrat sera archivé
+              automatiquement.
+            </p>
+          )}
+          {modele?.langue === 'ar' && (
+            <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Le contrat de cette société est <strong>en arabe</strong> : les mentions
+              du document se saisissent en arabe, plus bas. Les dates, le C.I.N. et
+              les montants restent en chiffres et lettres latins.
+            </p>
+          )}
+        </>
+      }
+      actions={
+        <>
+          {save.error && (
+            <div className="w-full">
+              <ErrorNote>{save.error.message}</ErrorNote>
+            </div>
+          )}
+          {contrat && <SupprimerContrat contrat={contrat} onDeleted={onClose} />}
+          <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">
+            Annuler
+          </button>
+          <button onClick={() => save.mutate()} disabled={save.isPending}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </>
+      }
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         {field('Type de contrat', (
           <select value={f.type_contrat} onChange={(e) => set('type_contrat')(e.target.value)} className={inputCls}>
@@ -377,23 +442,41 @@ function ContratForm({
         )}
       </div>
 
-      {save.error && (
-        <div className="mt-3">
-          <ErrorNote>{save.error.message}</ErrorNote>
+      {aSaisir.length > 0 && (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <p className="mb-3 text-sm font-semibold text-slate-900">
+            Mentions propres au contrat imprimé
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {aSaisir.map((c) => (
+              <div key={c.id}>
+                {field(c.label, (
+                  c.type === 'long' ? (
+                    <textarea
+                      dir="auto" rows={2} value={docLibre[c.id] ?? ''}
+                      onChange={(e) => setDocLibre((p) => ({ ...p, [c.id]: e.target.value }))}
+                      className={inputCls}
+                    />
+                  ) : (
+                    <input
+                      dir="auto"
+                      type={c.type === 'nombre' ? 'number' : 'text'}
+                      value={docLibre[c.id] ?? ''}
+                      onChange={(e) => setDocLibre((p) => ({ ...p, [c.id]: e.target.value }))}
+                      className={inputCls}
+                    />
+                  )
+                ))}
+                {c.aide && <p className="mt-1 text-xs text-slate-400">{c.aide}</p>}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Un champ vide s’imprime en pointillés, comme sur le formulaire papier.
+          </p>
         </div>
       )}
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        {contrat && <SupprimerContrat contrat={contrat} onDeleted={onClose} />}
-        <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">
-          Annuler
-        </button>
-        <button onClick={() => save.mutate()} disabled={save.isPending}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-          {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
-      </div>
-    </div>
+    </PanneauDocument>
   )
 }
 
@@ -486,12 +569,77 @@ function CongesPanel({
   const [f, setF] = useState({ debut: '', fin: '', type: 'C', motif: '' })
   const [engagement, setEngagement] = useState<Conge | null>(null)
 
+  // L'engagement se remplit ICI, en même temps que le congé : ce sont les
+  // dates saisies sur ce formulaire qui alimentent le document, et le
+  // document qui se compose sous les yeux pendant la saisie.
+  const modele = useMemo(() => modeleEngagement(entreprise), [entreprise])
+  const [docLibre, setDocLibre] = useState<Record<string, string>>(
+    () => ({ ...(modeleEngagement(entreprise).defauts ?? {}) }),
+  )
+
+  const jours = f.debut && f.fin && f.fin >= f.debut
+    ? Math.round((new Date(f.fin + 'T00:00:00').getTime()
+                - new Date(f.debut + 'T00:00:00').getTime()) / 86400000) + 1
+    : 0
+
+  const COUVERTS = ['cin', 'naissance', 'debut', 'fin', 'annee', 'duree']
+  const valeursDoc: Record<string, string> = {
+    ...(modele.defauts ?? {}),
+    ...valeursEmploye(employee, modele),
+    debut: dateDoc(f.debut),
+    fin: dateDoc(f.fin),
+    annee: f.debut ? f.debut.slice(0, 4) : '',
+    duree: jours > 0 ? `${jours} يوما` : '',
+    ...docLibre,
+  }
+  const aSaisir = champsASaisir(modele, COUVERTS)
+
   if (isLoading) return <Spinner label="Chargement des congés…" />
 
   return (
     <div>
-      <div className="mb-4 rounded-xl border border-slate-200 p-3">
-        <p className="mb-3 text-sm font-semibold text-slate-900">Enregistrer un congé / une absence</p>
+      <div className="mb-4">
+      <PanneauDocument
+        modele={modele}
+        valeurs={valeursDoc}
+        enTete={
+          <>
+            <p className="mb-1 text-sm font-semibold text-slate-900">
+              Enregistrer un congé / une absence
+            </p>
+            <p className="mb-3 text-xs text-slate-500">
+              Les dates saisies ici composent l’engagement à droite, et sont
+              écrites dans le pointage à l’enregistrement.
+            </p>
+          </>
+        }
+        actions={
+          <>
+            {creer.error && (
+              <div className="w-full">
+                <ErrorNote>{creer.error.message}</ErrorNote>
+              </div>
+            )}
+            <button
+              onClick={() =>
+                creer.mutate(
+                  { ...f, champsDocument: docLibre },
+                  {
+                    onSuccess: () => {
+                      setF({ debut: '', fin: '', type: 'C', motif: '' })
+                      setDocLibre({ ...(modele.defauts ?? {}) })
+                    },
+                  },
+                )
+              }
+              disabled={creer.isPending || !f.debut || !f.fin}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              {creer.isPending ? 'Enregistrement…' : 'Enregistrer le congé'}
+            </button>
+          </>
+        }
+      >
         <div className="grid gap-3 sm:grid-cols-2">
           {/* Calendrier natif : plus rapide que la saisie au clavier */}
           {field('Du *', (
@@ -525,20 +673,42 @@ function CongesPanel({
           l’employé n’est pas décompté. Un employé peut cumuler plusieurs congés, à condition
           qu’ils ne se chevauchent pas.
         </p>
-        {creer.error && (
-          <div className="mt-3">
-            <ErrorNote>{creer.error.message}</ErrorNote>
+
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <p className="mb-1 text-sm font-semibold text-slate-900">
+            Mentions de l’engagement signé
+          </p>
+          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            L’engagement est <strong>en arabe</strong> : basculez le clavier. Le champ
+            s’oriente tout seul. Le C.I.N. et les dates restent en caractères latins.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {aSaisir.map((c) => (
+              <div key={c.id}>
+                {field(c.label, (
+                  c.type === 'long' ? (
+                    <textarea
+                      dir="auto" rows={2} value={docLibre[c.id] ?? ''}
+                      onChange={(e) => setDocLibre((p) => ({ ...p, [c.id]: e.target.value }))}
+                      className={inputCls}
+                    />
+                  ) : (
+                    <input
+                      dir="auto" type="text" value={docLibre[c.id] ?? ''}
+                      onChange={(e) => setDocLibre((p) => ({ ...p, [c.id]: e.target.value }))}
+                      className={inputCls}
+                    />
+                  )
+                ))}
+                {c.aide && <p className="mt-1 text-xs text-slate-400">{c.aide}</p>}
+              </div>
+            ))}
           </div>
-        )}
-        <div className="mt-3 flex justify-end">
-          <button
-            onClick={() => creer.mutate(f, { onSuccess: () => setF({ debut: '', fin: '', type: 'C', motif: '' }) })}
-            disabled={creer.isPending || !f.debut || !f.fin}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            {creer.isPending ? 'Enregistrement…' : 'Enregistrer le congé'}
-          </button>
+          <p className="mt-2 text-xs text-slate-400">
+            Un champ vide s’imprime en pointillés, comme sur le formulaire papier.
+          </p>
         </div>
+      </PanneauDocument>
       </div>
 
       {supprimer.error && (
