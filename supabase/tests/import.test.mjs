@@ -180,24 +180,23 @@ ok('… ni aucun site en double',
 console.log('\n  ── 4. Suppression des absents ──────────────────────────')
 await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_3_supprimer_absents.sql'), 'utf8'))
 
-ok('l’absent sans historique est bel et bien supprimé',
+ok('l’absent sans historique est supprimé',
    (await rows(`select 1 from public.employees where id=$1`, [absent])).length === 0)
 
-const ap = await q1(`select actif, date_sortie, nom_prenom from public.employees where id=$1`,
-                    [absentAvecPaie])
-ok('l’absent qui figure dans une paie n’est PAS supprimé', !!ap, 'introuvable')
-ok('… il est marqué sorti', ap && ap.actif === false && ap.date_sortie !== null,
-   ap ? `actif=${ap.actif}` : '—')
-ok('… son bulletin de paie est intact',
+// Même celui qui figurait dans une paie : la base ne porte que du jeu d'essai,
+// la suppression est demandée sans exception.
+ok('l’absent qui figurait dans une paie est supprimé lui aussi',
+   (await rows(`select 1 from public.employees where id=$1`, [absentAvecPaie])).length === 0)
+ok('… sa ligne de paie est partie en cascade',
    Number((await q1(`select count(*) as c from public.lignes_paie where employee_id=$1`,
-                    [absentAvecPaie])).c) === 1)
+                    [absentAvecPaie])).c) === 0)
 
 ok('l’employé de DUO (société sans état) n’est ni supprimé ni sorti',
    (await q1(`select actif from public.employees where id=$1`, [horsLot]))?.actif === true)
 
-ok('les 544 de l’état sont toujours en poste',
-   Number((await q1(`select count(*) as c from public.employees where actif`)).c) === 544 + 1,
-   String((await q1(`select count(*) as c from public.employees where actif`)).c))
+ok('il ne reste QUE les 544 des états (plus l’employé de Duo)',
+   Number((await q1(`select count(*) as c from public.employees`)).c) === 544 + 1,
+   String((await q1(`select count(*) as c from public.employees`)).c))
 
 // Le registre des huit sociétés fournies = exactement les états reçus
 const effectifs = await rows(
