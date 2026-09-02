@@ -1,5 +1,5 @@
 -- ============================================================================
---  IMPORT DU REGISTRE — 1 sur 3 : APERÇU (ne modifie RIEN)
+--  IMPORT DU REGISTRE — 1 sur 3 : APERÇU (ne modifie aucun employé)
 --  ============================================================
 --  544 employés · 8 sociétés · 92 sites · états du 02/09/2026
 --
@@ -14,19 +14,23 @@
 --    VIGILMA GARD MAROC                 → VIGILMA GARD MAROC
 --
 --  ⚠ DUO MULTI SERVICE et MEGANTER SERVICE MAROC n'ont pas d'état dans cet
---    envoi : leurs employés ne sont donc PAS concernés, et il ne faut
---    surtout pas les sortir tant que leurs listes ne sont pas arrivées.
+--    envoi : leurs employés ne sont concernés par aucun des trois scripts.
 --
---  Supabase → SQL Editor → coller → Run. L'éditeur n'affiche que le dernier
---  résultat : pour lire les autres, sélectionnez tout le bloc jusqu'à
---  « FIN DU SOCLE », puis la requête « ▶ » qui vous intéresse, et lancez.
+--  MODE D'EMPLOI
+--    1. Collez tout le fichier dans Supabase → SQL Editor et faites Run.
+--       Vous verrez le résultat de la DERNIÈRE requête (la n° 5).
+--    2. Pour lire les autres : sélectionnez à la souris la requête « ▶ »
+--       qui vous intéresse, et faites Run. La table de travail reste en
+--       place, inutile de recoller les 544 lignes.
+--    3. Quand vous avez fini, lancez le MÉNAGE en bas de fichier.
 --
---  Rien n'est écrit : le script se termine par un rollback.
+--  Aucun employé, site ou pointage n'est touché : ce script ne fait que lire.
 -- ============================================================================
 
-begin;
+drop view  if exists public.import_rapprochement;
+drop table if exists public.import_etat;
 
-create temporary table etat_recu (
+create table public.import_etat (
   societe        text,
   site           text,
   departement    text,
@@ -39,9 +43,12 @@ create temporary table etat_recu (
   mode_reglement text,
   ville          text,
   adresse        text
-) on commit drop;
+);
 
-insert into etat_recu
+-- Table de travail : personne d'autre que l'éditeur SQL n'y accède.
+alter table public.import_etat enable row level security;
+
+insert into public.import_etat
   (societe, site, departement, matricule, nom_prenom, cin, cnss,
    date_naissance, date_embauche, mode_reglement, ville, adresse)
 values
@@ -590,10 +597,10 @@ values
   ('VIGILMA GARD MAROC', 'SUPERVISEUR', 'ADMINISTRATIF', 5, 'MHAMDI REDA', 'F416891', '163244606', '1992-06-12', '2023-09-01', 'Virement', 'OUJDA', 'RTE EL AOUNIA LOT TAZAGHINE'),
   ('VIGILMA GARD MAROC', 'ASSISTANTE ADMINISTRATIF', 'ADMINISTRATIF', 38, 'BAKKOUR FATIMA', 'K565271', '106679658', '1999-07-01', '2024-06-01', 'Virement', 'TANGER', 'HAY RAHRAH HAOUMAT EL');
 
--- Un rapprochement se fait d'abord sur le C.I.N. — le seul identifiant qui
+-- Le rapprochement se fait d'abord sur le C.I.N. — le seul identifiant qui
 -- ne bouge pas — puis, à défaut, sur société+matricule, et en dernier
 -- recours sur société+nom.
-create temporary view rapprochement as
+create view public.import_rapprochement as
 select
   r.*,
   c.id as company_id,
@@ -607,7 +614,7 @@ select
       where e.company_id = c.id
         and upper(trim(e.nom_prenom)) = upper(trim(r.nom_prenom)) limit 1)
   ) as employee_id
-from etat_recu r
+from public.import_etat r
 left join public.companies c on upper(trim(c.name)) = upper(trim(r.societe));
 
 -- ─────────────────────────────── FIN DU SOCLE ───────────────────────────────
@@ -615,18 +622,18 @@ left join public.companies c on upper(trim(c.name)) = upper(trim(r.societe));
 
 -- ▶ 1. Une société de l'état sans correspondance en base ? (doit être vide)
 select distinct 'société introuvable en base' as alerte, societe
-  from rapprochement where company_id is null;
+  from public.import_rapprochement where company_id is null;
 
 -- ▶ 2. Combien de créations, combien de mises à jour, par société
 select societe,
        count(*)                                        as sur_l_etat,
        count(*) filter (where employee_id is null)     as a_creer,
        count(*) filter (where employee_id is not null) as a_mettre_a_jour
-  from rapprochement group by societe order by societe;
+  from public.import_rapprochement group by societe order by societe;
 
 -- ▶ 3. Les sites qui n'existent pas encore et seront créés
 select r.societe, r.site as site_a_creer, count(*) as employes
-  from rapprochement r
+  from public.import_rapprochement r
   left join public.sites s on s.company_id = r.company_id
                           and upper(trim(s.name)) = upper(trim(r.site))
  where s.id is null and r.company_id is not null
@@ -636,7 +643,7 @@ select r.societe, r.site as site_a_creer, count(*) as employes
 select e.nom_prenom, e.matricule,
        co.name as societe_actuelle, r.societe as societe_etat,
        s.name  as site_actuel,      r.site    as site_etat
-  from rapprochement r
+  from public.import_rapprochement r
   join public.employees e on e.id = r.employee_id
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
@@ -645,14 +652,23 @@ select e.nom_prenom, e.matricule,
  order by r.societe, e.nom_prenom;
 
 -- ▶ 5. Les employés EN BASE absents de tous les états reçus.
---     Le script d'application ne les touche pas. À vous de trancher :
---     départ réel, oubli, ou société dont l'état n'est pas encore arrivé.
+--     Ce sont eux que le script 3 supprimera. Duo et Meganter y figurent
+--     forcément — leurs états ne sont pas arrivés — mais le script 3 ne
+--     les regarde pas.
 select co.name as societe, e.matricule, e.nom_prenom, e.cin,
        s.name as site, e.actif
   from public.employees e
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
- where not exists (select 1 from rapprochement r where r.employee_id = e.id)
+ where not exists (select 1 from public.import_rapprochement r
+                    where r.employee_id = e.id)
  order by co.name, e.nom_prenom;
 
-rollback;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+--  MÉNAGE — à lancer quand vous avez fini avec les trois scripts.
+--  Tant que ces deux objets existent, vous pouvez relancer n'importe
+--  quelle requête « ▶ » sans recoller les 544 lignes.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- drop view  if exists public.import_rapprochement;
+-- drop table if exists public.import_etat;

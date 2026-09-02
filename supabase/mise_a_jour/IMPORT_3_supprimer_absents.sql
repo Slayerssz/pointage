@@ -11,16 +11,21 @@
 --    revoir ce script : effacer un bulletin déjà édité fausserait un mois
 --    validé, et c'est une pièce que la C.N.S.S. peut réclamer.
 --
---  Lancez d'abord IMPORT_1 (aperçu), puis IMPORT_2 (application).
---  Celui-ci vient en dernier.
+--  MODE D'EMPLOI
+--    1. Lancez d'abord IMPORT_1 (aperçu) puis IMPORT_2 (application).
+--    2. Collez ce fichier et faites Run : il commence par créer la table
+--       de travail, PUIS supprime, PUIS affiche le bilan.
+--    3. Pour voir qui va partir AVANT de supprimer, lancez d'abord le
+--       socle seul (jusqu'à « FIN DU SOCLE »), puis la requête « ▶ » ;
+--       lancez le bloc « do » ensuite.
 --
---  DUO MULTI SERVICE et MEGANTER SERVICE MAROC ne sont PAS concernés :
---  leurs états ne sont pas arrivés, leurs employés restent intacts.
+--  DUO MULTI SERVICE et MEGANTER SERVICE MAROC ne sont PAS concernés.
 -- ============================================================================
 
-begin;
+drop view  if exists public.import_rapprochement;
+drop table if exists public.import_etat;
 
-create temporary table etat_recu (
+create table public.import_etat (
   societe        text,
   site           text,
   departement    text,
@@ -33,9 +38,12 @@ create temporary table etat_recu (
   mode_reglement text,
   ville          text,
   adresse        text
-) on commit drop;
+);
 
-insert into etat_recu
+-- Table de travail : personne d'autre que l'éditeur SQL n'y accède.
+alter table public.import_etat enable row level security;
+
+insert into public.import_etat
   (societe, site, departement, matricule, nom_prenom, cin, cnss,
    date_naissance, date_embauche, mode_reglement, ville, adresse)
 values
@@ -584,10 +592,10 @@ values
   ('VIGILMA GARD MAROC', 'SUPERVISEUR', 'ADMINISTRATIF', 5, 'MHAMDI REDA', 'F416891', '163244606', '1992-06-12', '2023-09-01', 'Virement', 'OUJDA', 'RTE EL AOUNIA LOT TAZAGHINE'),
   ('VIGILMA GARD MAROC', 'ASSISTANTE ADMINISTRATIF', 'ADMINISTRATIF', 38, 'BAKKOUR FATIMA', 'K565271', '106679658', '1999-07-01', '2024-06-01', 'Virement', 'TANGER', 'HAY RAHRAH HAOUMAT EL');
 
--- Un rapprochement se fait d'abord sur le C.I.N. — le seul identifiant qui
+-- Le rapprochement se fait d'abord sur le C.I.N. — le seul identifiant qui
 -- ne bouge pas — puis, à défaut, sur société+matricule, et en dernier
 -- recours sur société+nom.
-create temporary view rapprochement as
+create view public.import_rapprochement as
 select
   r.*,
   c.id as company_id,
@@ -601,52 +609,61 @@ select
       where e.company_id = c.id
         and upper(trim(e.nom_prenom)) = upper(trim(r.nom_prenom)) limit 1)
   ) as employee_id
-from etat_recu r
+from public.import_etat r
 left join public.companies c on upper(trim(c.name)) = upper(trim(r.societe));
 
 -- ─────────────────────────────── FIN DU SOCLE ───────────────────────────────
 
 
--- Les personnes en base qui ne figurent sur aucun état reçu
-create temporary view absents as
-select e.id, e.matricule, e.nom_prenom, e.cin,
-       co.name as societe, s.name as site
+-- ▶ Qui va disparaître, et ce qui part avec (à lancer seul, avant le bloc do)
+select co.name as societe, e.matricule, e.nom_prenom, e.cin, s.name as site,
+       (select count(*) from public.pointages p   where p.employee_id = e.id) as pointages,
+       (select count(*) from public.lignes_paie l where l.employee_id = e.id) as lignes_de_paie,
+       (select count(*) from public.contrats c    where c.employee_id = e.id) as contrats,
+       (select count(*) from public.conges g      where g.employee_id = e.id) as conges
   from public.employees e
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
  where co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
-   and not exists (select 1 from rapprochement r where r.employee_id = e.id);
+   and not exists (select 1 from public.import_rapprochement r
+                    where r.employee_id = e.id)
+ order by co.name, e.nom_prenom;
 
--- ▶ À LIRE AVANT DE VALIDER : qui va disparaître, et ce qui part avec
-select a.societe, a.matricule, a.nom_prenom, a.cin, a.site,
-       (select count(*) from public.pointages p   where p.employee_id  = a.id) as pointages,
-       (select count(*) from public.lignes_paie l where l.employee_id  = a.id) as lignes_de_paie,
-       (select count(*) from public.contrats c    where c.employee_id  = a.id) as contrats,
-       (select count(*) from public.conges g      where g.employee_id  = a.id) as conges
-  from absents a
- order by a.societe, a.nom_prenom;
 
--- La suppression. Pointages, contrats, congés, documents et lignes de
--- paie suivent en cascade.
-delete from public.employees e where e.id in (select id from absents);
+do $bloc$
+declare v_n int;
+begin
+  delete from public.employees e
+   using public.companies co
+   where co.id = e.company_id
+     and co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
+     and not exists (select 1 from public.import_rapprochement r
+                      where r.employee_id = e.id);
+  get diagnostics v_n = row_count;
+  raise notice '% employé(s) supprimé(s).', v_n;
+end $bloc$;
 
--- Le bilan. Pour les huit sociétés fournies, « en_poste » doit retomber
--- exactement sur l'effectif de vos états.
+
+-- ▶ Le bilan : « en_poste » doit retomber exactement sur vos états
 select co.name as societe,
        count(*) filter (where e.date_sortie is null) as en_poste,
-       count(*) filter (where e.date_sortie is not null) as sortis,
        count(*) as total
   from public.employees e
   join public.companies co on co.id = e.company_id
  group by co.name order by co.name;
 
-commit;
-
 
 -- ═══════════════════════════════════════════════════════════════════════════
---  FACULTATIF — les sites devenus vides
---  Une annexe peut se retrouver sans personne. Le script n'y touche pas :
---  un site vide aujourd'hui peut resservir demain. Pour les voir :
+--  MÉNAGE — à lancer quand vous avez fini avec les trois scripts.
+--  Tant que ces deux objets existent, vous pouvez relancer n'importe
+--  quelle requête « ▶ » sans recoller les 544 lignes.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- drop view  if exists public.import_rapprochement;
+-- drop table if exists public.import_etat;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+--  FACULTATIF — les annexes devenues vides. Le script n'y touche pas :
+--  un site vide aujourd'hui peut resservir demain.
 -- ═══════════════════════════════════════════════════════════════════════════
 -- select co.name as societe, s.name as site_vide
 --   from public.sites s

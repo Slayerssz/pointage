@@ -9,6 +9,37 @@ const db = new PGlite()
 let P = 0, F = 0
 const ok = (n, c, d = '') => { c ? (P++, console.log('  ✓ ' + n)) : (F++, console.log('  ✗ ' + n + (d ? '  → ' + d : ''))) }
 const q1 = async (s, p = []) => (await db.query(s, p)).rows[0]
+
+/**
+ * Découpe un script en instructions, en respectant les blocs $bloc$…$bloc$.
+ * L'éditeur SQL de Supabase exécute les instructions une par une : les
+ * scripts d'import doivent tenir sous ce régime, pas seulement en bloc.
+ */
+function instructions(sql) {
+  const out = []
+  let cur = '', i = 0, tag = null
+  while (i < sql.length) {
+    if (!tag) {
+      const m = /^\$[A-Za-z_]*\$/.exec(sql.slice(i))
+      if (m) { tag = m[0]; cur += tag; i += tag.length; continue }
+      if (sql[i] === ';') { out.push(cur.trim()); cur = ''; i++; continue }
+    } else if (sql.startsWith(tag, i)) {
+      cur += tag; i += tag.length; tag = null; continue
+    }
+    cur += sql[i++]
+  }
+  if (cur.trim()) out.push(cur.trim())
+  return out.filter((x) => x && !/^(--|\s)*$/.test(x))
+}
+
+/** Rejoue un script comme le ferait l'éditeur Supabase : une par une. */
+async function jouerScript(fichier) {
+  const sql = fs.readFileSync(path.join(RACINE, 'mise_a_jour', fichier), 'utf8')
+  for (const st of instructions(sql)) {
+    try { await db.query(st) }
+    catch (e) { throw new Error(`${fichier} — ${e.message}\n   sur : ${st.slice(0, 120)}`) }
+  }
+}
 const rows = async (s, p = []) => (await db.query(s, p)).rows
 
 await db.exec(`
@@ -92,8 +123,7 @@ ok(`base de départ : ${avant} employés, ${SOC.length} sociétés`, avant === 5
 
 // ── 1. L'aperçu ne doit rien changer
 console.log('\n  ── 1. Aperçu ───────────────────────────────────────────')
-const apercu = fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_1_apercu.sql'), 'utf8')
-await db.exec(apercu)
+await jouerScript('IMPORT_1_apercu.sql')
 ok('l’aperçu ne modifie aucun employé',
    Number((await q1(`select count(*) as c from public.employees`)).c) === avant)
 ok('l’aperçu ne crée aucun site',
@@ -101,7 +131,7 @@ ok('l’aperçu ne crée aucun site',
 
 // ── 2. L'application
 console.log('\n  ── 2. Application ──────────────────────────────────────')
-await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_2_appliquer.sql'), 'utf8'))
+await jouerScript('IMPORT_2_appliquer.sql')
 
 const apres = Number((await q1(`select count(*) as c from public.employees`)).c)
 // 544 sur les états ; 3 étaient déjà en base et sont rapprochés (a, b et
@@ -168,7 +198,7 @@ ok('les sites ont été créés',
 
 // ── 3. Relancer l'import ne doit rien dupliquer
 console.log('\n  ── 3. Idempotence ──────────────────────────────────────')
-await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_2_appliquer.sql'), 'utf8'))
+await jouerScript('IMPORT_2_appliquer.sql')
 ok('relancer l’import ne crée aucun doublon',
    Number((await q1(`select count(*) as c from public.employees`)).c) === apres,
    String((await q1(`select count(*) as c from public.employees`)).c))
@@ -178,7 +208,7 @@ ok('… ni aucun site en double',
 
 // ── 4. La suppression des absents
 console.log('\n  ── 4. Suppression des absents ──────────────────────────')
-await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_3_supprimer_absents.sql'), 'utf8'))
+await jouerScript('IMPORT_3_supprimer_absents.sql')
 
 ok('l’absent sans historique est supprimé',
    (await rows(`select 1 from public.employees where id=$1`, [absent])).length === 0)
@@ -214,6 +244,12 @@ ok('après suppression, chaque société a EXACTEMENT l’effectif de son état'
 
 ok('les pointages de l’employé supprimé sont partis avec lui',
    Number((await q1(`select count(*) as c from public.pointages where employee_id=$1`, [absent])).c) === 0)
+
+ok('la table de travail est protégée par RLS',
+   (await q1(`select relrowsecurity as r from pg_class where relname='import_etat'`))?.r === true)
+await db.exec(`drop view if exists public.import_rapprochement; drop table if exists public.import_etat;`)
+ok('le ménage supprime bien la table de travail',
+   (await rows(`select 1 from pg_class where relname='import_etat'`)).length === 0)
 
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)
