@@ -1,4 +1,4 @@
-import { remplir, type ModeleContrat } from '../lib/contratsModeles'
+import type { ModeleContrat } from '../lib/contratsModeles'
 
 /**
  * LE CONTRAT, TEL QU'IL S'IMPRIME.
@@ -20,7 +20,7 @@ export default function ContratDocument({
   echelle?: number
 }) {
   const arabe = modele.langue === 'ar'
-  const t = (s: string) => remplir(s, valeurs)
+  const t = (s: string) => rendre(s, valeurs, arabe)
 
   return (
     <article
@@ -74,14 +74,14 @@ export default function ContratDocument({
           return (
             <ul key={i} style={{ margin: '1.5mm 0', paddingInlineStart: '8mm', listStyle: 'disc' }}>
               {b.items.map((it, j) => (
-                <li key={j} style={{ marginBottom: '1mm' }}>{marquer(t(it), arabe)}</li>
+                <li key={j} style={{ marginBottom: '1mm' }}>{t(it)}</li>
               ))}
             </ul>
           )
         }
         return (
           <p key={i} style={{ margin: '0 0 2mm' }}>
-            {marquer(t(b.texte), arabe)}
+            {t(b.texte)}
           </p>
         )
       })}
@@ -111,20 +111,29 @@ export default function ContratDocument({
 }
 
 /**
- * Dans un texte arabe, une valeur en caractères latins doit être isolée,
- * sinon le navigateur la recompose au mauvais endroit de la ligne. Les
- * valeurs saisies sont donc encadrées de <bdi>, et soulignées pour qu'on
- * voie d'un coup d'œil ce qui a été rempli.
+ * Remplace chaque jeton par sa valeur, en isolant les valeurs UNE À UNE.
+ *
+ * L'isolement compte sur le contrat arabe : le C.I.N., les dates et les
+ * montants y restent en caractères latins, et sans <bdi> autour de chacun
+ * le navigateur les recompose au mauvais bout de la ligne. Encadrer le
+ * paragraphe entier ne servirait à rien — c'est la valeur qu'il faut
+ * isoler de son voisinage, pas la phrase.
+ *
+ * Un champ vide ressort en pointillés, comme sur le formulaire vierge.
  */
-function marquer(texte: string, arabe: boolean) {
-  const morceaux = texte.split(/(……………………)/g)
-  return morceaux.map((m, i) =>
-    m === '……………………' ? (
-      <span key={i} style={{ letterSpacing: '0.05em', color: '#555' }}>{m}</span>
-    ) : arabe ? (
-      <bdi key={i}>{m}</bdi>
-    ) : (
-      <span key={i}>{m}</span>
-    ),
-  )
+function rendre(texte: string, valeurs: Record<string, string>, arabe: boolean) {
+  return texte.split(/(\{\{\w+\}\})/g).map((morceau, i) => {
+    const jeton = /^\{\{(\w+)\}\}$/.exec(morceau)
+    if (!jeton) return <span key={i}>{morceau}</span>
+
+    const valeur = (valeurs[jeton[1]] ?? '').trim()
+    if (!valeur) {
+      return (
+        <span key={i} style={{ letterSpacing: '0.05em', color: '#555' }}>
+          ……………………
+        </span>
+      )
+    }
+    return arabe ? <bdi key={i}>{valeur}</bdi> : <span key={i}>{valeur}</span>
+  })
 }

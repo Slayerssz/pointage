@@ -553,7 +553,7 @@ const MODELES: Record<string, ModeleContrat> = {
     fonction: 'AGENT DE SECURITE',
   }),
 
-  'MEGANTER SERVICE MAROC': familleA({
+  'MEGAINTER SERVICE MAROC': familleA({
     titre: 'CONTRAT DE TRAVAIL TEMPORAIRE',
     societe:
       'Société : MEGAINTER SERVICE MAROC à responsabilité limitée associe unique sise : Rés Chaouia Av Youssef Ibn Tachfine Rue Rachid Reda 4éme Etg N°21-Tanger.',
@@ -632,6 +632,9 @@ function cle(nom: string): string {
 }
 
 const PAR_CLE = new Map(Object.entries(MODELES).map(([k, v]) => [cle(k), v]))
+
+// Même société, deux graphies selon qu'on lise la base ou le papier.
+PAR_CLE.set(cle('MEGANTER SERVICE MAROC'), MODELES['MEGAINTER SERVICE MAROC'])
 
 /** Le modèle de contrat d'une société, ou null si elle n'en a pas encore. */
 export function modeleContrat(entreprise: string | null | undefined): ModeleContrat | null {

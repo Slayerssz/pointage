@@ -30,8 +30,17 @@ export default function ContratRedaction({
   const [imprime, setImprime] = useState(false)
 
   // Ce que le dossier sait déjà : inutile de le retaper.
+  //
+  // Sauf sur les contrats arabes : le registre écrit les noms, adresses et
+  // villes en caractères latins, alors que ces contrats se remplissent en
+  // arabe. Les préremplir obligerait à effacer avant d'écrire. On ne garde
+  // donc que ce qui s'écrit pareil dans les deux langues — le C.I.N., qui
+  // est de toute façon en lettres latines sur la carte, les dates et les
+  // montants.
   useEffect(() => {
     if (!modele) return
+    const enArabe = modele.langue === 'ar'
+    const LATIN_SEULEMENT: ChampContrat['depuis'][] = ['nom_prenom', 'adresse', 'ville']
     const depuis: Record<NonNullable<ChampContrat['depuis']>, string> = {
       nom_prenom: employee.nom_prenom ?? '',
       cin: employee.cin ?? '',
@@ -41,7 +50,11 @@ export default function ContratRedaction({
       ville: employee.ville ?? '',
     }
     const initial: Record<string, string> = {}
-    for (const c of modele.champs) if (c.depuis) initial[c.id] = depuis[c.depuis]
+    for (const c of modele.champs) {
+      if (!c.depuis) continue
+      if (enArabe && LATIN_SEULEMENT.includes(c.depuis)) continue
+      initial[c.id] = depuis[c.depuis]
+    }
     setValeurs(initial)
   }, [modele, employee])
 
@@ -104,6 +117,13 @@ export default function ContratRedaction({
           <p className="mb-3 text-xs text-slate-500">
             Un champ laissé vide s’imprime en pointillés, comme sur le formulaire papier.
           </p>
+          {modele.langue === 'ar' && (
+            <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Ce contrat se remplit <strong>en arabe</strong> : basculez le clavier.
+              Le champ s’oriente tout seul selon ce que vous tapez. Le C.I.N., les
+              dates et les montants restent en chiffres et lettres latins.
+            </p>
+          )}
           <div className="space-y-3">
             {modele.champs.map((c) => (
               <label key={c.id} className="block">
@@ -111,12 +131,16 @@ export default function ContratRedaction({
                 {c.type === 'long' ? (
                   <textarea
                     rows={2}
+                    dir="auto"
                     value={valeurs[c.id] ?? ''}
                     onChange={(e) => set(c.id)(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   />
                 ) : (
                   <input
+                    // « auto » laisse le navigateur orienter le champ d'après
+                    // le premier caractère saisi : latin à gauche, arabe à droite.
+                    dir="auto"
                     type={c.type === 'nombre' ? 'number' : 'text'}
                     value={valeurs[c.id] ?? ''}
                     onChange={(e) => set(c.id)(e.target.value)}

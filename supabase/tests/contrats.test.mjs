@@ -6,7 +6,9 @@ const src = fs.readFileSync(new URL('../../src/lib/contratsModeles.ts', import.m
 let P = 0, F = 0
 const ok = (n, c, d = '') => { c ? (P++, console.log('  ✓ ' + n)) : (F++, console.log('  ✗ ' + n + (d ? '  → ' + d : ''))) }
 
-const SOCIETES = ['BO', 'DUO MULTI SERVICE', 'GROUPE TRIPLE A', 'MEGANTER SERVICE MAROC',
+// Megainter s'écrit avec un i sur ses papiers ; l'autre graphie est un
+// alias, vérifié plus bas.
+const SOCIETES = ['BO', 'DUO MULTI SERVICE', 'GROUPE TRIPLE A', 'MEGAINTER SERVICE MAROC',
   'NORD PLANET', 'TRIMAX', 'SERCLEAN NEGOCE', 'VIGILMA GARD MAROC',
   'AL SAFAE EL MAGHREB', 'EDEN VERT SERVICE']
 
@@ -41,7 +43,16 @@ ok('aucun logo, aucun en-tête dans le document',
 console.log('\n  ── Arabe ──────────────────────────────────────────────')
 const doc = fs.readFileSync(new URL('../../src/components/ContratDocument.tsx', import.meta.url), 'utf8')
 ok('le document bascule en droite-à-gauche', doc.includes(`dir={arabe ? 'rtl' : 'ltr'}`))
-ok('les valeurs latines sont isolées par <bdi>', doc.includes('<bdi'))
+ok('chaque valeur est isolée séparément, pas le paragraphe entier',
+   doc.includes('<bdi key={i}>{valeur}</bdi>'))
+ok('les champs de saisie s’orientent d’après ce qu’on tape',
+   fs.readFileSync(new URL('../../src/components/ContratRedaction.tsx', import.meta.url), 'utf8')
+     .includes('dir="auto"'))
+ok('un contrat arabe ne préremplit pas les données latines du registre',
+   fs.readFileSync(new URL('../../src/components/ContratRedaction.tsx', import.meta.url), 'utf8')
+     .includes("LATIN_SEULEMENT"))
+ok('les deux graphies de Megainter mènent au même modèle',
+   src.includes("PAR_CLE.set(cle('MEGANTER SERVICE MAROC')"))
 ok('les deux contrats arabes sont enregistrés',
    src.includes("'AL SAFAE EL MAGHREB': familleD") && src.includes("'EDEN VERT SERVICE': familleD"))
 
@@ -54,6 +65,7 @@ for (const [quoi, phrase] of [
   ['la signature légalisée', 'PS : Signature légalisée'],
   ['la période d’essai de huit jours (arabe)', 'ثمانية أيام'],
   ['la compétence juridictionnelle marocaine', 'juridictions marocaines compétentes'],
+  ['l’orthographe MEGAINTER du papier', 'MEGAINTER SERVICE MAROC'],
 ]) ok(quoi + ' est reprise', src.includes(phrase))
 
 console.log('\n' + '═'.repeat(66))

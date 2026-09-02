@@ -57,7 +57,7 @@ const ENTETES: Record<string, Entete> = {
   'NORD PLANET':          { logo: '/entetes/nord-planet.png',        accent: '#006f9d' },
   'SERCLEAN NEGOCE':      { logo: '/entetes/serclean-negoce.png',    accent: '#2c2667' },
   // Le logo porte « MEGAINTER », la base « MEGANTER » : c'est bien la même société.
-  'MEGANTER SERVICE MAROC': { logo: '/entetes/meganter-service-maroc.png', accent: '#616364' },
+  'MEGAINTER SERVICE MAROC': { logo: '/entetes/meganter-service-maroc.png', accent: '#616364' },
 }
 
 /** En-tête neutre, pour une entreprise dont le logo n'a pas encore été fourni. */
@@ -74,6 +74,10 @@ function cle(nom: string): string {
 }
 
 const PAR_CLE = new Map(Object.entries(ENTETES).map(([k, v]) => [cle(k), v]))
+
+// La société est enregistrée « MEGANTER » dans certaines bases et
+// « MEGAINTER » sur ses papiers : les deux mènent au même en-tête.
+PAR_CLE.set(cle('MEGANTER SERVICE MAROC'), ENTETES['MEGAINTER SERVICE MAROC'])
 
 /** L'en-tête d'une entreprise, ou un en-tête neutre si elle n'en a pas encore. */
 export function enteteDe(nomEntreprise: string | undefined | null): Entete {
