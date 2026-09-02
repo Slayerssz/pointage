@@ -245,11 +245,32 @@ ok('après suppression, chaque société a EXACTEMENT l’effectif de son état'
 ok('les pointages de l’employé supprimé sont partis avec lui',
    Number((await q1(`select count(*) as c from public.pointages where employee_id=$1`, [absent])).c) === 0)
 
+// ── 5. Le ménage, puis le contrôle final
+console.log('\n  ── 5. Ménage et contrôle final ─────────────────────────')
 ok('la table de travail est protégée par RLS',
    (await q1(`select relrowsecurity as r from pg_class where relname='import_etat'`))?.r === true)
 await db.exec(`drop view if exists public.import_rapprochement; drop table if exists public.import_etat;`)
 ok('le ménage supprime bien la table de travail',
    (await rows(`select 1 from pg_class where relname='import_etat'`)).length === 0)
+
+
+const controles = await rows(
+  fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'VERIFIER_import.sql'), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('--')).join('\n'))
+const mauvais = controles.filter((c) => c.verdict !== 'OK' && c.verdict !== 'pour information')
+for (const c of mauvais) console.log(`      ${c.controle} : attendu ${c.attendu}, trouvé ${c.trouve} → ${c.verdict}`)
+ok(`les ${controles.length} contrôles de VERIFIER_import sont au vert`, mauvais.length === 0)
+ok('le contrôle repère bien les 8 sociétés',
+   controles.filter((c) => c.controle.startsWith('Effectif —')).length === 8)
+
+// Et il doit SAVOIR crier quand quelque chose cloche.
+await db.query(`update public.employees set matricule = null
+                 where id = (select id from public.employees limit 1)`)
+const apresCasse = await rows(
+  fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'VERIFIER_import.sql'), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('--')).join('\n'))
+ok('un matricule effacé fait bien apparaître un PROBLÈME',
+   apresCasse.some((c) => c.controle === 'Employés sans matricule' && c.verdict === 'PROBLÈME'))
 
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)

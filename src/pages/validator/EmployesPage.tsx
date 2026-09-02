@@ -19,6 +19,7 @@ import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
 import ApercuEmploye from '../../components/ApercuEmploye'
+import ListeMarcheDialogue from '../../components/ListeMarcheDialogue'
 import ListePrint from '../../components/ListePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
@@ -71,6 +72,8 @@ export default function EmployesPage() {
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
+  // La liste courte remise au client : nom, C.I.N., n° C.N.S.S., rien d'autre.
+  const [listeMarche, setListeMarche] = useState<Employee[] | null>(null)
   const [chargementListe, setChargementListe] = useState(false)
   const { data: entreprises } = useQuery({
     queryKey: ['companies'],
@@ -163,7 +166,7 @@ export default function EmployesPage() {
 
   /** Liste du personnel : tous les employés correspondant aux filtres
    *  actuels, et pas seulement ceux de la page affichée. */
-  const imprimerSelection = async () => {
+  const imprimerSelection = async (cible = setListe) => {
     setChargementListe(true)
     try {
       let q = supabase
@@ -188,7 +191,7 @@ export default function EmployesPage() {
       else if (statutFilter === 'sorti') q = q.eq('actif', false)
       const { data: rows, error } = await q
       if (error) throw error
-      setListe(rows as Employee[])
+      cible(rows as Employee[])
     } finally {
       setChargementListe(false)
     }
@@ -242,12 +245,20 @@ export default function EmployesPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={imprimerSelection}
+            onClick={() => imprimerSelection()}
             disabled={chargementListe || !data?.count}
             title="Liste de tous les employés correspondant aux filtres, regroupés par site"
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
           >
             {chargementListe ? 'Préparation…' : `Imprimer la liste${data ? ` (${data.count})` : ''}`}
+          </button>
+          <button
+            onClick={() => imprimerSelection(setListeMarche)}
+            disabled={chargementListe || !data?.count}
+            title="Version courte pour le client : nom, C.I.N. et n° C.N.S.S. seulement"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Liste de marché
           </button>
           <button
             onClick={() => setAdding(true)}
@@ -544,6 +555,15 @@ export default function EmployesPage() {
           entreprise={entrepriseDe(fiche)}
           sites={sitesImpression}
           onClose={() => setFiche(null)}
+        />
+      )}
+
+      {listeMarche && listeMarche.length > 0 && (
+        <ListeMarcheDialogue
+          employees={listeMarche}
+          entreprise={entrepriseDe(listeMarche[0])}
+          siteNom={siteFilter ? (sites?.find((s) => s.id === siteFilter)?.name ?? null) : null}
+          onClose={() => setListeMarche(null)}
         />
       )}
 

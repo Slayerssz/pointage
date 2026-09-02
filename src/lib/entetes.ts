@@ -18,6 +18,23 @@ export interface Entete {
   accent: string
   /** Ligne sous le nom, si le logo ne la contient pas déjà */
   sousTitre?: string
+  /** Les mentions légales du bas de page. Absentes tant que la société
+   *  ne nous les a pas communiquées : le document se passe alors de pied. */
+  pied?: PiedDePage
+}
+
+/** Le bloc d'identification légale imprimé en bas des documents officiels. */
+export interface PiedDePage {
+  siegeSocial: string
+  if?: string
+  rc?: string
+  patente?: string
+  cnss?: string
+  ice?: string
+  banque?: string
+  rib?: string
+  tel?: string
+  mail?: string
 }
 
 const ENTETES: Record<string, Entete> = {
@@ -26,7 +43,16 @@ const ENTETES: Record<string, Entete> = {
   'GROUPE TRIPLE A':      { logo: '/entetes/groupe-triple-a.png',     accent: '#94040d' },
   'BO':                   { logo: '/entetes/bo.png',                  accent: '#0c6aa4' },
   'TRIMAX':               { logo: '/entetes/trimax.png',              accent: '#171b32' },
-  'VIGILMA GARD MAROC':   { logo: '/entetes/vigilma-gard-maroc.png',  accent: '#63656a' },
+  'VIGILMA GARD MAROC':   {
+    logo: '/entetes/vigilma-gard-maroc.png', accent: '#63656a',
+    pied: {
+      siegeSocial: 'DRADEB 1 RUE 2 N°35 2EME ETAGE TANGER',
+      if: '53692100', rc: '135975', patente: '50211305',
+      cnss: '4710553', ice: '003258325000054',
+      banque: 'ATTIJARIWAFA BANK', rib: '007640000601200000078590',
+      tel: '+212 6 66 29 65 33', mail: 'vigilmagardmaroc@gmail.com',
+    },
+  },
   'DUO MULTI SERVICE':    { logo: '/entetes/duo-multi-service.png',   accent: '#a8070c' },
   'NORD PLANET':          { logo: '/entetes/nord-planet.png',        accent: '#006f9d' },
   'SERCLEAN NEGOCE':      { logo: '/entetes/serclean-negoce.png',    accent: '#2c2667' },
