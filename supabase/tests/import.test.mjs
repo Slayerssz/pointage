@@ -146,7 +146,7 @@ await jouerScript('IMPORT_2_appliquer.sql')
 const apres = Number((await q1(`select count(*) as c from public.employees`)).c)
 // 544 sur les états ; 3 étaient déjà en base et sont rapprochés (a, b et
 // un troisième non — a et b seulement), + les 2 non rapprochés conservés.
-ok(`544 employés importés (${apres} en base au total)`, apres === 544 + 4, String(apres))
+ok(`557 employés importés (${apres} en base au total)`, apres === 557 + 4, String(apres))
 
 const t = await q1(`select e.*, s.name as site, co.name as societe
                       from public.employees e
@@ -171,13 +171,13 @@ ok('l’employé absent des états n’est pas touché', f.actif === true && f.n
 
 const h = await q1(`select e.*, co.name as societe from public.employees e
                     join public.companies co on co.id=e.company_id where e.id=$1`, [horsLot])
-ok('un employé d’une société sans état ne bouge pas',
+ok('l’employé de DUO est bien rattaché à sa société',
    h.societe === 'DUO MULTI SERVICE' && h.actif === true)
 
 // Les effectifs par société doivent coller aux totaux des PDF
 const attendu = { 'BO': 66, 'AL SAFAE EL MAGHREB': 51, 'EDEN VERT SERVICE': 161,
   'GROUPE TRIPLE A': 104, 'NORD PLANET': 7, 'SERCLEAN NEGOCE': 5, 'TRIMAX': 67,
-  'VIGILMA GARD MAROC': 83 }
+  'VIGILMA GARD MAROC': 83, 'DUO MULTI SERVICE': 11, 'MEGANTER SERVICE MAROC': 2 }
 const parCo = await rows(`select co.name, count(*)::int as n from public.employees e
                           join public.companies co on co.id=e.company_id
                           group by co.name`)
@@ -186,7 +186,8 @@ for (const [nom, n] of Object.entries(attendu)) {
   const trouve = parCo.find((x) => x.name.toUpperCase() === nom)?.n ?? 0
   // BO porte en plus les deux fiches d'essai restées en base :
   // le « fantôme » et l'ancien salarié déjà passé en paie
-  const cible = nom === 'BO' ? n + 2 : nom === 'GROUPE TRIPLE A' ? n + 1 : n
+  const cible = nom === 'BO' ? n + 2 : nom === 'GROUPE TRIPLE A' ? n + 1
+              : nom === 'DUO MULTI SERVICE' ? n + 1 : n
   if (trouve !== cible) { effOk = false; console.log(`      ${nom}: ${trouve} au lieu de ${cible}`) }
 }
 ok('les effectifs par société correspondent aux totaux des PDF', effOk)
@@ -234,11 +235,13 @@ ok('… sa ligne de paie est partie en cascade',
 ok('l’intrus d’une société écrite en casse mixte est supprimé lui aussi',
    (await rows(`select 1 from public.employees where id=$1`, [intrusGta])).length === 0)
 
-ok('l’employé de DUO (société sans état) n’est ni supprimé ni sorti',
-   (await q1(`select actif from public.employees where id=$1`, [horsLot]))?.actif === true)
+// Duo a désormais son état : l'employé d'essai qui n'y figure pas s'en va
+// comme les autres. Plus aucune société n'est mise à l'écart.
+ok('l’employé d’essai de DUO, absent de son état, est supprimé',
+   (await rows(`select 1 from public.employees where id=$1`, [horsLot])).length === 0)
 
-ok('il ne reste QUE les 544 des états (plus l’employé de Duo)',
-   Number((await q1(`select count(*) as c from public.employees`)).c) === 544 + 1,
+ok('il ne reste QUE les 557 des états',
+   Number((await q1(`select count(*) as c from public.employees`)).c) === 557,
    String((await q1(`select count(*) as c from public.employees`)).c))
 
 // Le registre des huit sociétés fournies = exactement les états reçus
@@ -246,7 +249,8 @@ const effectifs = await rows(
   `select co.name, count(*) filter (where e.actif)::int as n
      from public.employees e join public.companies co on co.id=e.company_id
     where upper(co.name) in ('BO','AL SAFAE EL MAGHREB','EDEN VERT SERVICE','GROUPE TRIPLE A',
-                      'NORD PLANET','SERCLEAN NEGOCE','TRIMAX','VIGILMA GARD MAROC')
+                      'NORD PLANET','SERCLEAN NEGOCE','TRIMAX','VIGILMA GARD MAROC',
+                      'DUO MULTI SERVICE','MEGANTER SERVICE MAROC')
     group by co.name`)
 let exact = true
 for (const [nom, n] of Object.entries(attendu)) {
@@ -273,8 +277,8 @@ const controles = await rows(
 const mauvais = controles.filter((c) => c.verdict !== 'OK' && c.verdict !== 'pour information')
 for (const c of mauvais) console.log(`      ${c.controle} : attendu ${c.attendu}, trouvé ${c.trouve} → ${c.verdict}`)
 ok(`les ${controles.length} contrôles de VERIFIER_import sont au vert`, mauvais.length === 0)
-ok('le contrôle repère bien les 8 sociétés',
-   controles.filter((c) => c.controle.startsWith('Effectif —')).length === 8)
+ok('le contrôle couvre les 10 sociétés',
+   controles.filter((c) => c.controle.startsWith('Effectif —')).length === 10)
 
 // Et il doit SAVOIR crier quand quelque chose cloche.
 await db.query(`update public.employees set matricule = null

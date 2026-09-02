@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useFermerSurEchap } from '../lib/impression'
-import ListeMarchePrint from './ListeMarchePrint'
+import ListeSimplifieePrint from './ListeSimplifieePrint'
 import type { Employee } from '../lib/types'
 
 /** Le mois en cours, du premier au dernier jour — sans passer par UTC. */
@@ -33,7 +33,7 @@ function intituleParDefaut(employees: Employee[]): string {
  * du marché, la façon dont le client s'appelle sur le papier, et la
  * période couverte. Le reste vient du registre.
  */
-export default function ListeMarcheDialogue({
+export default function ListeSimplifieeDialogue({
   employees,
   entreprise,
   siteNom,
@@ -56,7 +56,7 @@ export default function ListeMarcheDialogue({
 
   if (imprime) {
     return (
-      <ListeMarchePrint
+      <ListeSimplifieePrint
         employees={employees}
         entreprise={entreprise}
         marche={marche}
@@ -77,14 +77,17 @@ export default function ListeMarcheDialogue({
         className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-slate-900">Liste de marché</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Liste simplifiée</h2>
         <p className="mt-1 text-sm text-slate-500">
-          La version courte remise au client : numéro, nom, C.I.N. et n° C.N.S.S., rien
-          d’autre. {employees.length} agent(s) y figureront.
+          {employees.length} employé(s). Il ne reste qu’à nommer le document : ces
+          quatre informations ne sont pas dans le registre.
         </p>
 
         <div className="mt-4 space-y-3">
-          <Champ label="Marché n°" aide="Tel qu’il figure sur le contrat, par exemple 04/ECIB/2024">
+          <Champ
+            label="Marché n° (facultatif)"
+            aide="Tel qu’il figure sur le contrat. Laissez vide s’il n’y en a pas : la ligne ne s’imprimera pas."
+          >
             <input
               value={marche}
               onChange={(e) => setMarche(e.target.value)}
@@ -101,7 +104,10 @@ export default function ListeMarcheDialogue({
             />
           </Champ>
 
-          <Champ label="Établissement" aide="Le nom du client tel qu’il doit paraître sur le papier">
+          <Champ
+            label="Établissement"
+            aide="Le nom du client tel qu’il doit paraître. Prérempli avec l’annexe filtrée."
+          >
             <input
               value={etablissement}
               onChange={(e) => setEtablissement(e.target.value)}

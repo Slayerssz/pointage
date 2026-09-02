@@ -15,8 +15,10 @@ with attendu (societe, employes, sites) as (
   values
     ('AL SAFAE EL MAGHREB', 51, 9),
     ('BO', 66, 8),
+    ('DUO MULTI SERVICE', 11, 2),
     ('EDEN VERT SERVICE', 161, 16),
     ('GROUPE TRIPLE A', 104, 17),
+    ('MEGANTER SERVICE MAROC', 2, 1),
     ('NORD PLANET', 7, 4),
     ('SERCLEAN NEGOCE', 5, 2),
     ('TRIMAX', 67, 17),
@@ -51,7 +53,7 @@ controles as (
 
   union all
   -- 3. Personne en trop dans les huit sociétés fournies
-  select 3, 'Total en poste sur les 8 sociétés', '544',
+  select 3, 'Total en poste sur les 10 sociétés', '557',
          (select count(*)::text from public.employees e
             join public.companies co on co.id = e.company_id
            where e.date_sortie is null
@@ -125,7 +127,7 @@ controles as (
 
   union all
   -- 9. Les virements sont ceux qui auront un bulletin de paie
-  select 9, 'Payés par virement (donc avec bulletin)', '408',
+  select 9, 'Payés par virement (donc avec bulletin)', '419',
          (select count(*)::text from public.employees e
             join public.companies co on co.id = e.company_id
            where e.date_sortie is null
@@ -135,7 +137,7 @@ controles as (
                       join public.companies co on co.id = e.company_id
                      where e.date_sortie is null
                        and upper(trim(co.name)) in (select upper(societe) from attendu)
-                       and lower(coalesce(e.mode_reglement, '')) like 'vir%') = 408
+                       and lower(coalesce(e.mode_reglement, '')) like 'vir%') = 419
               then 'OK' else 'à vérifier' end
 
   union all
@@ -148,12 +150,14 @@ controles as (
               then 'OK' else 'PROBLÈME' end
 
   union all
-  -- 11. Duo et Meganter devaient rester intacts
-  select 11, 'Duo + Meganter — employés conservés', 'inchangé',
-         (select count(*)::text from public.employees e
-            join public.companies co on co.id = e.company_id
-           where upper(trim(co.name)) in ('DUO MULTI SERVICE', 'MEGANTER SERVICE MAROC')),
-         'pour information'
+  -- 11. Une société en base qui ne figure sur aucun état : à signaler,
+  --     l'import ne l'a pas touchée et personne ne l'a réclamée.
+  select 11, 'Sociétés en base sans état reçu', '0',
+         (select coalesce(string_agg(co.name, ', '), '0') from public.companies co
+           where upper(trim(co.name)) not in (select upper(societe) from attendu)),
+         case when exists (select 1 from public.companies co
+                            where upper(trim(co.name)) not in (select upper(societe) from attendu))
+              then 'à vérifier' else 'OK' end
 
   union all
   -- 12. La table de travail de l'import ne doit pas rester derrière

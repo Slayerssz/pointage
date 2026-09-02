@@ -16,6 +16,8 @@ d = json.load(open(SP + "/listes/roster.json"))
 
 SOCIETES = {
  'BO NETTOYAGE':                    'BO',
+ 'DUO':                             'DUO MULTI SERVICE',
+ 'MEGA':                            'MEGANTER SERVICE MAROC',
  'COOPERATIVE AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
  'COOPERATIVE EDEN VERT SERVICE':   'EDEN VERT SERVICE',
  'GTA':                             'GROUPE TRIPLE A',
@@ -109,8 +111,8 @@ ENTETE = f"""--  {n} employés · {len(d)} sociétés · {ns} sites · états du
 --  RATTACHEMENT AUX SOCIÉTÉS (nom de l'état → nom en base)
 {chr(10).join(f'--    {k:34} → {v}' for k, v in SOCIETES.items())}
 --
---  ⚠ DUO MULTI SERVICE et MEGANTER SERVICE MAROC n'ont pas d'état dans cet
---    envoi : leurs employés ne sont concernés par aucun des trois scripts."""
+--  Les dix sociétés du groupe sont couvertes : après ces scripts, le
+--  registre correspond exactement aux états, sans exception."""
 
 apercu = f"""-- ============================================================================
 --  IMPORT DU REGISTRE — 1 sur 3 : APERÇU (ne modifie aucun employé)
@@ -164,9 +166,7 @@ select e.nom_prenom, e.matricule,
  order by r.societe, e.nom_prenom;
 
 -- ▶ 5. Les employés EN BASE absents de tous les états reçus.
---     Ce sont eux que le script 3 supprimera. Duo et Meganter y figurent
---     forcément — leurs états ne sont pas arrivés — mais le script 3 ne
---     les regarde pas.
+--     Ce sont eux, et eux seuls, que le script 3 supprimera.
 select co.name as societe, e.matricule, e.nom_prenom, e.cin,
        s.name as site, e.actif
   from public.employees e
@@ -330,8 +330,8 @@ select co.name as societe,
 sortie = f"""-- ============================================================================
 --  IMPORT DU REGISTRE — 3 sur 3 : SUPPRIMER CEUX QUI NE FIGURENT PLUS
 --  ============================================================
---  Après ce script, le registre des HUIT sociétés fournies contient
---  exactement les {n} personnes de vos états, et personne d'autre.
+--  Après ce script, le registre contient exactement les {n} personnes de
+--  vos états, et personne d'autre.
 --
 --  ⚠ IRRÉVERSIBLE, et sans exception : une fiche supprimée emporte avec
 --    elle ses pointages, ses contrats, ses congés, ses documents et ses
@@ -347,8 +347,6 @@ sortie = f"""-- ================================================================
 --    3. Pour voir qui va partir AVANT de supprimer, lancez d'abord le
 --       socle seul (jusqu'à « FIN DU SOCLE »), puis la requête « ▶ » ;
 --       lancez le bloc « do » ensuite.
---
---  DUO MULTI SERVICE et MEGANTER SERVICE MAROC ne sont PAS concernés.
 -- ============================================================================
 
 {SOCLE}

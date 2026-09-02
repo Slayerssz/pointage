@@ -6,18 +6,17 @@ import PortailImpression from './PortailImpression'
 import type { Employee } from '../lib/types'
 
 /**
- * LISTE DE MARCHÉ — la liste courte remise au client.
+ * LISTE SIMPLIFIÉE — la version courte, celle qui sort de l'entreprise.
  *
  * Rien d'autre que le numéro, le nom, le C.I.N. et le numéro C.N.S.S. :
- * c'est ce que le donneur d'ordre a le droit de voir. Ni salaire, ni
- * adresse, ni téléphone, contrairement à la liste du personnel qui, elle,
- * reste un document interne.
+ * c'est ce que le client a le droit de voir. Ni salaire, ni adresse, ni
+ * téléphone, contrairement à la liste complète qui, elle, reste interne.
  *
  * La mise en page suit le modèle papier : marché en haut à gauche, titre
  * et établissement centrés et soulignés, bandeau de période, tableau à
  * quatre colonnes, mentions légales en pied.
  */
-export default function ListeMarchePrint({
+export default function ListeSimplifieePrint({
   employees,
   entreprise,
   marche,
@@ -80,11 +79,13 @@ export default function ListeMarchePrint({
             )}
           </header>
 
-          <p className="mt-6 font-semibold" style={{ fontSize: '11pt' }}>
-            MARCHE N°: {marche || '—'}
-          </p>
+          {marche.trim() && (
+            <p className="mt-6 font-semibold" style={{ fontSize: '11pt' }}>
+              MARCHE N°: {marche}
+            </p>
+          )}
 
-          <div className="mt-5 text-center">
+          <div className={`text-center ${marche.trim() ? 'mt-5' : 'mt-8'}`}>
             <h1 className="font-bold underline" style={{ fontSize: '13pt' }}>
               {intitule}
             </h1>
@@ -162,10 +163,11 @@ export default function ListeMarchePrint({
             </table>
           </div>
 
-          {/* Les mentions légales, poussées en bas de page */}
-          <footer className="mt-auto pt-8">
-            {pied ? (
-              <>
+          {/* Les mentions légales, poussées en bas de page. Toutes les
+              sociétés n'en impriment pas : sans elles, la page se termine
+              simplement après le tableau. */}
+          {pied && (
+            <footer className="mt-auto pt-8">
                 <div
                   style={{
                     height: '2.5mm',
@@ -193,17 +195,8 @@ export default function ListeMarchePrint({
                     ].filter(Boolean).join('   ')}
                   </p>
                 </div>
-              </>
-            ) : (
-              <p
-                className="border-t pt-2 text-center italic"
-                style={{ fontSize: '7pt', color: '#666' }}
-              >
-                Mentions légales de {entreprise} non renseignées — envoyez-les pour
-                qu’elles s’impriment ici (siège, IF, RC, patente, CNSS, ICE, RIB).
-              </p>
-            )}
-          </footer>
+            </footer>
+          )}
         </article>
       </div>
     </PortailImpression>

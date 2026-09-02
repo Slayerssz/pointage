@@ -19,7 +19,8 @@ import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
 import ApercuEmploye from '../../components/ApercuEmploye'
-import ListeMarcheDialogue from '../../components/ListeMarcheDialogue'
+import ListeSimplifieeDialogue from '../../components/ListeSimplifieeDialogue'
+import ChoixImpression from '../../components/ChoixImpression'
 import ListePrint from '../../components/ListePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
@@ -72,8 +73,10 @@ export default function EmployesPage() {
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
+  // La sélection chargée, en attente du choix « complète ou simplifiée ».
+  const [aImprimer, setAImprimer] = useState<Employee[] | null>(null)
   // La liste courte remise au client : nom, C.I.N., n° C.N.S.S., rien d'autre.
-  const [listeMarche, setListeMarche] = useState<Employee[] | null>(null)
+  const [listeSimple, setListeSimple] = useState<Employee[] | null>(null)
   const [chargementListe, setChargementListe] = useState(false)
   const { data: entreprises } = useQuery({
     queryKey: ['companies'],
@@ -245,20 +248,12 @@ export default function EmployesPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => imprimerSelection()}
+            onClick={() => imprimerSelection(setAImprimer)}
             disabled={chargementListe || !data?.count}
-            title="Liste de tous les employés correspondant aux filtres, regroupés par site"
+            title="Choix du niveau de détail à l’étape suivante"
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
           >
             {chargementListe ? 'Préparation…' : `Imprimer la liste${data ? ` (${data.count})` : ''}`}
-          </button>
-          <button
-            onClick={() => imprimerSelection(setListeMarche)}
-            disabled={chargementListe || !data?.count}
-            title="Version courte pour le client : nom, C.I.N. et n° C.N.S.S. seulement"
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-          >
-            Liste de marché
           </button>
           <button
             onClick={() => setAdding(true)}
@@ -558,12 +553,22 @@ export default function EmployesPage() {
         />
       )}
 
-      {listeMarche && listeMarche.length > 0 && (
-        <ListeMarcheDialogue
-          employees={listeMarche}
-          entreprise={entrepriseDe(listeMarche[0])}
+      {aImprimer && aImprimer.length > 0 && (
+        <ChoixImpression
+          nombre={aImprimer.length}
           siteNom={siteFilter ? (sites?.find((s) => s.id === siteFilter)?.name ?? null) : null}
-          onClose={() => setListeMarche(null)}
+          onComplete={() => { setListe(aImprimer); setAImprimer(null) }}
+          onSimplifiee={() => { setListeSimple(aImprimer); setAImprimer(null) }}
+          onClose={() => setAImprimer(null)}
+        />
+      )}
+
+      {listeSimple && listeSimple.length > 0 && (
+        <ListeSimplifieeDialogue
+          employees={listeSimple}
+          entreprise={entrepriseDe(listeSimple[0])}
+          siteNom={siteFilter ? (sites?.find((s) => s.id === siteFilter)?.name ?? null) : null}
+          onClose={() => setListeSimple(null)}
         />
       )}
 

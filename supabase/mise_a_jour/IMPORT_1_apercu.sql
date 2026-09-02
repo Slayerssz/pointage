@@ -1,10 +1,12 @@
 -- ============================================================================
 --  IMPORT DU REGISTRE — 1 sur 3 : APERÇU (ne modifie aucun employé)
 --  ============================================================
---  544 employés · 8 sociétés · 92 sites · états du 02/09/2026
+--  557 employés · 10 sociétés · 95 sites · états du 02/09/2026
 --
 --  RATTACHEMENT AUX SOCIÉTÉS (nom de l'état → nom en base)
 --    BO NETTOYAGE                       → BO
+--    DUO                                → DUO MULTI SERVICE
+--    MEGA                               → MEGANTER SERVICE MAROC
 --    COOPERATIVE AL SAFAE EL MAGHRIB    → AL SAFAE EL MAGHREB
 --    COOPERATIVE EDEN VERT SERVICE      → EDEN VERT SERVICE
 --    GTA                                → GROUPE TRIPLE A
@@ -13,8 +15,8 @@
 --    TRIMAX                             → TRIMAX
 --    VIGILMA GARD MAROC                 → VIGILMA GARD MAROC
 --
---  ⚠ DUO MULTI SERVICE et MEGANTER SERVICE MAROC n'ont pas d'état dans cet
---    envoi : leurs employés ne sont concernés par aucun des trois scripts.
+--  Les dix sociétés du groupe sont couvertes : après ces scripts, le
+--  registre correspond exactement aux états, sans exception.
 --
 --  MODE D'EMPLOI
 --    1. Collez tout le fichier dans Supabase → SQL Editor et faites Run.
@@ -330,6 +332,17 @@ values
   ('EDEN VERT SERVICE', 'ENCG', 'JARDINIER', 118, 'EL HANNACH MOHAMED SAID', 'LC110910', null, '1980-04-13', '2026-08-20', 'Virement', 'TANGER', 'HAY BNI OURIAGHEL 1 RUE 79 NR 4'),
   ('EDEN VERT SERVICE', 'ENCG', 'JARDINIER', 119, 'GHILAN MOHAMED', 'LA43001', null, '1976-01-01', '2026-08-20', 'Virement', 'TANGER', 'BENI SAID BAHRAIENN'),
   ('EDEN VERT SERVICE', 'ENCG', 'JARDINIER', 120, 'EL HAOUARI RACHID', 'Z366930', null, '1983-01-01', '2026-08-20', 'Virement', 'ZAER', 'IMM 214 APPT 13 GH 20 ANNOUR 02'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 9, 'BAHBA NAIMA', 'UA71605', '127815820', '1981-03-01', '2026-07-01', 'Virement', 'TANGER', 'AL IRFAN 2 TRC 2 IMB 97 ETG 1 NR'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 17, 'EL FAHSSI MAJDA', 'BK637205', null, '1997-05-04', '2026-07-01', 'Espece', 'TANGER', 'HAY BOUKHALEF'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 16, 'ESALHI MARIA', 'ZT143907', null, '1990-02-20', '2026-07-01', 'Espece', 'TAOUNAT', 'DR BOUKALAA TAFRANT GHAFSAI'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 15, 'AIT OUAKRIM KHADIJA', 'KB48304', '142257230', '1986-04-20', '2026-07-01', 'Virement', 'TANGER', 'HAY BOUKHALF RUE 23'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 14, 'EL MEHIAOUI RACHIDA', 'VA90199', '151531257', '1980-01-01', '2026-07-01', 'Virement', 'TANGER', 'HAY BEROUAKA RUE 17 NO 1'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 13, 'BEN SABER GHIZLANE', 'BH450841', '148550858', '1986-03-11', '2026-07-01', 'Virement', 'TANGER', 'EL IRFANE 2 GH 17 IMB 187 ETG 1 NO'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 12, 'BOUTOUR AMAL', 'ZT11602', '133974051', '1992-01-21', '2026-07-01', 'Virement', 'FNIDEQ', 'HAY CHBAR RUE OUED OURIKA NR'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 11, 'LARBI KABBAJ', 'K324062', '109359250', '1978-09-13', '2026-07-01', 'Virement', 'TANGER', 'AIN HAYANI RUE SANAOUBAR NO'),
+  ('DUO MULTI SERVICE', 'ENSA', 'NETTOYAGE', 10, 'EL MOUKAFIH HORIA', 'R215021', '125132019', '1978-12-10', '2026-07-01', 'Virement', 'TANGER', 'HAY BOUKHALF TANGER'),
+  ('DUO MULTI SERVICE', 'AUTRE SITE', 'NETTOYAGE', 18, 'IBRAHIMI ABDESLAM', null, null, '2026-01-01', null, 'Virement', null, null),
+  ('DUO MULTI SERVICE', 'AUTRE SITE', 'NETTOYAGE', 19, 'BOUCHAIBAT HABIBA', null, null, '2026-01-01', null, 'Virement', null, null),
   ('GROUPE TRIPLE A', 'ARONDIST MGHOGHA', 'SECURITE', 412, 'FOUNOUNOU MOHAMED', 'Z220815', '101231314', '1977-01-01', '2023-10-18', 'Virement', 'TAZA', 'DR AL AAMAL TAINESTE TAZA'),
   ('GROUPE TRIPLE A', 'ARONDIST MGHOGHA', 'SECURITE', 382, 'EL AZAMI EL HASSANI AZIZ', 'C963694', '181330559', '1981-01-01', '2021-07-01', 'Espece', 'TANGER', 'COMP RESD DOUHA OUAFAE 6 ETG'),
   ('GROUPE TRIPLE A', 'ARONDIST MGHOGHA', 'SECURITE', 252, 'BELMADANI ADIL', 'A492149', '116528682', '1971-01-01', '2023-10-18', 'Virement', 'TANGER', 'MGHOGHA EL KEBIRA TANGER'),
@@ -434,6 +447,8 @@ values
   ('GROUPE TRIPLE A', 'SUPERVISEUR', 'ADMINISTRATIF', 1210, 'AMINE HASSANE', 'LA113695', '123727491', '1988-08-02', '2026-01-13', 'Virement', 'LARACHE', 'LOT CHAABAN 1 RES ENNASR NR 25'),
   ('GROUPE TRIPLE A', 'SUPERVISEUR', 'ADMINISTRATIF', 1060, 'OUAFI IMAD', 'M444879', null, '1987-01-19', '2021-10-01', 'Virement', 'TANGER', 'HAY MESNANA SECTEUR AL'),
   ('GROUPE TRIPLE A', 'SUPERVISEUR', 'ADMINISTRATIF', 446, 'EL ABIAD MOHAMED', 'GM41976', '148291950', '1975-04-19', '2019-01-01', 'Virement', 'TANGER', 'HAY MOUJAHIDINE TR 2 N° 252'),
+  ('MEGANTER SERVICE MAROC', 'ADMINISTRATIVE', 'ADMIN', 9, 'SARIE YOUSRA', 'K578299', '166981358', '2024-09-01', null, 'Virement', null, 'TANGER'),
+  ('MEGANTER SERVICE MAROC', 'ADMINISTRATIVE', 'ADMIN', 10, 'HAIDA NADA', 'K557693', '172948116', '1998-04-19', '2024-07-01', 'Virement', 'TANGER', 'RUE SAID BEN JOUBAIR NO 2'),
   ('NORD PLANET', 'CRI-Tanger', 'NETTOYAGE', 103, 'BOU AJAJ SOUKAINA', 'K574061', '142720916', '2000-01-19', '2025-01-01', 'Virement', 'TANGER', 'MESNANA SECTEUR ETTAYEF RUE'),
   ('NORD PLANET', 'CRI-Tanger', 'NETTOYAGE', 102, 'ZAYOU RAHMA', 'LA73095', '170057263', '1983-01-01', '2025-01-01', 'Virement', 'TANGER', 'HAY MGHOUGHA SEGHIRA RUE 68'),
   ('NORD PLANET', 'CRI-Tanger', 'NETTOYAGE', 101, 'ABBAS LAAZIZA', 'LB115407', '108965708', '1984-04-26', '2025-01-01', 'Virement', 'TANGER', 'MGHOUGHA SGHIRA'),
@@ -652,9 +667,7 @@ select e.nom_prenom, e.matricule,
  order by r.societe, e.nom_prenom;
 
 -- ▶ 5. Les employés EN BASE absents de tous les états reçus.
---     Ce sont eux que le script 3 supprimera. Duo et Meganter y figurent
---     forcément — leurs états ne sont pas arrivés — mais le script 3 ne
---     les regarde pas.
+--     Ce sont eux, et eux seuls, que le script 3 supprimera.
 select co.name as societe, e.matricule, e.nom_prenom, e.cin,
        s.name as site, e.actif
   from public.employees e
