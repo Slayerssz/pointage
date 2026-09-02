@@ -69,13 +69,26 @@ const revenu = (await q1(
 const absent = (await q1(
   `insert into public.employees(company_id,site_id,nom_prenom,cin)
    values ($1,$2,'FANTOME INCONNU','ZZ999999') returning id`, [coBO, sBO])).id
-// d) un employé d'une société sans état : il ne doit surtout pas bouger
+// d) un absent qui figure DÉJÀ dans une paie : à sortir, jamais à supprimer
+const absentAvecPaie = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,cin)
+   values ($1,$2,'ANCIEN PAYE','ZZ111111') returning id`, [coBO, sBO])).id
+
+// e) un employé d'une société sans état : il ne doit surtout pas bouger
 const horsLot = (await q1(
   `insert into public.employees(company_id,site_id,nom_prenom,cin)
    values ($1,$2,'DUO PERSONNE','YY888888') returning id`, [coDuo, sDuo])).id
 
+// on lui fabrique une période de paie et une ligne, comme en production
+const per = (await q1(
+  `insert into public.periodes_paie(company_id,annee,mois,statut,jours_base)
+   values ($1,2025,12,'paie_validee',26) returning id`, [coBO])).id
+await db.query(
+  `insert into public.lignes_paie(periode_id,employee_id,nom_prenom,salaire_base,net_a_payer)
+   values ($1,$2,'ANCIEN PAYE',4000,4000)`, [per, absentAvecPaie])
+
 const avant = Number((await q1(`select count(*) as c from public.employees`)).c)
-ok(`base de départ : ${avant} employés, ${SOC.length} sociétés`, avant === 4)
+ok(`base de départ : ${avant} employés, ${SOC.length} sociétés`, avant === 5)
 
 // ── 1. L'aperçu ne doit rien changer
 console.log('\n  ── 1. Aperçu ───────────────────────────────────────────')
@@ -93,7 +106,7 @@ await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_2_appliqu
 const apres = Number((await q1(`select count(*) as c from public.employees`)).c)
 // 544 sur les états ; 3 étaient déjà en base et sont rapprochés (a, b et
 // un troisième non — a et b seulement), + les 2 non rapprochés conservés.
-ok(`544 employés importés (${apres} en base au total)`, apres === 544 + 2, String(apres))
+ok(`544 employés importés (${apres} en base au total)`, apres === 544 + 3, String(apres))
 
 const t = await q1(`select e.*, s.name as site, co.name as societe
                       from public.employees e
@@ -131,8 +144,9 @@ const parCo = await rows(`select co.name, count(*)::int as n from public.employe
 let effOk = true
 for (const [nom, n] of Object.entries(attendu)) {
   const trouve = parCo.find((x) => x.name === nom)?.n ?? 0
-  // BO porte en plus le « fantôme » resté en base
-  const cible = nom === 'BO' ? n + 1 : n
+  // BO porte en plus les deux fiches d'essai restées en base :
+  // le « fantôme » et l'ancien salarié déjà passé en paie
+  const cible = nom === 'BO' ? n + 2 : n
   if (trouve !== cible) { effOk = false; console.log(`      ${nom}: ${trouve} au lieu de ${cible}`) }
 }
 ok('les effectifs par société correspondent aux totaux des PDF', effOk)
@@ -162,16 +176,45 @@ ok('… ni aucun site en double',
    (await rows(`select company_id, upper(trim(name)) n from public.sites
                  group by 1,2 having count(*)>1`)).length === 0)
 
-// ── 4. Les sorties facultatives
-console.log('\n  ── 4. Sorties (facultatif) ─────────────────────────────')
-await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_3_sorties_facultatif.sql'), 'utf8'))
-ok('le fantôme absent des états est sorti',
-   (await q1(`select actif, date_sortie from public.employees where id=$1`, [absent])).actif === false)
-ok('l’employé de DUO n’est PAS sorti (société sans état)',
-   (await q1(`select actif from public.employees where id=$1`, [horsLot])).actif === true)
-ok('les 544 de l’état restent en poste',
+// ── 4. La suppression des absents
+console.log('\n  ── 4. Suppression des absents ──────────────────────────')
+await db.exec(fs.readFileSync(path.join(RACINE, 'mise_a_jour', 'IMPORT_3_supprimer_absents.sql'), 'utf8'))
+
+ok('l’absent sans historique est bel et bien supprimé',
+   (await rows(`select 1 from public.employees where id=$1`, [absent])).length === 0)
+
+const ap = await q1(`select actif, date_sortie, nom_prenom from public.employees where id=$1`,
+                    [absentAvecPaie])
+ok('l’absent qui figure dans une paie n’est PAS supprimé', !!ap, 'introuvable')
+ok('… il est marqué sorti', ap && ap.actif === false && ap.date_sortie !== null,
+   ap ? `actif=${ap.actif}` : '—')
+ok('… son bulletin de paie est intact',
+   Number((await q1(`select count(*) as c from public.lignes_paie where employee_id=$1`,
+                    [absentAvecPaie])).c) === 1)
+
+ok('l’employé de DUO (société sans état) n’est ni supprimé ni sorti',
+   (await q1(`select actif from public.employees where id=$1`, [horsLot]))?.actif === true)
+
+ok('les 544 de l’état sont toujours en poste',
    Number((await q1(`select count(*) as c from public.employees where actif`)).c) === 544 + 1,
    String((await q1(`select count(*) as c from public.employees where actif`)).c))
+
+// Le registre des huit sociétés fournies = exactement les états reçus
+const effectifs = await rows(
+  `select co.name, count(*) filter (where e.actif)::int as n
+     from public.employees e join public.companies co on co.id=e.company_id
+    where co.name in ('BO','AL SAFAE EL MAGHREB','EDEN VERT SERVICE','GROUPE TRIPLE A',
+                      'NORD PLANET','SERCLEAN NEGOCE','TRIMAX','VIGILMA GARD MAROC')
+    group by co.name`)
+let exact = true
+for (const [nom, n] of Object.entries(attendu)) {
+  const trouve = effectifs.find((x) => x.name === nom)?.n ?? 0
+  if (trouve !== n) { exact = false; console.log(`      ${nom}: ${trouve} en poste au lieu de ${n}`) }
+}
+ok('après suppression, chaque société a EXACTEMENT l’effectif de son état', exact)
+
+ok('les pointages de l’employé supprimé sont partis avec lui',
+   Number((await q1(`select count(*) as c from public.pointages where employee_id=$1`, [absent])).c) === 0)
 
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)

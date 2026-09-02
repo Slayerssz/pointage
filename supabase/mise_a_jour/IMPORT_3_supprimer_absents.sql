@@ -1,13 +1,26 @@
 -- ============================================================================
---  IMPORT DU REGISTRE — 3 sur 3 : SORTIR CEUX QUI NE FIGURENT PLUS
+--  IMPORT DU REGISTRE — 3 sur 3 : SUPPRIMER CEUX QUI NE FIGURENT PLUS
 --  ============================================================
---  ⚠ FACULTATIF. À ne lancer QU'APRÈS avoir lu la liste 5 de l'aperçu, et
---    JAMAIS avant d'avoir reçu les états de DUO MULTI SERVICE et MEGANTER
---    SERVICE MAROC. Ce script ne touche qu'aux huit sociétés fournies ; les
---    deux autres sont épargnées, mais relisez quand même la liste.
+--  Après ce script, le registre des HUIT sociétés fournies contient
+--  exactement les 544 personnes de vos états, et personne d'autre.
 --
---  Un employé « sorti » n'est pas supprimé : il reste au registre avec sa
---  date de sortie, ses pointages et son historique de paie.
+--  ⚠ IRRÉVERSIBLE. Lancez d'abord l'aperçu (IMPORT_1) puis l'application
+--    (IMPORT_2). Ce script vient en dernier.
+--
+--  DEUX SORTS POSSIBLES, selon ce que la personne a laissé derrière elle
+--
+--    · SUPPRIMÉE — aucun bulletin de paie, aucun pointage dans un mois
+--      clôturé. La fiche part, avec ses pointages, contrats et congés.
+--
+--    · MARQUÉE « SORTIE » — elle figure dans une paie déjà éditée, ou a
+--      pointé dans un mois clôturé. La supprimer effacerait un historique
+--      de paie et fausserait des mois déjà validés ; c'est aussi celui que
+--      la C.N.S.S. peut vous réclamer. Elle disparaît donc des listes
+--      actives sans que le passé soit détruit. C'est exactement la règle
+--      qu'applique déjà le bouton « Supprimer » de l'application.
+--
+--  DUO MULTI SERVICE et MEGANTER SERVICE MAROC ne sont PAS concernés :
+--  leurs états ne sont pas arrivés, leurs employés restent intacts.
 -- ============================================================================
 
 begin;
@@ -599,22 +612,72 @@ left join public.companies c on upper(trim(c.name)) = upper(trim(r.societe));
 -- ─────────────────────────────── FIN DU SOCLE ───────────────────────────────
 
 
--- Qui va sortir, exactement — lisez avant de valider
-select co.name as societe, e.matricule, e.nom_prenom, e.cin, s.name as site
+-- Les personnes en base qui ne figurent sur aucun état, et ce qu'elles
+-- ont laissé derrière elles.
+create temporary view absents as
+select e.id, e.matricule, e.nom_prenom, e.cin,
+       co.name as societe, s.name as site,
+       (select count(*) from public.lignes_paie lp
+         where lp.employee_id = e.id) as bulletins_de_paie,
+       (select count(*) from public.pointages p
+          join public.periodes_paie pp
+            on pp.company_id = p.company_id
+           and pp.annee = date_part('year', p.pointed_on)::int
+           and pp.mois  = date_part('month', p.pointed_on)::int
+         where p.employee_id = e.id and pp.statut <> 'ouvert')
+         as pointages_dans_un_mois_cloture
   from public.employees e
   join public.companies co on co.id = e.company_id
   left join public.sites s on s.id = e.site_id
- where e.date_sortie is null
-   and co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
-   and not exists (select 1 from rapprochement r where r.employee_id = e.id)
- order by co.name, e.nom_prenom;
-
-update public.employees e
-   set date_sortie = current_date
-  from public.companies co
- where co.id = e.company_id
-   and e.date_sortie is null
-   and co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
+ where co.name in ('AL SAFAE EL MAGHREB', 'BO', 'EDEN VERT SERVICE', 'GROUPE TRIPLE A', 'NORD PLANET', 'SERCLEAN NEGOCE', 'TRIMAX', 'VIGILMA GARD MAROC')
    and not exists (select 1 from rapprochement r where r.employee_id = e.id);
 
+-- ▶ À LIRE AVANT DE VALIDER : qui part, qui reste avec son historique
+select societe, matricule, nom_prenom, cin, site,
+       bulletins_de_paie, pointages_dans_un_mois_cloture,
+       case when bulletins_de_paie = 0
+             and pointages_dans_un_mois_cloture = 0
+            then 'SUPPRIMÉE'
+            else 'marquée sortie (historique de paie conservé)'
+       end as sort
+  from absents
+ order by sort, societe, nom_prenom;
+
+-- 1. Celles qui n'ont rien laissé : suppression. Pointages, contrats,
+--    congés et documents partent en cascade avec la fiche.
+delete from public.employees e
+ where e.id in (select id from absents
+                 where bulletins_de_paie = 0
+                   and pointages_dans_un_mois_cloture = 0);
+
+-- 2. Celles qui figurent dans une paie : on les sort, sans rien effacer.
+update public.employees e
+   set date_sortie = coalesce(e.date_sortie, current_date)
+ where e.id in (select id from absents
+                 where bulletins_de_paie > 0
+                    or pointages_dans_un_mois_cloture > 0);
+
+-- 3. Le bilan. Pour les huit sociétés fournies, « en_poste » doit
+--    retomber exactement sur l'effectif de vos états.
+select co.name as societe,
+       count(*) filter (where e.date_sortie is null) as en_poste,
+       count(*) filter (where e.date_sortie is not null) as sortis,
+       count(*) as total
+  from public.employees e
+  join public.companies co on co.id = e.company_id
+ group by co.name order by co.name;
+
 commit;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+--  FACULTATIF — les sites devenus vides
+--  Après les suppressions, un site peut n'avoir plus personne. Le script
+--  ne les touche pas : un site vide aujourd'hui peut resservir demain.
+--  Pour les voir :
+-- ═══════════════════════════════════════════════════════════════════════════
+-- select co.name as societe, s.name as site_vide
+--   from public.sites s
+--   join public.companies co on co.id = s.company_id
+--  where not exists (select 1 from public.employees e where e.site_id = s.id)
+--  order by co.name, s.name;
