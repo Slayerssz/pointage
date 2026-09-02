@@ -19,6 +19,7 @@ import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import BulletinPaiePrint from '../../components/BulletinPaiePrint'
+import RecapPaiePrint from '../../components/RecapPaiePrint'
 import { useBulletins } from '../../lib/bulletin'
 
 export default function PaiePage() {
@@ -577,6 +578,11 @@ function BulletinsModale({
   periodeId, employeeId, entreprise, onClose,
 }: { periodeId: string; employeeId: string | null; entreprise: string; onClose: () => void }) {
   const { data, isLoading, error } = useBulletins(periodeId, employeeId)
+  // Un seul employé : on va droit à son bulletin. Toute la période : on
+  // demande d'abord si c'est un bulletin par personne ou l'état d'ensemble.
+  const [forme, setForme] = useState<'individuel' | 'recap' | null>(
+    employeeId ? 'individuel' : null,
+  )
 
   if (isLoading) {
     return (
@@ -620,7 +626,68 @@ function BulletinsModale({
       </div>
     )
   }
-  return <BulletinPaiePrint bulletins={data} entreprise={entreprise} onClose={onClose} />
+  if (forme === null) {
+    return (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+        <div
+          className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2 className="text-lg font-semibold text-slate-900">Bulletins de paie</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {data.length} employé(s) payé(s) par virement. Sous quelle forme ?
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <FormeBulletin
+              titre="Un bulletin par employé"
+              pour="À remettre à chacun"
+              detail={`${data.length} page${data.length > 1 ? 's' : ''} A4, une par personne, avec le détail de ses cotisations et son net.`}
+              onClick={() => setForme('individuel')}
+            />
+            <FormeBulletin
+              titre="Un état pour tout le monde"
+              pour="Pour la banque et le comptable"
+              detail="Une ligne par employé, regroupée par site, avec sous-totaux et total général. A4 paysage."
+              onClick={() => setForme('recap')}
+            />
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return forme === 'recap' ? (
+    <RecapPaiePrint bulletins={data} entreprise={entreprise} onClose={onClose} />
+  ) : (
+    <BulletinPaiePrint bulletins={data} entreprise={entreprise} onClose={onClose} />
+  )
+}
+
+function FormeBulletin({
+  titre, pour, detail, onClick,
+}: { titre: string; pour: string; detail: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col rounded-xl border border-slate-300 p-4 text-left transition hover:border-slate-900 hover:bg-slate-50"
+    >
+      <span className="block text-sm font-semibold text-slate-900">{titre}</span>
+      <span className="mt-0.5 block text-xs font-medium tracking-wide text-slate-500 uppercase">
+        {pour}
+      </span>
+      <span className="mt-2 block text-sm text-slate-600">{detail}</span>
+    </button>
+  )
 }
 
 function Total({ label, value, fort }: { label: string; value: string; fort?: boolean }) {
