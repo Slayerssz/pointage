@@ -26,6 +26,7 @@ export default function ApercuEmploye({
   contratCourant,
   onModifier,
   onFiche,
+  onContrat,
   onClose,
 }: {
   employee: Employee
@@ -36,6 +37,7 @@ export default function ApercuEmploye({
   contratCourant?: ContratCourant | null
   onModifier?: () => void
   onFiche?: () => void
+  onContrat?: () => void
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
@@ -245,6 +247,14 @@ export default function ApercuEmploye({
           >
             Fermer
           </button>
+          {onContrat && (
+            <button
+              onClick={onContrat}
+              className="rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Rédiger un contrat
+            </button>
+          )}
           {onFiche && (
             <button
               onClick={onFiche}

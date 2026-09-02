@@ -1,0 +1,216 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatDateFr } from '../lib/dates'
+import { modeleContrat, type ChampContrat } from '../lib/contratsModeles'
+import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
+import BarreImpression from './BarreImpression'
+import PortailImpression from './PortailImpression'
+import ContratDocument from './ContratDocument'
+import type { Employee } from '../lib/types'
+
+/**
+ * RÉDIGER UN CONTRAT.
+ *
+ * À gauche les champs, à droite la page telle qu'elle sortira de
+ * l'imprimante — elle se met à jour à chaque frappe, de sorte qu'on voit
+ * ce qu'on signe avant de l'imprimer. Ce qui est déjà au dossier de
+ * l'employé est prérempli ; le reste se saisit une fois.
+ */
+export default function ContratRedaction({
+  employee,
+  entreprise,
+  onClose,
+}: {
+  employee: Employee
+  entreprise: string
+  onClose: () => void
+}) {
+  useFermerSurEchap(onClose)
+  const modele = modeleContrat(entreprise)
+  const [valeurs, setValeurs] = useState<Record<string, string>>({})
+  const [imprime, setImprime] = useState(false)
+
+  // Ce que le dossier sait déjà : inutile de le retaper.
+  useEffect(() => {
+    if (!modele) return
+    const depuis: Record<NonNullable<ChampContrat['depuis']>, string> = {
+      nom_prenom: employee.nom_prenom ?? '',
+      cin: employee.cin ?? '',
+      date_naissance: employee.date_naissance ? formatDateFr(employee.date_naissance) : '',
+      adresse: [employee.adresse, employee.ville].filter(Boolean).join(', '),
+      salaire: employee.salaire != null ? String(employee.salaire) : '',
+      ville: employee.ville ?? '',
+    }
+    const initial: Record<string, string> = {}
+    for (const c of modele.champs) if (c.depuis) initial[c.id] = depuis[c.depuis]
+    setValeurs(initial)
+  }, [modele, employee])
+
+  if (!modele) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+        <div className="max-w-md rounded-2xl bg-white p-5 text-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <p className="font-semibold text-slate-900">Aucun modèle de contrat</p>
+          <p className="mt-1 text-slate-600">
+            {entreprise} n’a pas encore de modèle enregistré. Envoyez son contrat type
+            et il sera ajouté.
+          </p>
+          <button onClick={onClose} className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
+            Fermer
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (imprime) {
+    return <ContratImpression modele={modele} valeurs={valeurs} employee={employee} onClose={() => setImprime(false)} />
+  }
+
+  const set = (id: string) => (v: string) => setValeurs((x) => ({ ...x, [id]: v }))
+  const remplis = modele.champs.filter((c) => (valeurs[c.id] ?? '').trim()).length
+  const manquants = modele.champs.length - remplis
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 bg-white px-4 py-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">
+            Contrat de travail — {employee.nom_prenom}
+          </h2>
+          <p className="text-xs text-slate-500">
+            {entreprise} · {remplis} champ(s) sur {modele.champs.length}
+            {manquants > 0 && ` · ${manquants} encore en pointillés`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Fermer
+          </button>
+          <button
+            onClick={() => setImprime(true)}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            Imprimer / PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* Les champs */}
+        <div className="w-full shrink-0 overflow-y-auto border-b border-slate-300 bg-white p-4 lg:w-80 lg:border-r lg:border-b-0">
+          <p className="mb-3 text-xs text-slate-500">
+            Un champ laissé vide s’imprime en pointillés, comme sur le formulaire papier.
+          </p>
+          <div className="space-y-3">
+            {modele.champs.map((c) => (
+              <label key={c.id} className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">{c.label}</span>
+                {c.type === 'long' ? (
+                  <textarea
+                    rows={2}
+                    value={valeurs[c.id] ?? ''}
+                    onChange={(e) => set(c.id)(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                ) : (
+                  <input
+                    type={c.type === 'nombre' ? 'number' : 'text'}
+                    value={valeurs[c.id] ?? ''}
+                    onChange={(e) => set(c.id)(e.target.value)}
+                    placeholder={c.type === 'date' ? 'jj/mm/aaaa' : undefined}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                )}
+                {c.aide && <span className="mt-1 block text-xs text-slate-400">{c.aide}</span>}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* La page, à jour à chaque frappe */}
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-200 p-4">
+          <Apercu>
+            <ContratDocument modele={modele} valeurs={valeurs} />
+          </Apercu>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Met la page A4 à l'échelle de la place disponible, sans la déformer. */
+function Apercu({ children }: { children: React.ReactNode }) {
+  const boite = useRef<HTMLDivElement>(null)
+  const [echelle, setEchelle] = useState(1)
+  const LARGEUR_MM = 210
+  const PX_PAR_MM = 96 / 25.4
+
+  useEffect(() => {
+    const el = boite.current
+    if (!el) return
+    const mesurer = () => {
+      const dispo = el.clientWidth
+      setEchelle(Math.min(1, dispo / (LARGEUR_MM * PX_PAR_MM)))
+    }
+    mesurer()
+    const ro = new ResizeObserver(mesurer)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [PX_PAR_MM])
+
+  const largeur = LARGEUR_MM * PX_PAR_MM
+  return (
+    <div ref={boite} className="mx-auto max-w-[900px]">
+      <div style={{ width: largeur * echelle, margin: '0 auto' }}>
+        <div
+          className="shadow-xl"
+          style={{
+            width: largeur,
+            transform: `scale(${echelle})`,
+            transformOrigin: 'top left',
+            marginBottom: echelle < 1 ? `-${(1 - echelle) * 100}%` : undefined,
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** La vue d'impression : la page seule, portée dans le corps du document. */
+function ContratImpression({
+  modele, valeurs, employee, onClose,
+}: {
+  modele: NonNullable<ReturnType<typeof modeleContrat>>
+  valeurs: Record<string, string>
+  employee: Employee
+  onClose: () => void
+}) {
+  useModeImpression()
+  const { pret, imprimer } = useImpression(0)
+  const nom = useMemo(
+    () => `Contrat_${employee.nom_prenom.replace(/\s+/g, '_')}`,
+    [employee.nom_prenom],
+  )
+
+  return (
+    <PortailImpression>
+      <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
+        <BarreImpression
+          titre={`Contrat — ${employee.nom_prenom}`}
+          pret={pret}
+          imprimer={imprimer}
+          nomFichier={nom}
+          onClose={onClose}
+        />
+        <div className="document-imprimable mx-auto my-6 shadow-xl print:my-0 print:shadow-none">
+          <ContratDocument modele={modele} valeurs={valeurs} />
+        </div>
+      </div>
+    </PortailImpression>
+  )
+}

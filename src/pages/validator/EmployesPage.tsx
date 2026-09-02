@@ -24,7 +24,7 @@ import ChoixImpression from '../../components/ChoixImpression'
 import ListePrint from '../../components/ListePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
-import ContratPrint from '../../components/ContratPrint'
+import ContratRedaction from '../../components/ContratRedaction'
 
 const PAGE_SIZE = 50
 
@@ -72,6 +72,8 @@ export default function EmployesPage() {
   const [fiche, setFiche] = useState<Employee | null>(null)
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
+  // Rédiger un contrat pour cette personne, sur le modèle de sa société.
+  const [contratPour, setContratPour] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
   // La sélection chargée, en attente du choix « complète ou simplifiée ».
   const [aImprimer, setAImprimer] = useState<Employee[] | null>(null)
@@ -539,6 +541,7 @@ export default function EmployesPage() {
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
           })()}
           onFiche={() => { setFiche(apercu); setApercu(null) }}
+          onContrat={() => { setContratPour(apercu); setApercu(null) }}
           onModifier={() => { setEditing(apercu); setApercu(null) }}
           onClose={() => setApercu(null)}
         />
@@ -585,11 +588,18 @@ export default function EmployesPage() {
       )}
 
       {impression && (
-        <ContratPrint
-          contrat={impression.contrat}
+        <ContratRedaction
           employee={impression.employee}
-          entreprise={company?.name ?? ''}
+          entreprise={entrepriseDe(impression.employee)}
           onClose={() => setImpression(null)}
+        />
+      )}
+
+      {contratPour && (
+        <ContratRedaction
+          employee={contratPour}
+          entreprise={entrepriseDe(contratPour)}
+          onClose={() => setContratPour(null)}
         />
       )}
     </div>
