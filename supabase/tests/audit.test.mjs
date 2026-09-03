@@ -604,6 +604,22 @@ await refuse('deux employés ne peuvent pas partager un matricule',
 ok('toutes les tables ont la sécurité au niveau ligne',
    sansRlsInstall.length === 0, sansRlsInstall.join(', '))
 
+section('Le contrôle des blocs dit-il vrai ?')
+
+// Sur cette base, tous les blocs viennent d'être passés : le contrôle
+// doit tous les voir. S'il en rate un, il enverrait relancer un bloc
+// déjà appliqué — ou pire, en déclarerait un passé qui ne l'est pas.
+const controle = fs.readFileSync(path.join(BLOCS, 'VERIFIER_blocs.sql'), 'utf8')
+const requete = controle.slice(controle.indexOf('with attendu'),
+                               controle.indexOf(';', controle.indexOf('order by numero')))
+const etats = await rows(requete)
+const manquants = etats.filter((e) => e.etat !== 'PASSÉ')
+ok(`le contrôle voit les ${etats.length} blocs comme passés`,
+   manquants.length === 0,
+   manquants.map((m) => `${m.numero} ${m.bloc}`).join(' · '))
+ok('… et il en contrôle bien autant qu’il en existe',
+   etats.length === ORDRE.length, `${etats.length} contrôlés / ${ORDRE.length} fichiers`)
+
 console.log('\n' + '═'.repeat(68))
 console.log(F === 0
   ? `  ✅  ${P} vérifications, toutes réussies`

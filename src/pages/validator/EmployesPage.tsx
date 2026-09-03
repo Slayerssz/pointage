@@ -12,7 +12,7 @@ import {
 import { useEmployeFiltres, useSites, useSitesPrincipaux, useTousLesSites } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
-import { useContratsCourants, formatDH } from '../../lib/paie'
+import { MOIS_FR, useContratsCourants, formatDH } from '../../lib/paie'
 import { contratAffichage } from '../../lib/contrats'
 import type { Contrat, Employee, SituationFamiliale } from '../../lib/types'
 import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
@@ -82,10 +82,19 @@ export default function EmployesPage() {
   })
   // La colonne « Jours » montre un mois, pas un cumul depuis toujours.
   const maintenant = new Date()
+  const [filtresOuverts, setFiltresOuverts] = useState(false)
   const [moisJours, setMoisJours] = useState(
     `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`,
   )
   const [anneeJ, moisJ] = moisJours.split('-').map(Number)
+  const moisAujourdhui =
+    `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`
+
+  /** Reculer ou avancer d'un mois, en passant l'année quand il le faut. */
+  const decalerMois = (pas: number) => {
+    const d = new Date(anneeJ, moisJ - 1 + pas, 1)
+    setMoisJours(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
   const { data: joursDuMois } = useQuery({
     queryKey: ['jours-du-mois', companyId, anneeJ, moisJ],
     enabled: Boolean(companyId),
@@ -248,6 +257,16 @@ export default function EmployesPage() {
     setPage(1)
   }
 
+  const nbFiltres = [principalFilter, siteFilter, villeFilter, modeFilter,
+                     qualifFilter, contratFilter].filter(Boolean).length
+                    + (statutFilter === 'actif' ? 0 : 1)
+                    + (toutesEntreprises ? 1 : 0)
+  const effacerFiltres = () => {
+    setPrincipalFilter(''); setSiteFilter(''); setVilleFilter(''); setModeFilter('')
+    setQualifFilter(''); setStatutFilter('actif'); setContratFilter('')
+    setToutesEntreprises(false); setPage(1)
+  }
+
   const filterSelect = (
     value: string,
     onChange: (v: string) => void,
@@ -297,49 +316,111 @@ export default function EmployesPage() {
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher (nom, matricule, CIN)…"
-          className="w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-        />
-        {!toutesEntreprises && (principaux ?? []).length > 0 &&
-          filterSelect(principalFilter, resetPage(setPrincipalFilter), 'Tous les sites principaux',
-            (principaux ?? []).map((p) => ({ value: p.id, label: p.name })))}
-        {!toutesEntreprises && filterSelect(siteFilter, resetPage(setSiteFilter), 'Toutes les annexes',
-          (sites ?? [])
-            .filter((s) => !principalFilter || s.site_principal_id === principalFilter)
-            .map((s) => ({ value: s.id, label: s.name })))}
-        {filterSelect(villeFilter, resetPage(setVilleFilter), 'Toutes les villes',
-          (filtres?.villes ?? []).map((v) => ({ value: v, label: v })))}
-        {filterSelect(modeFilter, resetPage(setModeFilter), 'Tous les règlements',
-          (filtres?.modes_reglement ?? []).map((v) => ({ value: v, label: v })))}
-        {filterSelect(qualifFilter, resetPage(setQualifFilter), 'Toutes les qualifications',
-          (filtres?.qualifications ?? []).map((v) => ({ value: v, label: v })))}
-        {filterSelect(statutFilter, resetPage(setStatutFilter), 'Tous les statuts', [
-          { value: 'actif', label: 'En poste' },
-          { value: 'sorti', label: 'Sortis' },
-        ])}
-        {estAdmin && (
-          <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={toutesEntreprises}
-              onChange={(e) => { setToutesEntreprises(e.target.checked); setPage(1) }}
-              className="h-4 w-4 rounded border-slate-300"
-            />
-            Toutes les entreprises
-          </label>
-        )}
-        {filterSelect(contratFilter, resetPage(setContratFilter), 'Tous les contrats', [
-          { value: 'bientot', label: 'Contrat bientôt terminé (≤ 10 j)' },
-          { value: 'termine', label: 'Contrat terminé' },
-          { value: 'actif', label: 'Contrat en cours' },
-          { value: 'sans', label: 'Sans contrat' },
-        ])}
+      {/* Le mois commande la colonne « Jours » : il reste sous les yeux,
+          jamais rangé derrière un bouton. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-xl border border-slate-300 bg-white p-1">
+          <button
+            onClick={() => decalerMois(-1)}
+            aria-label="Mois précédent"
+            className="rounded-lg px-2.5 py-1.5 text-slate-600 hover:bg-slate-100"
+          >
+            ‹
+          </button>
+          <span className="min-w-44 text-center text-sm font-semibold text-slate-900">
+            {MOIS_FR[moisJ - 1]} {anneeJ}
+          </span>
+          <button
+            onClick={() => decalerMois(1)}
+            aria-label="Mois suivant"
+            className="rounded-lg px-2.5 py-1.5 text-slate-600 hover:bg-slate-100"
+          >
+            ›
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {moisJours !== moisAujourdhui && (
+            <button
+              onClick={() => setMoisJours(moisAujourdhui)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Ce mois-ci
+            </button>
+          )}
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher (nom, matricule, CIN)…"
+            className="w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+          />
+          <button
+            onClick={() => setFiltresOuverts((x) => !x)}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${
+              nbFiltres > 0
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Filtres
+            {nbFiltres > 0 && (
+              <span className="rounded-full bg-emerald-600 px-1.5 text-xs font-semibold text-white">
+                {nbFiltres}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
+
+      {filtresOuverts && (
+        <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-wrap gap-2">
+            {!toutesEntreprises && (principaux ?? []).length > 0 &&
+              filterSelect(principalFilter, resetPage(setPrincipalFilter), 'Tous les sites principaux',
+                (principaux ?? []).map((p) => ({ value: p.id, label: p.name })))}
+            {!toutesEntreprises && filterSelect(siteFilter, resetPage(setSiteFilter), 'Toutes les annexes',
+              (sites ?? [])
+                .filter((s) => !principalFilter || s.site_principal_id === principalFilter)
+                .map((s) => ({ value: s.id, label: s.name })))}
+            {filterSelect(villeFilter, resetPage(setVilleFilter), 'Toutes les villes',
+              (filtres?.villes ?? []).map((v) => ({ value: v, label: v })))}
+            {filterSelect(modeFilter, resetPage(setModeFilter), 'Tous les règlements',
+              (filtres?.modes_reglement ?? []).map((v) => ({ value: v, label: v })))}
+            {filterSelect(qualifFilter, resetPage(setQualifFilter), 'Toutes les qualifications',
+              (filtres?.qualifications ?? []).map((v) => ({ value: v, label: v })))}
+            {filterSelect(statutFilter, resetPage(setStatutFilter), 'Tous les statuts', [
+              { value: 'actif', label: 'En poste' },
+              { value: 'sorti', label: 'Sortis' },
+            ])}
+            {filterSelect(contratFilter, resetPage(setContratFilter), 'Tous les contrats', [
+              { value: 'bientot', label: 'Contrat bientôt terminé (≤ 10 j)' },
+              { value: 'termine', label: 'Contrat terminé' },
+              { value: 'actif', label: 'Contrat en cours' },
+              { value: 'sans', label: 'Sans contrat' },
+            ])}
+            {estAdmin && (
+              <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={toutesEntreprises}
+                  onChange={(e) => { setToutesEntreprises(e.target.checked); setPage(1) }}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Toutes les entreprises
+              </label>
+            )}
+          </div>
+          {nbFiltres > 0 && (
+            <button
+              onClick={effacerFiltres}
+              className="mt-2 text-xs font-medium text-slate-500 underline hover:text-slate-800"
+            >
+              Tout effacer
+            </button>
+          )}
+        </div>
+      )}
 
       {isLoading && <Spinner label="Chargement des employés…" />}
       {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
@@ -366,17 +447,9 @@ export default function EmployesPage() {
                 <th className="px-4 py-3.5 font-medium">Contrat</th>
                 <th className="px-4 py-3.5 font-medium">Règlement</th>
                 <th className="px-4 py-3.5 text-right font-medium">Salaire</th>
-                <th className="px-4 py-3.5 text-right font-medium">
-                  <label className="flex flex-col items-end gap-1">
-                    <span>Jours</span>
-                    <input
-                      type="month"
-                      value={moisJours}
-                      onChange={(e) => setMoisJours(e.target.value)}
-                      title="Jours travaillés sur ce mois"
-                      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-normal normal-case"
-                    />
-                  </label>
+                <th className="px-4 py-3.5 text-right font-medium"
+                    title={`Jours travaillés en ${MOIS_FR[moisJ - 1]} ${anneeJ}`}>
+                  Jours
                 </th>
                 <th className="fige-droite px-4 py-3.5" />
               </tr>
