@@ -75,6 +75,53 @@ export function useValiderSortie(companyId: string | undefined) {
   })
 }
 
+/** Ce que la clôture du mois retirerait de la liste des employés. */
+export interface ADossier {
+  employee_id: string
+  matricule: number | null
+  nom_prenom: string
+  date_sortie: string
+  montant: number
+  motif: string | null
+}
+
+export function useApercuArchivage(
+  companyId: string | undefined, annee: number, mois: number,
+) {
+  return useQuery({
+    queryKey: ['apercu-archivage', companyId, annee, mois],
+    enabled: Boolean(companyId),
+    queryFn: async (): Promise<ADossier[]> => {
+      const { data, error } = await supabase.rpc('apercu_archivage', {
+        p_company: companyId, p_annee: annee, p_mois: mois,
+      })
+      if (error) throw error
+      return (data ?? []) as ADossier[]
+    },
+  })
+}
+
+/**
+ * La clôture du mois : les départs validés de ce mois quittent la liste
+ * des employés. Réservé à l'administrateur — c'est lui qui arrête le mois.
+ */
+export function useArchiverSorties(companyId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { annee: number; mois: number }) => {
+      const { data, error } = await supabase.rpc('archiver_sorties', {
+        p_company: companyId, p_annee: v.annee, p_mois: v.mois,
+      })
+      if (error) throw error
+      return data as number
+    },
+    onSuccess: () => {
+      rafraichir(qc, companyId)
+      qc.invalidateQueries({ queryKey: ['apercu-archivage'] })
+    },
+  })
+}
+
 export function useAnnulerSortie(companyId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({

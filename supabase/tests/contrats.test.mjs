@@ -152,6 +152,19 @@ ok('on choisit l’employé, et sa fiche remplit le reçu',
    sortiesPage.includes('— Choisir un employé —') && sortiesPage.includes('valeursEmploye'))
 ok('le reçu se compose pendant la saisie', sortiesPage.includes('<PanneauDocument'))
 ok('la validation demande une confirmation', sortiesPage.includes('Confirmer : il quitte les listes'))
+ok('le départ se fait en deux temps : valider, puis clôturer le mois',
+   sortiesPage.includes('function ClotureDuMois'))
+ok('seul l’administrateur voit la clôture',
+   sortiesPage.includes("profile?.role === 'admin' && <ClotureDuMois"))
+ok('une fiche archivée quitte la liste des employés',
+   fs.readFileSync(new URL('../../src/pages/validator/EmployesPage.tsx', import.meta.url), 'utf8')
+     .includes(".is('archive_le', null)"))
+ok('les sorties sont réservées au bureau et à l’administrateur',
+   fs.readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8')
+     .includes("<RequireRole roles={['validator', 'admin']}>"))
+ok('l’icône des sorties a la taille des autres',
+   fs.readFileSync(new URL('../../src/components/Layout.tsx', import.meta.url), 'utf8')
+     .match(/sorties: \(\s*<svg[^>]*className="h-5 w-5"/))
 ok('… et dit ce qu’elle emporte et ce qu’elle garde',
    sortiesPage.includes('restent consultables'))
 

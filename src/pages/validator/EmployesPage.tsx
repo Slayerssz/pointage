@@ -136,6 +136,7 @@ export default function EmployesPage() {
           'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
           { count: 'exact' },
         )
+        .is('archive_le', null)
         .order('matricule', { ascending: true, nullsFirst: false })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
       // Vue « toutes les entreprises » : réservée à l'administrateur
@@ -190,6 +191,7 @@ export default function EmployesPage() {
         .select(
           'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
         )
+        .is('archive_le', null)
         .order('matricule', { ascending: true, nullsFirst: false })
         .limit(500)
       if (!(estAdmin && toutesEntreprises)) q = q.eq('company_id', companyId!)

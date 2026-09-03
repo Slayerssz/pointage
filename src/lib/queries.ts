@@ -77,6 +77,7 @@ export function useSiteEmployees(siteId: string, enabled: boolean) {
         .select('id, nom_prenom, matricule, qualification, jour_de_repos')
         .eq('site_id', siteId)
         .eq('actif', true)
+        .is('archive_le', null)
         .order('matricule', { ascending: true, nullsFirst: false })
         .range(from, from + SITE_EMPLOYEES_PAGE - 1)
       if (error) throw error

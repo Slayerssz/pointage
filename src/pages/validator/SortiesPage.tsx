@@ -7,8 +7,11 @@ import { formatDH } from '../../lib/paie'
 import { modeleSolde } from '../../lib/soldeToutCompte'
 import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
 import {
-  useAnnulerSortie, useEnregistrerSortie, useSorties, useValiderSortie, type Sortie,
+  useAnnulerSortie, useApercuArchivage, useArchiverSorties, useEnregistrerSortie,
+  useSorties, useValiderSortie, type Sortie,
 } from '../../lib/sorties'
+import { useAuth } from '../../contexts/AuthContext'
+import { MOIS_FR } from '../../lib/paie'
 import PanneauDocument from '../../components/PanneauDocument'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
@@ -26,6 +29,7 @@ import type { Employee } from '../../lib/types'
  */
 export default function SortiesPage() {
   const { companyId } = useParams()
+  const { profile } = useAuth()
   const { data: company } = useQuery({
     queryKey: ['company', companyId],
     enabled: Boolean(companyId),
@@ -46,6 +50,7 @@ export default function SortiesPage() {
         .select('*')
         .eq('company_id', companyId!)
         .eq('actif', true)
+        .is('archive_le', null)
         .order('nom_prenom')
       if (error) throw error
       return (data ?? []) as Employee[]
@@ -106,6 +111,8 @@ export default function SortiesPage() {
         </>
       )}
 
+      {profile?.role === 'admin' && <ClotureDuMois companyId={companyId} />}
+
       {enCours.length > 0 && (
         <ListeSorties
           titre="Départs en préparation"
@@ -119,8 +126,8 @@ export default function SortiesPage() {
 
       {validees.length > 0 && (
         <ListeSorties
-          titre="Départs validés"
-          aide="Ces fiches ont quitté les listes actives. Rien n’a été supprimé."
+          titre="Départs validés, en attente de clôture"
+          aide="Ces personnes sont marquées « sortie » et figurent encore au registre. L’administrateur les en retire à la clôture du mois."
           sorties={validees}
           employes={employes ?? []}
           companyId={companyId}
@@ -131,6 +138,124 @@ export default function SortiesPage() {
         <EmptyState>Aucun employé en poste : rien à préparer ici.</EmptyState>
       )}
     </div>
+  )
+}
+
+/**
+ * LA CLÔTURE DU MOIS.
+ *
+ * Valider une sortie marque la personne comme partie ; elle reste
+ * visible au registre. En fin de mois, l'administrateur passe les
+ * départs en revue et les retire d'un coup. Deux temps, deux personnes :
+ * celui qui constate le départ n'est pas celui qui arrête le mois.
+ */
+function ClotureDuMois({ companyId }: { companyId: string | undefined }) {
+  const maintenant = new Date()
+  const [annee, setAnnee] = useState(maintenant.getFullYear())
+  const [mois, setMois] = useState(maintenant.getMonth() + 1)
+  const [confirme, setConfirme] = useState(false)
+
+  const { data: dossiers } = useApercuArchivage(companyId, annee, mois)
+  const archiver = useArchiverSorties(companyId)
+
+  useEffect(() => { setConfirme(false) }, [annee, mois])
+
+  const n = dossiers?.length ?? 0
+
+  return (
+    <section className="mt-8 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
+            Clôture du mois
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Retire de la liste des employés les départs validés de ce mois-là.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <select
+            value={mois} onChange={(e) => setMois(Number(e.target.value))}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm"
+          >
+            {MOIS_FR.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+          <select
+            value={annee} onChange={(e) => setAnnee(Number(e.target.value))}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm"
+          >
+            {[0, 1, 2].map((d) => {
+              const a = maintenant.getFullYear() - d
+              return <option key={a} value={a}>{a}</option>
+            })}
+          </select>
+        </div>
+      </div>
+
+      {n === 0 ? (
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-500">
+          Aucun départ validé en {MOIS_FR[mois - 1]} {annee}. Rien à clôturer.
+        </p>
+      ) : (
+        <>
+          <ul className="mt-3 space-y-1">
+            {dossiers!.map((d) => (
+              <li
+                key={d.employee_id}
+                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+              >
+                <span className="text-slate-800">
+                  {d.matricule != null && (
+                    <span className="mr-2 font-mono text-xs text-slate-500">{d.matricule}</span>
+                  )}
+                  {d.nom_prenom}
+                </span>
+                <span className="text-xs text-slate-500">
+                  parti le {formatDateFr(d.date_sortie)} · {formatDH(d.montant)}
+                  {d.motif ? ` · ${d.motif}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {confirme && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Ces {n} fiche(s) quitteront la liste des employés. Elles ne sont pas
+              supprimées : pointages, contrats, congés et bulletins de paie restent
+              consultables, et vous pouvez les y ramener.
+            </p>
+          )}
+          {archiver.error && <ErrorNote>{archiver.error.message}</ErrorNote>}
+
+          <div className="mt-3 flex justify-end gap-2">
+            {!confirme ? (
+              <button
+                onClick={() => setConfirme(true)}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Clôturer {MOIS_FR[mois - 1]} — {n} départ{n > 1 ? 's' : ''}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setConfirme(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => archiver.mutate({ annee, mois }, { onSuccess: () => setConfirme(false) })}
+                  disabled={archiver.isPending}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+                >
+                  {archiver.isPending ? 'Clôture…' : `Confirmer le retrait de ${n} fiche(s)`}
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 

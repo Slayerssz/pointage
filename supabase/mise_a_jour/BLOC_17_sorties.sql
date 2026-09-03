@@ -55,7 +55,7 @@ alter table public.sorties enable row level security;
 drop policy if exists sorties_lecture on public.sorties;
 create policy sorties_lecture on public.sorties
   for select to authenticated
-  using (public.current_user_role() in ('admin', 'validator', 'rh', 'paie'));
+  using (public.current_user_role() in ('admin', 'validator'));
 
 -- L'écriture passe par les fonctions ci-dessous.
 
@@ -78,7 +78,7 @@ declare
   v_company uuid;
   v_id uuid;
 begin
-  perform public.exiger_role('admin', 'validator', 'rh');
+  perform public.exiger_role('admin', 'validator');
 
   select company_id into v_company from public.employees where id = p_employee;
   if v_company is null then
@@ -126,7 +126,7 @@ declare
   v_employee uuid;
   v_date date;
 begin
-  perform public.exiger_role('admin', 'validator', 'rh');
+  perform public.exiger_role('admin', 'validator');
 
   select employee_id, date_sortie into v_employee, v_date
     from public.sorties where id = p_sortie and not valide;
@@ -156,7 +156,7 @@ security definer
 set search_path = public
 as $$
 begin
-  perform public.exiger_role('admin', 'validator', 'rh');
+  perform public.exiger_role('admin', 'validator');
 
   delete from public.sorties where id = p_sortie and not valide;
   if not found then

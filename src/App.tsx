@@ -127,7 +127,7 @@ export default function App() {
               <Route
                 path="sorties"
                 element={
-                  <RequireRole roles={['validator', 'admin', 'rh']}>
+                  <RequireRole roles={['validator', 'admin']}>
                     <SortiesPage />
                   </RequireRole>
                 }

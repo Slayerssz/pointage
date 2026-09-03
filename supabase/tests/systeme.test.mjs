@@ -109,6 +109,7 @@ const ORDRE = [
   'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
   'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
+  'BLOC_18_archivage_sorties.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -167,6 +168,8 @@ const SENSIBLES = [
   ['valider_sortie',            `select public.valider_sortie(gen_random_uuid())`],
   ['annuler_sortie',            `select public.annuler_sortie(gen_random_uuid())`],
   ['reintegrer_employe',        `select public.reintegrer_employe(gen_random_uuid())`],
+  ['archiver_sorties',          `select public.archiver_sorties(gen_random_uuid(),2026,1)`],
+  ['apercu_archivage',          `select public.apercu_archivage(gen_random_uuid(),2026,1)`],
   ['analytics_paie',            `select public.analytics_paie(null,2026)`],
   ['bulletin_paie',             `select public.bulletin_paie(gen_random_uuid())`],
   ['maj_bareme_igr',            `select public.maj_bareme_igr('[]'::jsonb)`],
@@ -758,6 +761,73 @@ ok('… et l’employé n’a jamais bougé',
    (await q1(`select actif from public.employees where id=$1`, [partant])).actif === true)
 
 await db.query(`delete from public.employees where id=$1`, [partant])
+
+// ═════════════════════════════════ 9 quinquies. CLÔTURE DU MOIS ═════
+
+section('Clôture du mois : les sortis quittent la liste')
+await connecte(bureau)
+
+const sortant = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,cin,salaire)
+   values ($1,$2,'SORTANT DE MARS','SM33','3000') returning id`, [co, aRiad])).id
+const sm = (await q1(
+  `select public.enregistrer_sortie($1,'2026-03-20'::date,4200,'Espece',null,'{}'::jsonb) as id`,
+  [sortant])).id
+await q1(`select public.valider_sortie($1)`, [sm])
+
+ok('après validation, la fiche est marquée sortie',
+   (await q1(`select actif from public.employees where id=$1`, [sortant])).actif === false)
+ok('… mais reste dans la liste des employés',
+   (await q1(`select archive_le from public.employees where id=$1`, [sortant])).archive_le === null)
+
+// C'est l'administrateur qui arrête le mois.
+await refuse('le bureau ne clôture pas le mois',
+  `select public.archiver_sorties($1,2026,3)`, [co], REFUS)
+await refuse('… ni ne consulte l’aperçu de clôture',
+  `select public.apercu_archivage($1,2026,3)`, [co], REFUS)
+
+await connecte(admin)
+const apercu = (await q1(`select public.apercu_archivage($1,2026,3) as a`, [co])).a
+ok('l’aperçu annonce le départ de mars',
+   apercu.length === 1 && apercu[0].nom_prenom === 'SORTANT DE MARS', JSON.stringify(apercu))
+ok('… avec le solde versé', Number(apercu[0].montant) === 4200)
+
+ok('un autre mois ne montre rien',
+   (await q1(`select public.apercu_archivage($1,2026,4) as a`, [co])).a.length === 0)
+
+const retires = Number(await q1(`select public.archiver_sorties($1,2026,3) as n`, [co]).then((r) => r.n))
+ok('la clôture retire un départ', retires === 1, String(retires))
+ok('… la fiche quitte la liste',
+   (await q1(`select archive_le from public.employees where id=$1`, [sortant])).archive_le !== null)
+ok('… mais existe toujours',
+   !!(await q1(`select 1 from public.employees where id=$1`, [sortant])))
+ok('relancer la clôture ne retire rien de plus',
+   Number(await q1(`select public.archiver_sorties($1,2026,3) as n`, [co]).then((r) => r.n)) === 0)
+
+// Une sortie seulement préparée n'est jamais emportée par la clôture.
+const hesitant = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,cin,salaire)
+   values ($1,$2,'HESITANT','HS44','3000') returning id`, [co, aRiad])).id
+await connecte(bureau)
+await q1(`select public.enregistrer_sortie($1,'2026-03-25'::date,100,'Espece',null,'{}'::jsonb)`,
+         [hesitant])
+await connecte(admin)
+ok('un départ non validé n’apparaît pas à la clôture',
+   (await q1(`select public.apercu_archivage($1,2026,3) as a`, [co])).a.length === 0)
+ok('… et la clôture ne l’emporte pas',
+   Number(await q1(`select public.archiver_sorties($1,2026,3) as n`, [co]).then((r) => r.n)) === 0)
+ok('… il est toujours en poste',
+   (await q1(`select actif from public.employees where id=$1`, [hesitant])).actif === true)
+
+// Réintégrer ramène aussi depuis les archives.
+await q1(`select public.reintegrer_employe($1)`, [sortant])
+const revenu2 = await q1(`select actif, archive_le, date_sortie from public.employees where id=$1`,
+                         [sortant])
+ok('réintégrer sort des archives',
+   revenu2.actif === true && revenu2.archive_le === null && revenu2.date_sortie === null)
+
+await db.query(`delete from public.employees where id = any($1)`, [[sortant, hesitant]])
+await connecte(bureau)
 
 // ═══════════════════════════════════════════════ 10. BULLETIN & RESET ═
 
