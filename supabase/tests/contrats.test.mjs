@@ -94,12 +94,8 @@ ok('… et le lieu de signature du formulaire ne les écrase pas',
    detail0.includes("...(enArabe ? {} : { fait_a: f.signe_a })"))
 
 console.log('\n  ── Le formulaire du contrat ───────────────────────────')
-ok('les champs sont groupés par sujet',
-   ["L’engagement", 'La rémunération', 'La signature'].every((t) => detail0.includes(t)))
-ok('le lieu de travail se choisit parmi les annexes',
-   detail0.includes('— Annexe de la société —'))
-ok('un lieu qui n’est plus une annexe reste proposé',
-   detail0.includes('!(sites ?? []).some((si) => si.name === f.lieu_travail)'))
+ok('le formulaire annonce ce qu’il fait',
+   detail0.includes('Ce que le contrat imprime'))
 
 console.log('\n  ── Les modèles générés maison ont disparu ─────────────')
 for (const f of ['src/components/ContratPrint.tsx', 'src/components/EngagementPrint.tsx',
@@ -134,6 +130,21 @@ ok('le formulaire garde une largeur fixe, le reste va au document',
 ok('la fenêtre s’élargit quand le document est à côté',
    fs.readFileSync(new URL('../../src/pages/validator/EmployesPage.tsx', import.meta.url), 'utf8')
      .includes("max-w-[104rem]"))
+
+console.log('\n  ── Les formulaires ne demandent que le nécessaire ─────')
+for (const parti of [
+  "periode_essai_jours: f.periode_essai_jours", 'lieu_travail: f.lieu_travail.trim()',
+  'heures_par_jour: f.heures_par_jour.trim()', 'mode_reglement: f.mode_reglement ||',
+  'representant_employeur: f.representant_employeur.trim()',
+  'observations: f.observations.trim()',
+]) ok(`le contrat ne demande plus « ${parti.split(':')[0]} »`, !detail0.includes(parti))
+ok('le contrat n’affiche un champ que si le modèle l’imprime',
+   detail0.includes("surLePapier('salaire') && field") && detail0.includes("surLePapier('fait_a') && field"))
+ok('le type de contrat reste : il porte les alertes de fin',
+   detail0.includes("c’est lui qui distingue un CDI"))
+ok('le congé ne demande plus ni type ni motif',
+   !detail0.includes("{field('Type', (") && !detail0.includes("{field('Motif', ("))
+ok('… et il enregistre bien un congé payé', detail0.includes("type: 'C', motif: ''"))
 
 console.log('\n  ── Reçu pour solde de tout compte ─────────────────────')
 const solde = fs.readFileSync(new URL('../../src/lib/soldeToutCompte.ts', import.meta.url), 'utf8')

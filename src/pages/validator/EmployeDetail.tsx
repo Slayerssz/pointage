@@ -10,7 +10,7 @@ import {
   useSupprimerConge,
 } from '../../lib/paie'
 import { TYPES_CONTRAT, contratAffichage, contratStatut, joursRestants } from '../../lib/contrats'
-import { TYPES_ABSENCE, gardeLabel } from '../../lib/gardes'
+import { gardeLabel } from '../../lib/gardes'
 import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
 import { Chip, ErrorNote, Spinner } from '../../components/ui'
 import DocumentsSignes from '../../components/DocumentsSignes'
@@ -19,7 +19,6 @@ import PanneauDocument from '../../components/PanneauDocument'
 import { jetonsDuModele, modeleContrat } from '../../lib/contratsModeles'
 import { modeleEngagement } from '../../lib/engagementConge'
 import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
-import { useSites } from '../../lib/queries'
 import { useDocuments } from '../../lib/documents'
 
 const inputCls =
@@ -237,9 +236,6 @@ function ContratForm({
 }) {
   const qc = useQueryClient()
   const modele = modeleContrat(entreprise)
-  // Le lieu de travail se choisit parmi les annexes de la société : on ne
-  // demande à personne de retenir quatre-vingt-douze noms de sites.
-  const { data: sites } = useSites(employee.company_id)
   // Un renouvellement reprend tout l'ancien contrat, mais enchaîne les dates :
   // début = lendemain de l'ancienne fin, fin = un an plus tard.
   const base = contrat ?? renouvelle ?? null
@@ -251,16 +247,10 @@ function ContratForm({
     date_fin: renouvelle
       ? (renouvelle.date_fin ? unAnApres(debutRenouv) : '')
       : (contrat?.date_fin ?? ''),
-    periode_essai_jours: renouvelle ? '0' : (base?.periode_essai_jours?.toString() ?? '90'),
     poste: base?.poste ?? employee.qualification ?? '',
-    lieu_travail: base?.lieu_travail ?? '',
     salaire_mensuel: base?.salaire_mensuel?.toString() ?? employee.salaire?.toString() ?? '',
-    heures_par_jour: base?.heures_par_jour?.toString() ?? employee.heures_par_jour?.toString() ?? '8',
-    mode_reglement: base?.mode_reglement ?? employee.mode_reglement ?? '',
     signe_a: base?.signe_a ?? employee.ville ?? '',
     signe_le: renouvelle ? todayIso() : (contrat?.signe_le ?? todayIso()),
-    representant_employeur: base?.representant_employeur ?? '',
-    observations: base?.observations ?? '',
     archive: contrat?.archive ?? false,
   })
   const set = (k: keyof typeof f) => (v: string | boolean) => setF((p) => ({ ...p, [k]: v }))
@@ -302,8 +292,6 @@ function ContratForm({
   // que de laisser chercher pourquoi « rien ne change quand je tape ».
   const jetons = jetonsDuModele(modele)
   const surLePapier = (jeton: string) => jetons.has(jeton)
-  const marque = (label: string, jeton: string) =>
-    surLePapier(jeton) ? label : `${label} ⋯`
 
   const save = useMutation({
     mutationFn: async () => {
@@ -317,16 +305,10 @@ function ContratForm({
         type_contrat: f.type_contrat,
         date_debut: f.date_debut,
         date_fin: f.date_fin || null,
-        periode_essai_jours: f.periode_essai_jours ? Number(f.periode_essai_jours) : 0,
         poste: f.poste.trim() || null,
-        lieu_travail: f.lieu_travail.trim() || null,
         salaire_mensuel: f.salaire_mensuel.trim() ? Number(f.salaire_mensuel) : null,
-        heures_par_jour: f.heures_par_jour.trim() ? Number(f.heures_par_jour) : null,
-        mode_reglement: f.mode_reglement || null,
         signe_a: f.signe_a.trim() || null,
         signe_le: f.signe_le || null,
-        representant_employeur: f.representant_employeur.trim() || null,
-        observations: f.observations.trim() || null,
         archive: f.archive,
         champs_document: docLibre,
       }
@@ -399,101 +381,52 @@ function ContratForm({
         </>
       }
     >
-      <p className="mb-3 text-xs text-slate-500">
-        Les champs suivis de <span className="text-slate-400">⋯</span> restent au
-        registre : ce modèle de contrat ne les imprime pas.
-      </p>
-
-      <Section titre="L’engagement">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {field('Type de contrat', (
-          <select value={f.type_contrat} onChange={(e) => set('type_contrat')(e.target.value)} className={inputCls}>
-            {TYPES_CONTRAT.map((t) => (
-              <option key={t.code} value={t.code}>{t.label}</option>
-            ))}
-          </select>
-        ))}
-        {field(marque('Poste / fonction', 'fonction'), (
-          <input type="text" value={f.poste} onChange={(e) => set('poste')(e.target.value)} className={inputCls} />
-        ))}
-        {/* Calendrier natif : plus sûr que la saisie au clavier, et déjà
-            ce que fait le formulaire des congés. */}
-        {field(marque('Date de début *', 'debut'), (
-          <input type="date" value={f.date_debut}
-                 onChange={(e) => set('date_debut')(e.target.value)} className={inputCls} />
-        ))}
-        {field(
-          marque(f.type_contrat === 'CDI' ? 'Date de fin (vide = indéterminée)' : 'Date de fin *', 'fin'),
-          <input type="date" value={f.date_fin} min={f.date_debut || undefined}
-                 onChange={(e) => set('date_fin')(e.target.value)} className={inputCls} />,
-        )}
-        {field("Période d'essai (jours)" + ' ⋯', (
-          <input type="number" min="0" value={f.periode_essai_jours}
-                 onChange={(e) => set('periode_essai_jours')(e.target.value)} className={inputCls} />
-        ))}
-        {field('Lieu de travail' + ' ⋯', (
-          <select value={f.lieu_travail} onChange={(e) => set('lieu_travail')(e.target.value)}
-                  className={inputCls}>
-            <option value="">— Annexe de la société —</option>
-            {(sites ?? []).map((si) => (
-              <option key={si.id} value={si.name}>{si.name}</option>
-            ))}
-            {/* Un contrat plus ancien peut porter un lieu qui n'est plus une
-                annexe : on le garde plutôt que de l'effacer en silence. */}
-            {f.lieu_travail && !(sites ?? []).some((si) => si.name === f.lieu_travail) && (
-              <option value={f.lieu_travail}>{f.lieu_travail}</option>
-            )}
-          </select>
-        ))}
-      </div>
-      </Section>
-
-      <Section titre="La rémunération">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {field(marque('Salaire mensuel (DH)', 'salaire'), (
-          <input type="number" min="0" step="0.01" value={f.salaire_mensuel}
-                 onChange={(e) => set('salaire_mensuel')(e.target.value)} className={inputCls} />
-        ))}
-        {field('Heures par jour' + ' ⋯', (
-          <input type="number" min="0" step="0.5" value={f.heures_par_jour}
-                 onChange={(e) => set('heures_par_jour')(e.target.value)} className={inputCls} />
-        ))}
-        {field('Mode de règlement' + ' ⋯', (
-          <input type="text" value={f.mode_reglement} onChange={(e) => set('mode_reglement')(e.target.value)}
-                 className={inputCls} placeholder="Virement / Espèce" />
-        ))}
-      </div>
-      </Section>
-
-      <Section titre="La signature">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {field('Représentant de l’employeur' + ' ⋯', (
-          <input type="text" value={f.representant_employeur}
-                 onChange={(e) => set('representant_employeur')(e.target.value)} className={inputCls} />
-        ))}
-        {field(marque('Fait à', 'fait_a'), (
-          <input type="text" value={f.signe_a} onChange={(e) => set('signe_a')(e.target.value)} className={inputCls} />
-        ))}
-        {field(marque('Fait le', 'fait_le'), (
-          <input type="date" value={f.signe_le}
-                 onChange={(e) => set('signe_le')(e.target.value)} className={inputCls} />
-        ))}
-        <div className="sm:col-span-2">
-          {field('Observations (usage interne, ne s’imprime pas)', (
-            <textarea value={f.observations} onChange={(e) => set('observations')(e.target.value)}
-                      rows={2} className={inputCls} />
+      <Section titre="Ce que le contrat imprime">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('Type de contrat', (
+            <select value={f.type_contrat} onChange={(e) => set('type_contrat')(e.target.value)} className={inputCls}>
+              {TYPES_CONTRAT.map((t) => (
+                <option key={t.code} value={t.code}>{t.label}</option>
+              ))}
+            </select>
+          ))}
+          {surLePapier('fonction') && field('Poste / fonction', (
+            <input type="text" value={f.poste} onChange={(e) => set('poste')(e.target.value)} className={inputCls} />
+          ))}
+          {field('Date de début *', (
+            <input type="date" value={f.date_debut}
+                   onChange={(e) => set('date_debut')(e.target.value)} className={inputCls} />
+          ))}
+          {field(
+            f.type_contrat === 'CDI' ? 'Date de fin (vide = indéterminée)' : 'Date de fin *',
+            <input type="date" value={f.date_fin} min={f.date_debut || undefined}
+                   onChange={(e) => set('date_fin')(e.target.value)} className={inputCls} />,
+          )}
+          {surLePapier('salaire') && field('Salaire mensuel (DH)', (
+            <input type="number" min="0" step="0.01" value={f.salaire_mensuel}
+                   onChange={(e) => set('salaire_mensuel')(e.target.value)} className={inputCls} />
+          ))}
+          {surLePapier('fait_a') && field('Fait à', (
+            <input type="text" value={f.signe_a} onChange={(e) => set('signe_a')(e.target.value)} className={inputCls} />
+          ))}
+          {surLePapier('fait_le') && field('Fait le', (
+            <input type="date" value={f.signe_le}
+                   onChange={(e) => set('signe_le')(e.target.value)} className={inputCls} />
           ))}
         </div>
-        {contrat && (
-          <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-            <input type="checkbox" checked={f.archive} onChange={(e) => set('archive')(e.target.checked)}
-                   className="h-4 w-4 rounded border-slate-300" />
-            Archiver ce contrat (plus d’alerte de fin)
-          </label>
-        )}
-      </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Seul le type de contrat ne s’imprime pas : c’est lui qui distingue un CDI
+          d’un CDD, donc qui déclenche l’alerte de fin et permet le renouvellement.
+        </p>
       </Section>
 
+      {contrat && (
+        <label className="mt-4 flex items-center gap-2 border-t border-slate-200 pt-4 text-sm text-slate-700">
+          <input type="checkbox" checked={f.archive} onChange={(e) => set('archive')(e.target.checked)}
+                 className="h-4 w-4 rounded border-slate-300" />
+          Archiver ce contrat (plus d’alerte de fin)
+        </label>
+      )}
       {aSaisir.length > 0 && (
         <Section
           titre="Ce qui ne figure que sur le contrat"
@@ -634,7 +567,7 @@ function CongesPanel({
   const { data: conges, isLoading } = useCongesEmploye(employee.id)
   const creer = useCreerConge(employee.id)
   const supprimer = useSupprimerConge(employee.id)
-  const [f, setF] = useState({ debut: '', fin: '', type: 'C', motif: '' })
+  const [f, setF] = useState({ debut: '', fin: '' })
   const [engagement, setEngagement] = useState<Conge | null>(null)
 
   // L'engagement se remplit ICI, en même temps que le congé : ce sont les
@@ -673,7 +606,7 @@ function CongesPanel({
         enTete={
           <>
             <p className="mb-1 text-sm font-semibold text-slate-900">
-              Enregistrer un congé / une absence
+              Enregistrer un congé annuel
             </p>
             <p className="mb-3 text-xs text-slate-500">
               Les dates saisies ici composent l’engagement à droite, et sont
@@ -691,10 +624,10 @@ function CongesPanel({
             <button
               onClick={() =>
                 creer.mutate(
-                  { ...f, champsDocument: docLibre },
+                  { ...f, type: 'C', motif: '', champsDocument: docLibre },
                   {
                     onSuccess: () => {
-                      setF({ debut: '', fin: '', type: 'C', motif: '' })
+                      setF({ debut: '', fin: '' })
                       setDocLibre({ ...(modele.defauts ?? {}) })
                     },
                   },
@@ -724,22 +657,11 @@ function CongesPanel({
               className={inputCls}
             />
           ))}
-          {field('Type', (
-            <select value={f.type} onChange={(e) => setF((p) => ({ ...p, type: e.target.value }))} className={inputCls}>
-              {TYPES_ABSENCE.map((t) => (
-                <option key={t.code} value={t.code}>{t.label}</option>
-              ))}
-            </select>
-          ))}
-          {field('Motif', (
-            <input type="text" value={f.motif} onChange={(e) => setF((p) => ({ ...p, motif: e.target.value }))}
-                   className={inputCls} placeholder="facultatif" />
-          ))}
         </div>
         <p className="mt-2 text-xs text-slate-500">
           Les jours sont écrits automatiquement dans le pointage. Le jour de repos hebdomadaire de
           l’employé n’est pas décompté. Un employé peut cumuler plusieurs congés, à condition
-          qu’ils ne se chevauchent pas.
+          qu’ils ne se chevauchent pas. Une absence pour maladie se pointe au jour le jour.
         </p>
 
         <div className="mt-4 border-t border-slate-200 pt-4">
