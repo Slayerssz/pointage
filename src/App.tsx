@@ -143,7 +143,7 @@ export default function App() {
               <Route
                 path="paie"
                 element={
-                  <RequireRole roles={['paie', 'admin']}>
+                  <RequireRole roles={['paie', 'admin', 'validator']}>
                     <PaiePage />
                   </RequireRole>
                 }
@@ -151,7 +151,7 @@ export default function App() {
               <Route
                 path="bulletins"
                 element={
-                  <RequireRole roles={['paie', 'admin']}>
+                  <RequireRole roles={['paie', 'admin', 'validator']}>
                     <BulletinsPage />
                   </RequireRole>
                 }

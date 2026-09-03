@@ -138,7 +138,7 @@ export default function ApercuEmploye({
             <Champ label="Heures par jour">
               {employee.heures_par_jour != null ? `${employee.heures_par_jour} h` : '—'}
             </Champ>
-            <Champ label="Gardes travaillées">{formatGardes(employee.jours_travailles)}</Champ>
+            <Champ label="Jours travaillés">{formatGardes(employee.jours_travailles)}</Champ>
             {!employee.actif && (
               <Champ label="Date de sortie">
                 {employee.date_sortie ? formatDateFr(employee.date_sortie) : '—'}

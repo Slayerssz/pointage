@@ -80,6 +80,24 @@ export default function EmployesPage() {
       return data
     },
   })
+  // La colonne « Jours » montre un mois, pas un cumul depuis toujours.
+  const maintenant = new Date()
+  const [moisJours, setMoisJours] = useState(
+    `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`,
+  )
+  const [anneeJ, moisJ] = moisJours.split('-').map(Number)
+  const { data: joursDuMois } = useQuery({
+    queryKey: ['jours-du-mois', companyId, anneeJ, moisJ],
+    enabled: Boolean(companyId),
+    queryFn: async (): Promise<Record<string, { travailles: number; conge: number; maladie: number }>> => {
+      const { data, error } = await supabase.rpc('jours_du_mois', {
+        p_company: companyId, p_annee: anneeJ, p_mois: moisJ,
+      })
+      if (error) throw error
+      return (data ?? {}) as Record<string, { travailles: number; conge: number; maladie: number }>
+    },
+  })
+
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
   // Fiche individuelle (une personne) et liste du personnel (la sélection)
   const [fiche, setFiche] = useState<Employee | null>(null)
@@ -348,7 +366,18 @@ export default function EmployesPage() {
                 <th className="px-4 py-3.5 font-medium">Contrat</th>
                 <th className="px-4 py-3.5 font-medium">Règlement</th>
                 <th className="px-4 py-3.5 text-right font-medium">Salaire</th>
-                <th className="px-4 py-3.5 text-right font-medium">Gardes</th>
+                <th className="px-4 py-3.5 text-right font-medium">
+                  <label className="flex flex-col items-end gap-1">
+                    <span>Jours</span>
+                    <input
+                      type="month"
+                      value={moisJours}
+                      onChange={(e) => setMoisJours(e.target.value)}
+                      title="Jours travaillés sur ce mois"
+                      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-normal normal-case"
+                    />
+                  </label>
+                </th>
                 <th className="fige-droite px-4 py-3.5" />
               </tr>
             </thead>
@@ -496,7 +525,22 @@ export default function EmployesPage() {
                     </td>
 
                     <td className="px-4 py-3.5 text-right font-medium tabular-nums text-slate-900">
-                      {formatGardes(emp.jours_travailles)}
+                      {(() => {
+                        const j = joursDuMois?.[emp.id]
+                        if (!j) return <span className="text-slate-300">0</span>
+                        return (
+                          <>
+                            {formatGardes(j.travailles)}
+                            {(j.conge > 0 || j.maladie > 0) && (
+                              <span className="block text-[11px] font-normal text-slate-400">
+                                {j.conge > 0 && `${formatGardes(j.conge)} C`}
+                                {j.conge > 0 && j.maladie > 0 && ' · '}
+                                {j.maladie > 0 && `${formatGardes(j.maladie)} M`}
+                              </span>
+                            )}
+                          </>
+                        )
+                      })()}
                     </td>
 
                     <td
@@ -533,7 +577,7 @@ export default function EmployesPage() {
         <EmployeeFormModal
           companyId={companyId}
           employee={editing}
-          entreprise={company?.name ?? ''}
+          entreprise={editing ? entrepriseDe(editing) : (company?.name ?? '')}
           ficheSeule={estRH}
           onImprimerContrat={(contrat, employee) => setImpression({ contrat, employee })}
           onClose={() => {
@@ -862,7 +906,7 @@ function EmployeeFormModal({
               ))}
             </select>
           ))}
-          {field('Gardes travaillées', (
+          {field('Jours travaillés', (
             <input type="number" min="0" step="0.5" value={form.jours_travailles} onChange={(e) => set('jours_travailles')(e.target.value)} className={inputCls} />
           ))}
 

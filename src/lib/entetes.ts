@@ -73,11 +73,27 @@ function cle(nom: string): string {
     .trim()
 }
 
-const PAR_CLE = new Map(Object.entries(ENTETES).map(([k, v]) => [cle(k), v]))
 
-// La société est enregistrée « MEGANTER » dans certaines bases et
-// « MEGAINTER » sur ses papiers : les deux mènent au même en-tête.
-PAR_CLE.set(cle('MEGANTER SERVICE MAROC'), ENTETES['MEGAINTER SERVICE MAROC'])
+/** Les autres façons dont une société s'écrit selon la pièce qu'on lit. */
+const ALIAS: Record<string, string> = {
+  'GROUPE TRIPLE AAA': 'GROUPE TRIPLE A',
+  'GTA': 'GROUPE TRIPLE A',
+  'MEGANTER SERVICE MAROC': 'MEGAINTER SERVICE MAROC',
+  'BO NETTOYAGE': 'BO',
+  'NORD PLANET NEGOCE': 'NORD PLANET',
+  'SERCLEAN': 'SERCLEAN NEGOCE',
+  'AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
+  'COOPERATIVE AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
+  'COOPERATIVE EDEN VERT SERVICE': 'EDEN VERT SERVICE',
+  'TRIMAX SURVEILLANCE': 'TRIMAX',
+  'VIGILMA GARD': 'VIGILMA GARD MAROC',
+}
+
+const PAR_CLE = new Map(Object.entries(ENTETES).map(([k, v]) => [cle(k), v]))
+for (const [autre, officiel] of Object.entries(ALIAS)) {
+  const e = ENTETES[officiel]
+  if (e) PAR_CLE.set(cle(autre), e)
+}
 
 /** L'en-tête d'une entreprise, ou un en-tête neutre si elle n'en a pas encore. */
 export function enteteDe(nomEntreprise: string | undefined | null): Entete {

@@ -51,8 +51,18 @@ ok('les champs de saisie s’orientent d’après ce qu’on tape',
 ok('un contrat arabe ne préremplit pas les données latines du registre',
    fs.readFileSync(new URL('../../src/components/ContratRedaction.tsx', import.meta.url), 'utf8')
      .includes("LATIN_SEULEMENT"))
-ok('les deux graphies de Megainter mènent au même modèle',
-   src.includes("PAR_CLE.set(cle('MEGANTER SERVICE MAROC')"))
+// Les sociétés ne s'écrivent pas pareil sur leurs papiers et dans la base :
+// Groupe Triple A signe « AAA », Megainter perd son i, l'état de paie
+// abrégeait en « GTA ». Toutes ces graphies doivent retrouver leur dossier.
+for (const [autre, officiel] of [
+  ['GROUPE TRIPLE AAA', 'GROUPE TRIPLE A'],
+  ['GTA', 'GROUPE TRIPLE A'],
+  ['MEGANTER SERVICE MAROC', 'MEGAINTER SERVICE MAROC'],
+  ['COOPERATIVE EDEN VERT SERVICE', 'EDEN VERT SERVICE'],
+]) ok(`« ${autre} » retrouve ${officiel}`, src.includes(`'${autre}': '${officiel}'`))
+ok('les alias s’appliquent aussi aux en-têtes et aux identités légales',
+   ['src/lib/entetes.ts', 'src/lib/societes.ts'].every((f) =>
+     fs.readFileSync(new URL('../../' + f, import.meta.url), 'utf8').includes('const ALIAS')))
 ok('les deux contrats arabes sont enregistrés',
    src.includes("'AL SAFAE EL MAGHREB': familleD") && src.includes("'EDEN VERT SERVICE': familleD"))
 

@@ -109,7 +109,8 @@ const ORDRE = [
   'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
   'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
-  'BLOC_18_archivage_sorties.sql',
+  'BLOC_18_archivage_sorties.sql', 'BLOC_19_jours_par_mois.sql',
+  'BLOC_20_bureau_paie.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -665,10 +666,20 @@ ok('le net réellement versé (primes/retenues internes) est exposé à part',
 await refuse('une période inconnue est refusée clairement',
   `select public.bulletin_paie(gen_random_uuid())`, [], /introuvable/i)
 
-// Le bureau n'a pas accès au bulletin de paie
+// Le bureau couvre la paie : il accède au bulletin.
 await connecte(bureau)
-await refuse('le bureau n’accède pas au bulletin de paie',
-  `select public.bulletin_paie($1)`, [periode], REFUS)
+ok('le bureau accède au bulletin de paie',
+   Array.isArray((await q1(`select public.bulletin_paie($1) as b`, [periode])).b))
+ok('… et aux montants de la paie',
+   !!(await q1(`select public.analytics_paie($1,2026) as a`, [co])).a)
+
+// L'inverse est faux : la paie ne prend pas la main sur le bureau.
+await connecte(paie)
+await refuse('la paie ne valide pas le pointage du mois',
+  `select public.valider_pointage_mois($1,2026,9)`, [co], REFUS)
+await refuse('… ne crée pas de site', `select public.creer_site($1,'X')`, [co], REFUS)
+await refuse('… ne supprime pas d’employé',
+  `select public.supprimer_employe($1)`, [ePlein], REFUS)
 await connecte(paie)
 
 // On remet le barème à vide pour ne pas perturber les tests suivants.

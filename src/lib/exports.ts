@@ -57,7 +57,7 @@ export async function exporterPaieExcel(opts: {
   // En-têtes
   const colonnes = [
     'Matricule', 'Nom & Prénom', 'Annexe', 'Site principal', 'Qualification', 'CIN', 'CNSS',
-    'Salaire de base', 'Base (j)', 'Gardes', 'Congé', 'Malade',
+    'Salaire de base', 'Base (j)', 'Jours', 'Congé', 'Malade',
     'Jours payés', 'Heures', 'Salaire brut', 'Prime', 'Retenue dette',
     'Autres retenues', 'NET À PAYER', 'Règlement', 'Banque', 'RIB', 'Observations',
   ]
@@ -183,7 +183,7 @@ export async function exporterPaiePdf(opts: {
   autoTable(doc, {
     startY: 29,
     head: [[
-      'Mat.', 'Nom & Prénom', 'Site', 'Sal. base', 'Gardes', 'C', 'M',
+      'Mat.', 'Nom & Prénom', 'Site', 'Sal. base', 'Jours', 'C', 'M',
       'J. payés', 'Heures', 'Brut', 'Prime', 'Dette', 'Autres', 'NET', 'Règlement', 'Banque',
     ]],
     body: lignes.map((l) => [

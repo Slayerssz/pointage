@@ -119,7 +119,9 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     },
   })
 
-  const estPaie = profile?.role === 'paie' || profile?.role === 'admin'
+  // Le bureau couvre la paie : il modifie les lignes comme le service paie.
+  const estPaie =
+    profile?.role === 'paie' || profile?.role === 'admin' || profile?.role === 'validator'
   const estAdmin = profile?.role === 'admin'
   const verrouille = periode.statut === 'paie_validee'
   const enDemande = periode.statut === 'reouverture_demandee'
@@ -509,7 +511,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
               <th className="fige-gauche px-3 py-3 font-medium">Employé</th>
               <th className="px-3 py-3 font-medium">Annexe</th>
               <th className="px-3 py-3 text-right font-medium">Salaire base</th>
-              <th className="px-3 py-3 text-center font-medium">Gardes</th>
+              <th className="px-3 py-3 text-center font-medium">Jours</th>
               <th className="px-3 py-3 text-center font-medium">C / M</th>
               <th className="px-3 py-3 text-center font-medium">J. payés</th>
               <th className="px-3 py-3 text-right font-medium">Heures</th>

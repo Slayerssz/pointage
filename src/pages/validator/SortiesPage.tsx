@@ -212,7 +212,7 @@ function ClotureDuMois({ companyId }: { companyId: string | undefined }) {
                 </span>
                 <span className="text-xs text-slate-500">
                   parti le {formatDateFr(d.date_sortie)} · {formatDH(d.montant)}
-                  {d.motif ? ` · ${d.motif}` : ''}
+
                 </span>
               </li>
             ))}
@@ -276,7 +276,6 @@ function FormulaireSortie({
     date_sortie: sortie?.date_sortie ?? todayIso(),
     montant: sortie?.montant != null ? String(sortie.montant) : '',
     mode: sortie?.mode_reglement ?? employee.mode_reglement ?? 'Virement',
-    motif: sortie?.motif ?? '',
   })
   const [docLibre, setDocLibre] = useState<Record<string, string>>(() => ({
     ...(modeleSolde(entreprise).defauts ?? {}),
@@ -304,7 +303,7 @@ function FormulaireSortie({
     dateSortie: f.date_sortie,
     montant: Number(f.montant) || 0,
     mode: f.mode,
-    motif: f.motif,
+    motif: '',
     champs: docLibre,
   }
 
@@ -407,17 +406,6 @@ function FormulaireSortie({
             ))}
           </select>
         </label>
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">
-            Motif (usage interne, ne s’imprime pas)
-          </span>
-          <input
-            type="text" value={f.motif}
-            onChange={(e) => setF((p) => ({ ...p, motif: e.target.value }))}
-            placeholder="Démission, fin de marché…"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
       </div>
 
       {aSaisir.length > 0 && (
@@ -488,7 +476,7 @@ function ListeSorties({
               <p className="text-xs text-slate-500">
                 Dernier jour {formatDateFr(s.date_sortie)} · {formatDH(s.montant)}
                 {s.mode_reglement ? ` en ${s.mode_reglement.toLowerCase()}` : ''}
-                {s.motif ? ` · ${s.motif}` : ''}
+
               </p>
             </div>
             {!s.valide && (

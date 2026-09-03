@@ -642,10 +642,27 @@ function cle(nom: string): string {
     .trim()
 }
 
-const PAR_CLE = new Map(Object.entries(MODELES).map(([k, v]) => [cle(k), v]))
 
-// Même société, deux graphies selon qu'on lise la base ou le papier.
-PAR_CLE.set(cle('MEGANTER SERVICE MAROC'), MODELES['MEGAINTER SERVICE MAROC'])
+/** Les autres façons dont une société s'écrit selon la pièce qu'on lit. */
+const ALIAS: Record<string, string> = {
+  'GROUPE TRIPLE AAA': 'GROUPE TRIPLE A',
+  'GTA': 'GROUPE TRIPLE A',
+  'MEGANTER SERVICE MAROC': 'MEGAINTER SERVICE MAROC',
+  'BO NETTOYAGE': 'BO',
+  'NORD PLANET NEGOCE': 'NORD PLANET',
+  'SERCLEAN': 'SERCLEAN NEGOCE',
+  'AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
+  'COOPERATIVE AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
+  'COOPERATIVE EDEN VERT SERVICE': 'EDEN VERT SERVICE',
+  'TRIMAX SURVEILLANCE': 'TRIMAX',
+  'VIGILMA GARD': 'VIGILMA GARD MAROC',
+}
+
+const PAR_CLE = new Map(Object.entries(MODELES).map(([k, v]) => [cle(k), v]))
+for (const [autre, officiel] of Object.entries(ALIAS)) {
+  const m = MODELES[officiel]
+  if (m) PAR_CLE.set(cle(autre), m)
+}
 
 /** Le modèle de contrat d'une société, ou null si elle n'en a pas encore. */
 export function modeleContrat(entreprise: string | null | undefined): ModeleContrat | null {

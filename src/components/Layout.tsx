@@ -94,6 +94,9 @@ export default function Layout() {
             { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
             { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
             { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+            // Le bureau couvre la paie ; l'inverse n'est pas vrai.
+            { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
+            { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
             { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           ]
         : profile?.role === 'rh'

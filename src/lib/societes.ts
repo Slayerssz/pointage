@@ -73,9 +73,27 @@ function cle(nom: string): string {
     .trim()
 }
 
+
+/** Les autres façons dont une société s'écrit selon la pièce qu'on lit. */
+const ALIAS: Record<string, string> = {
+  'GROUPE TRIPLE AAA': 'GROUPE TRIPLE A',
+  'GTA': 'GROUPE TRIPLE A',
+  'MEGANTER SERVICE MAROC': 'MEGAINTER SERVICE MAROC',
+  'BO NETTOYAGE': 'BO',
+  'NORD PLANET NEGOCE': 'NORD PLANET',
+  'SERCLEAN': 'SERCLEAN NEGOCE',
+  'AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
+  'COOPERATIVE AL SAFAE EL MAGHRIB': 'AL SAFAE EL MAGHREB',
+  'COOPERATIVE EDEN VERT SERVICE': 'EDEN VERT SERVICE',
+  'TRIMAX SURVEILLANCE': 'TRIMAX',
+  'VIGILMA GARD': 'VIGILMA GARD MAROC',
+}
+
 const PAR_CLE = new Map(Object.entries(SOCIETES).map(([k, v]) => [cle(k), v]))
-// La même société, selon qu'on lise la base ou ses papiers.
-PAR_CLE.set(cle('MEGANTER SERVICE MAROC'), SOCIETES['MEGAINTER SERVICE MAROC'])
+for (const [autre, officiel] of Object.entries(ALIAS)) {
+  const s2 = SOCIETES[officiel]
+  if (s2) PAR_CLE.set(cle(autre), s2)
+}
 
 export function societeDe(nom: string | null | undefined): Societe | null {
   if (!nom) return null
