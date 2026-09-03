@@ -6,22 +6,21 @@
 --  Sans date de fin, un contrat n'entre dans aucune alerte : ni bleu à dix
 --  jours du terme, ni jaune une fois échu. Il sort du suivi sans le dire.
 --
---  Le bloc traite lui-même les contrats incomplets : il leur pose une fin
---  à un an de leur début, puis vous les montre pour que vous corrigiez ce
---  qui doit l'être.
+--  Les contrats sans date de fin sont des essais : ils sont supprimés,
+--  avec les scans qui leur étaient rattachés.
 -- ============================================================================
 
 begin;
 
-  -- Ce qu'on va compléter, avant de le faire
-  select id, employee_id, date_debut,
-         (date_debut + interval '1 year')::date as fin_proposee
-    from public.contrats
-   where date_fin is null;
+  do $bloc$
+  declare v_n int;
+  begin
+    select count(*) into v_n from public.contrats where date_fin is null;
+    raise notice '% contrat(s) sans date de fin supprimé(s).', v_n;
+  end $bloc$;
 
-  update public.contrats
-     set date_fin = (date_debut + interval '1 year')::date
-   where date_fin is null;
+  -- Les documents rattachés partent en cascade avec le contrat.
+  delete from public.contrats where date_fin is null;
 
   alter table public.contrats
     alter column date_fin set not null;
@@ -32,9 +31,7 @@ begin;
 commit;
 
 
--- ▶ Les contrats complétés d'office : vérifiez leur date de fin
-select c.id, e.nom_prenom, c.date_debut, c.date_fin
-  from public.contrats c
-  join public.employees e on e.id = c.employee_id
- order by c.created_at desc
- limit 20;
+-- ▶ Contrôle : plus aucun contrat sans date de fin
+select count(*) as contrats_restants,
+       count(*) filter (where date_fin is null) as encore_sans_date_de_fin
+  from public.contrats;
