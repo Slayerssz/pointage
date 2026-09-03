@@ -110,7 +110,8 @@ const ORDRE = [
   'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
   'BLOC_18_archivage_sorties.sql', 'BLOC_19_jours_par_mois.sql',
-  'BLOC_20_bureau_paie.sql', 'BLOC_21_deux_types_contrat.sql',
+  'BLOC_20_bureau_paie.sql', 'BLOC_21_deux_types_contrat.sql', 'BLOC_22_date_fin_obligatoire.sql',
+  'BLOC_23_validation_par_scan.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -308,8 +309,10 @@ await db.query(`update public.contrats set date_fin = current_date - 1 where id=
 ok('date de fin dépassée → « terminé » (ligne jaune)', (await statutDe(ePlein)).statut === 'termine')
 await db.query(`update public.contrats set date_fin = current_date + 40 where id=$1`, [ct1.id])
 ok('fin lointaine → « en cours », aucune alerte', (await statutDe(ePlein)).statut === 'actif')
-await db.query(`update public.contrats set date_fin = null where id=$1`, [ct1.id])
-ok('CDI sans date de fin → jamais d’alerte', (await statutDe(ePlein)).statut === 'actif')
+// La date de fin est désormais obligatoire : c'est elle qui porte les
+// alertes, et un contrat sans elle sortait du suivi sans le dire.
+await refuse('un contrat sans date de fin est refusé',
+  `update public.contrats set date_fin = null where id=$1`, [ct1.id], /date_fin|not-null|null value/i)
 
 // Renouvellement : nouveau contrat, ancien archivé
 await db.query(`update public.contrats set date_fin='2026-06-30' where id=$1`, [ct1.id])
@@ -689,6 +692,13 @@ await connecte(paie)
 
 // ═════════════════════════════════════ 9 quater. LES SORTIES ═════
 
+/** Dépose le scan signé d'une pièce, comme le ferait le bureau. */
+const deposerScan = async (type, employeeId, lien) => (await q1(
+  `insert into public.documents(company_id, employee_id, type, ${lien.colonne},
+                                chemin, nom_fichier, mime)
+   values ($1,$2,$3,$4,$5,$6,'application/pdf') returning id`,
+  [co, employeeId, type, lien.id, `scan/${type}-${lien.id}.pdf`, `${type}-signe.pdf`])).id
+
 section('Sorties et solde de tout compte')
 await connecte(bureau)
 
@@ -727,6 +737,16 @@ await refuse('l’agent ne prépare pas de sortie',
   [partant], REFUS)
 await connecte(bureau)
 
+// Sans le reçu signé, rien ne bouge : c'est lui qui prouve que le solde
+// a été accepté.
+await refuse('sans reçu signé, la sortie ne se valide pas',
+  `select public.valider_sortie($1)`, [sortie], /reçu signé/i)
+ok('… et l’employé est toujours en poste',
+   (await q1(`select actif from public.employees where id=$1`, [partant])).actif === true)
+
+const scanSortie = await deposerScan('sortie', partant, { colonne: 'sortie_id', id: sortie })
+ok('le reçu signé déposé, la validation devient possible', !!scanSortie)
+
 // Valider : la personne quitte les listes, sans rien perdre.
 await q1(`select public.valider_sortie($1)`, [sortie])
 const apresSortie = await q1(`select actif, date_sortie from public.employees where id=$1`, [partant])
@@ -744,11 +764,52 @@ ok('la fiche n’est PAS supprimée',
 
 await refuse('une sortie validée ne se revalide pas',
   `select public.valider_sortie($1)`, [sortie], /introuvable|déjà validée/i)
+
+// Retirer le scan défait la validation : la pièce n'est plus au dossier.
+await db.query(`delete from public.documents where id=$1`, [scanSortie])
+ok('retirer le reçu ramène la sortie en préparation',
+   (await q1(`select valide from public.sorties where id=$1`, [sortie])).valide === false)
+await deposerScan('sortie', partant, { colonne: 'sortie_id', id: sortie })
+await q1(`select public.valider_sortie($1)`, [sortie])
 await refuse('… ni ne s’annule',
   `select public.annuler_sortie($1)`, [sortie], /déjà validée|introuvable/i)
 await refuse('… et on ne prépare pas une seconde sortie pour lui',
   `select public.enregistrer_sortie($1,'2026-05-31'::date,100,'Virement',null,'{}'::jsonb)`,
   [partant], /déjà validée/i)
+
+// ── Contrat et congé : le dépôt du scan vaut validation
+section('Contrat et congé : validés par leur scan')
+const ctScan = (await q1(
+  `insert into public.contrats(company_id,employee_id,type_contrat,date_debut,date_fin,created_by)
+   values ($1,$2,'CONTRAT','2026-01-01','2026-12-31',$3) returning id`,
+  [co, ePlein, bureau])).id
+ok('un contrat naît non validé',
+   (await q1(`select valide_le from public.contrats where id=$1`, [ctScan])).valide_le === null)
+
+const dCt = await deposerScan('contrat', ePlein, { colonne: 'contrat_id', id: ctScan })
+ok('déposer le contrat signé le valide',
+   (await q1(`select valide_le from public.contrats where id=$1`, [ctScan])).valide_le !== null)
+await db.query(`delete from public.documents where id=$1`, [dCt])
+ok('… le retirer annule la validation',
+   (await q1(`select valide_le from public.contrats where id=$1`, [ctScan])).valide_le === null)
+
+const cgScan = (await q1(
+  `select public.creer_conge($1,'2026-11-02'::date,'2026-11-06'::date,'C',null) as id`,
+  [ePlein])).id
+ok('un congé naît non validé',
+   (await q1(`select valide_le from public.conges where id=$1`, [cgScan])).valide_le === null)
+const dCg = await deposerScan('engagement', ePlein, { colonne: 'conge_id', id: cgScan })
+ok('déposer l’engagement signé valide le congé',
+   (await q1(`select valide_le from public.conges where id=$1`, [cgScan])).valide_le !== null)
+
+// Un scan d'un autre type ne vaut pas signature de celui-ci.
+await db.query(`delete from public.documents where id=$1`, [dCg])
+await deposerScan('autre', ePlein, { colonne: 'conge_id', id: cgScan })
+ok('un document « autre » ne vaut pas engagement signé',
+   (await q1(`select valide_le from public.conges where id=$1`, [cgScan])).valide_le === null)
+
+await db.query(`delete from public.conges where id=$1`, [cgScan])
+await db.query(`delete from public.contrats where id=$1`, [ctScan])
 
 // Réintégrer : réservé à l'administrateur, pour une erreur de saisie.
 await refuse('le bureau ne réintègre pas de lui-même',
@@ -784,6 +845,7 @@ const sortant = (await q1(
 const sm = (await q1(
   `select public.enregistrer_sortie($1,'2026-03-20'::date,4200,'Espece',null,'{}'::jsonb) as id`,
   [sortant])).id
+await deposerScan('sortie', sortant, { colonne: 'sortie_id', id: sm })
 await q1(`select public.valider_sortie($1)`, [sm])
 
 ok('après validation, la fiche est marquée sortie',

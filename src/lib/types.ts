@@ -80,7 +80,7 @@ export interface Document {
   id: string
   company_id: string
   employee_id: string
-  type: 'engagement' | 'contrat' | 'autre'
+  type: 'engagement' | 'contrat' | 'sortie' | 'autre'
   conge_id: string | null
   contrat_id: string | null
   chemin: string
@@ -131,7 +131,8 @@ export interface Contrat {
   numero: string | null
   type_contrat: TypeContrat
   date_debut: string
-  date_fin: string | null
+  /** Obligatoire : c'est elle qui déclenche les alertes de fin. */
+  date_fin: string
   periode_essai_jours: number | null
   poste: string | null
   lieu_travail: string | null
@@ -146,6 +147,8 @@ export interface Contrat {
   /** Les mentions du document imprimé qui n'ont pas de colonne à elles :
    *  numéro de marché, durée en toutes lettres, qualité en arabe… */
   champs_document: Record<string, string> | null
+  /** Renseignée quand le contrat signé a été scanné. Sans elle, rien n'engage. */
+  valide_le: string | null
   created_at: string
 }
 
@@ -178,6 +181,8 @@ export interface Conge {
   jours: number
   /** Idem, pour l'engagement de congé signé par le salarié. */
   champs_document: Record<string, string> | null
+  /** Renseignée quand l'engagement signé a été scanné. */
+  valide_le: string | null
   created_at: string
 }
 

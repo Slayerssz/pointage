@@ -41,15 +41,17 @@ export function useDocuments(opts: {
   employeeId?: string
   congeId?: string
   contratId?: string
+  sortieId?: string
 }) {
-  const { employeeId, congeId, contratId } = opts
+  const { employeeId, congeId, contratId, sortieId } = opts
   return useQuery({
-    queryKey: ['documents', employeeId, congeId, contratId],
-    enabled: Boolean(employeeId || congeId || contratId),
+    queryKey: ['documents', employeeId, congeId, contratId, sortieId],
+    enabled: Boolean(employeeId || congeId || contratId || sortieId),
     queryFn: async (): Promise<Document[]> => {
       let q = supabase.from('documents').select('*').order('created_at', { ascending: false })
       if (congeId) q = q.eq('conge_id', congeId)
       else if (contratId) q = q.eq('contrat_id', contratId)
+      else if (sortieId) q = q.eq('sortie_id', sortieId)
       else if (employeeId) q = q.eq('employee_id', employeeId)
       const { data, error } = await q
       if (error) throw error
@@ -64,6 +66,7 @@ export function useDeposerDocument(opts: {
   type: Document['type']
   congeId?: string
   contratId?: string
+  sortieId?: string
 }) {
   const qc = useQueryClient()
   return useMutation({
@@ -89,6 +92,7 @@ export function useDeposerDocument(opts: {
         type: opts.type,
         conge_id: opts.congeId ?? null,
         contrat_id: opts.contratId ?? null,
+        sortie_id: opts.sortieId ?? null,
         chemin,
         nom_fichier: fichier.name,
         mime: fichier.type || null,

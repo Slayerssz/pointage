@@ -150,10 +150,13 @@ function ContratsPanel({
                         ) : (
                           aff && <Chip tone={aff.chip}>{aff.label}</Chip>
                         )}
+                        {/* Un contrat n'engage qu'une fois le scan signé déposé. */}
+                        <Chip tone={c.valide_le ? 'green' : 'amber'}>
+                          {c.valide_le ? 'Signé' : 'En attente du scan'}
+                        </Chip>
                       </p>
                       <p className="mt-0.5 text-xs text-slate-600">
-                        Du {formatDateFr(c.date_debut)} au{' '}
-                        {c.date_fin ? formatDateFr(c.date_fin) : 'durée indéterminée'}
+                        Du {formatDateFr(c.date_debut)} au {formatDateFr(c.date_fin)}
                         {c.poste ? ` · ${c.poste}` : ''}
                         {c.salaire_mensuel != null ? ` · ${formatDH(c.salaire_mensuel)}` : ''}
                       </p>
@@ -296,6 +299,14 @@ function ContratForm({
   const save = useMutation({
     mutationFn: async () => {
       if (!f.date_debut) throw new Error('La date de début est obligatoire.')
+      if (!f.date_fin) {
+        throw new Error(
+          'La date de fin est obligatoire : sans elle, le contrat n’entre dans aucune alerte.',
+        )
+      }
+      if (f.date_fin < f.date_debut) {
+        throw new Error('La date de fin précède la date de début.')
+      }
       const payload = {
         company_id: employee.company_id,
         employee_id: employee.id,
@@ -395,7 +406,7 @@ function ContratForm({
                    onChange={(e) => set('date_debut')(e.target.value)} className={inputCls} />
           ))}
           {field(
-            'Date de fin (vide = pas d’alerte)',
+            'Date de fin *',
             <input type="date" value={f.date_fin} min={f.date_debut || undefined}
                    onChange={(e) => set('date_fin')(e.target.value)} className={inputCls} />,
           )}
@@ -412,9 +423,8 @@ function ContratForm({
           ))}
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          Seul le type de contrat ne s’imprime pas. Les couleurs de fin suivent la
-          date de fin, quel que soit le type : bleu à dix jours du terme, jaune une
-          fois échu.
+          Seul le type de contrat ne s’imprime pas. Les couleurs suivent la date de
+          fin, quel que soit le type : bleu à dix jours du terme, jaune une fois échu.
         </p>
       </Section>
 
@@ -735,11 +745,15 @@ function CongesPanel({
           <li key={c.id} className="rounded-xl border border-slate-200 p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-slate-900">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-900">
                   {formatDateFr(c.date_debut)} → {formatDateFr(c.date_fin)}
-                  <span className="ml-2 text-xs font-normal text-slate-500">
+                  <span className="text-xs font-normal text-slate-500">
                     {c.jours} jour{c.jours > 1 ? 's' : ''}
                   </span>
+                  {/* Le congé n'engage qu'une fois l'engagement signé déposé. */}
+                  <Chip tone={c.valide_le ? 'green' : 'amber'}>
+                    {c.valide_le ? 'Signé' : 'En attente du scan'}
+                  </Chip>
                 </p>
                 <p className="text-xs text-slate-500">
                   {gardeLabel(c.type)}

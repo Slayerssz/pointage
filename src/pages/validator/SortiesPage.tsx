@@ -13,6 +13,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { MOIS_FR } from '../../lib/paie'
 import PanneauDocument from '../../components/PanneauDocument'
+import DocumentsSignes from '../../components/DocumentsSignes'
+import { useDocuments } from '../../lib/documents'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
 
@@ -283,6 +285,11 @@ function FormulaireSortie({
   }))
   const [confirme, setConfirme] = useState(false)
 
+  // Le reçu signé conditionne la validation : sans lui, rien ne prouve
+  // que le salarié a accepté son solde.
+  const { data: scans } = useDocuments({ sortieId: sortie?.id })
+  const scanDepose = (scans ?? []).some((d) => d.type === 'sortie')
+
   // Ce que la fiche de l'employé apporte au reçu, sans rien retaper.
   const COUVERTS = ['nom', 'cin', 'adresse', 'mode', 'montant', 'fait_le']
   const valeursDoc: Record<string, string> = {
@@ -342,7 +349,9 @@ function FormulaireSortie({
           {sortie && !confirme && (
             <button
               onClick={() => setConfirme(true)}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              disabled={!scanDepose}
+              title={scanDepose ? undefined : 'Déposez d’abord le reçu signé'}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
             >
               Valider le départ
             </button>
@@ -359,6 +368,18 @@ function FormulaireSortie({
         </>
       }
     >
+      <ol className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+        {[
+          ['Enregistrer', !!sortie],
+          ['Imprimer et faire signer', !!sortie],
+          ['Déposer le reçu signé', scanDepose],
+          ['Valider le départ', false],
+        ].map(([libelle, fait], i) => (
+          <li key={libelle as string} className={fait ? 'font-medium text-emerald-700' : ''}>
+            {i + 1}. {libelle as string}{fait ? ' ✓' : ''}
+          </li>
+        ))}
+      </ol>
       {!sortie && (
         <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
           Enregistrez d’abord le départ. Il pourra être corrigé jusqu’à la validation,
@@ -407,6 +428,19 @@ function FormulaireSortie({
           </select>
         </label>
       </div>
+
+      {sortie && (
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <DocumentsSignes
+            companyId={employee.company_id}
+            employeeId={employee.id}
+            type="sortie"
+            sortieId={sortie.id}
+            intitule="le reçu signé"
+            aide="Imprimez le reçu, faites-le signer, puis déposez le scan ici. Le départ ne peut être validé qu’ensuite."
+          />
+        </div>
+      )}
 
       {aSaisir.length > 0 && (
         <div className="mt-4 border-t border-slate-200 pt-4">

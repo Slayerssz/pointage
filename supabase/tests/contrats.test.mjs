@@ -205,6 +205,19 @@ ok('l’icône des sorties a la taille des autres',
 ok('… et dit ce qu’elle emporte et ce qu’elle garde',
    sortiesPage.includes('restent consultables'))
 
+console.log('\n  ── Rien n’est validé sans son scan ────────────────────')
+ok('le contrat affiche s’il est signé ou en attente',
+   detail0.includes("c.valide_le ? 'Signé' : 'En attente du scan'"))
+ok('le congé aussi',
+   (detail0.match(/valide_le \? 'Signé'/g) ?? []).length >= 2)
+ok('la sortie n’ouvre la validation qu’une fois le reçu déposé',
+   sortiesPage.includes('disabled={!scanDepose}'))
+ok('… et le circuit est écrit à l’écran',
+   sortiesPage.includes('Déposer le reçu signé'))
+ok('le reçu se dépose depuis la page des sorties',
+   sortiesPage.includes('type="sortie"') && sortiesPage.includes('<DocumentsSignes'))
+
+
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)
 console.log('═'.repeat(66))

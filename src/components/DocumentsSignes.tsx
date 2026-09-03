@@ -22,6 +22,7 @@ export default function DocumentsSignes({
   type,
   congeId,
   contratId,
+  sortieId,
   intitule,
   aide,
 }: {
@@ -30,13 +31,14 @@ export default function DocumentsSignes({
   type: Document['type']
   congeId?: string
   contratId?: string
+  sortieId?: string
   /** Ce qu'on attend, en clair (ex. « l'engagement signé »). */
   intitule: string
   /** Phrase d'aide quand aucun fichier n'est encore déposé. */
   aide?: string
 }) {
-  const { data: docs, isLoading } = useDocuments({ employeeId, congeId, contratId })
-  const deposer = useDeposerDocument({ companyId, employeeId, type, congeId, contratId })
+  const { data: docs, isLoading } = useDocuments({ employeeId, congeId, contratId, sortieId })
+  const deposer = useDeposerDocument({ companyId, employeeId, type, congeId, contratId, sortieId })
   const supprimer = useSupprimerDocument()
   const champ = useRef<HTMLInputElement>(null)
   const [erreurOuverture, setErreurOuverture] = useState<string | null>(null)
