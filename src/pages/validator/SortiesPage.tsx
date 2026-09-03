@@ -8,7 +8,7 @@ import { modeleSolde } from '../../lib/soldeToutCompte'
 import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
 import {
   useAnnulerSortie, useApercuArchivage, useArchiverSorties, useEnregistrerSortie,
-  useSorties, useValiderSortie, type Sortie,
+  useSorties, type Sortie,
 } from '../../lib/sorties'
 import { useAuth } from '../../contexts/AuthContext'
 import { MOIS_FR } from '../../lib/paie'
@@ -107,7 +107,6 @@ export default function SortiesPage() {
               entreprise={company?.name ?? ''}
               companyId={companyId}
               sortie={sortieDeLEmploye}
-              onFini={() => setChoisi('')}
             />
           )}
         </>
@@ -159,6 +158,8 @@ function ClotureDuMois({ companyId }: { companyId: string | undefined }) {
 
   const { data: dossiers } = useApercuArchivage(companyId, annee, mois)
   const archiver = useArchiverSorties(companyId)
+
+  useEffect(() => { setConfirme(false) }, [annee, mois])
 
   useEffect(() => { setConfirme(false) }, [annee, mois])
 
@@ -262,17 +263,15 @@ function ClotureDuMois({ companyId }: { companyId: string | undefined }) {
 }
 
 function FormulaireSortie({
-  employee, entreprise, companyId, sortie, onFini,
+  employee, entreprise, companyId, sortie,
 }: {
   employee: Employee
   entreprise: string
   companyId: string | undefined
   sortie: Sortie | null
-  onFini: () => void
 }) {
   const modele = useMemo(() => modeleSolde(entreprise), [entreprise])
   const enregistrer = useEnregistrerSortie(companyId)
-  const valider = useValiderSortie(companyId)
 
   const [f, setF] = useState({
     date_sortie: sortie?.date_sortie ?? todayIso(),
@@ -283,7 +282,6 @@ function FormulaireSortie({
     ...(modeleSolde(entreprise).defauts ?? {}),
     ...((sortie?.champs_document ?? {}) as Record<string, string>),
   }))
-  const [confirme, setConfirme] = useState(false)
 
   // Le reçu signé conditionne la validation : sans lui, rien ne prouve
   // que le salarié a accepté son solde.
@@ -302,8 +300,6 @@ function FormulaireSortie({
     ...docLibre,
   }
   const aSaisir = champsASaisir(modele, COUVERTS)
-
-  useEffect(() => { setConfirme(false) }, [f.date_sortie, f.montant])
 
   const champs = {
     employeeId: employee.id,
@@ -332,11 +328,9 @@ function FormulaireSortie({
       }
       actions={
         <>
-          {(enregistrer.error || valider.error) && (
+          {enregistrer.error && (
             <div className="w-full">
-              <ErrorNote>
-                {(enregistrer.error ?? valider.error)?.message}
-              </ErrorNote>
+              <ErrorNote>{enregistrer.error.message}</ErrorNote>
             </div>
           )}
           <button
@@ -346,25 +340,6 @@ function FormulaireSortie({
           >
             {enregistrer.isPending ? 'Enregistrement…' : sortie ? 'Mettre à jour' : 'Enregistrer'}
           </button>
-          {sortie && !confirme && (
-            <button
-              onClick={() => setConfirme(true)}
-              disabled={!scanDepose}
-              title={scanDepose ? undefined : 'Déposez d’abord le reçu signé'}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
-            >
-              Valider le départ
-            </button>
-          )}
-          {sortie && confirme && (
-            <button
-              onClick={() => valider.mutate(sortie.id, { onSuccess: onFini })}
-              disabled={valider.isPending}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40"
-            >
-              {valider.isPending ? 'Validation…' : 'Confirmer : il quitte les listes'}
-            </button>
-          )}
         </>
       }
     >
@@ -373,7 +348,7 @@ function FormulaireSortie({
           ['Enregistrer', !!sortie],
           ['Imprimer et faire signer', !!sortie],
           ['Déposer le reçu signé', scanDepose],
-          ['Valider le départ', false],
+          ['Validé — il quitte les listes', scanDepose],
         ].map(([libelle, fait], i) => (
           <li key={libelle as string} className={fait ? 'font-medium text-emerald-700' : ''}>
             {i + 1}. {libelle as string}{fait ? ' ✓' : ''}
@@ -386,11 +361,12 @@ function FormulaireSortie({
           qui se fait le dernier jour travaillé.
         </p>
       )}
-      {confirme && (
-        <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-          Après validation, <strong>{employee.nom_prenom}</strong> disparaît des listes
-          d’employés et du pointage. Sa fiche, ses pointages et ses bulletins de paie
-          restent consultables. Seul l’administrateur peut le remettre en poste.
+      {scanDepose && (
+        <p className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          Le reçu signé est déposé : <strong>{employee.nom_prenom}</strong> est acté comme
+          parti. Il quitte le pointage et rejoint les fiches que l’administrateur retirera
+          à la clôture du mois. Sa fiche, ses pointages et ses bulletins restent
+          consultables ; retirer le reçu le remettrait en poste.
         </p>
       )}
 

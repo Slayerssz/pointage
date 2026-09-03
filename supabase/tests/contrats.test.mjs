@@ -188,7 +188,8 @@ const sortiesPage = fs.readFileSync(new URL('../../src/pages/validator/SortiesPa
 ok('on choisit l’employé, et sa fiche remplit le reçu',
    sortiesPage.includes('— Choisir un employé —') && sortiesPage.includes('valeursEmploye'))
 ok('le reçu se compose pendant la saisie', sortiesPage.includes('<PanneauDocument'))
-ok('la validation demande une confirmation', sortiesPage.includes('Confirmer : il quitte les listes'))
+ok('la clôture du mois, elle, demande une confirmation',
+   sortiesPage.includes('Confirmer le retrait de'))
 ok('le départ se fait en deux temps : valider, puis clôturer le mois',
    sortiesPage.includes('function ClotureDuMois'))
 ok('seul l’administrateur voit la clôture',
@@ -203,17 +204,22 @@ ok('l’icône des sorties a la taille des autres',
    fs.readFileSync(new URL('../../src/components/Layout.tsx', import.meta.url), 'utf8')
      .match(/sorties: \(\s*<svg[^>]*className="h-5 w-5"/))
 ok('… et dit ce qu’elle emporte et ce qu’elle garde',
-   sortiesPage.includes('restent consultables'))
+   sortiesPage.includes('bulletins restent'))
+ok('un scan retiré remet la personne en poste, et l’écran le dit',
+   sortiesPage.includes('le remettrait en poste'))
 
 console.log('\n  ── Rien n’est validé sans son scan ────────────────────')
 ok('le contrat affiche s’il est signé ou en attente',
    detail0.includes("c.valide_le ? 'Signé' : 'En attente du scan'"))
 ok('le congé aussi',
    (detail0.match(/valide_le \? 'Signé'/g) ?? []).length >= 2)
-ok('la sortie n’ouvre la validation qu’une fois le reçu déposé',
-   sortiesPage.includes('disabled={!scanDepose}'))
-ok('… et le circuit est écrit à l’écran',
-   sortiesPage.includes('Déposer le reçu signé'))
+ok('plus rien à valider à la main : le dépôt suffit',
+   !sortiesPage.includes('Valider le départ'))
+ok('le circuit en quatre temps est écrit à l’écran',
+   sortiesPage.includes('Déposer le reçu signé')
+   && sortiesPage.includes('Validé — il quitte les listes'))
+ok('l’écran dit ce que le dépôt vient de déclencher',
+   sortiesPage.includes('est acté comme') && sortiesPage.includes('clôture du mois'))
 ok('le reçu se dépose depuis la page des sorties',
    sortiesPage.includes('type="sortie"') && sortiesPage.includes('<DocumentsSignes'))
 

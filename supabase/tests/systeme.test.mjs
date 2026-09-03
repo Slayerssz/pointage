@@ -111,7 +111,7 @@ const ORDRE = [
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
   'BLOC_18_archivage_sorties.sql', 'BLOC_19_jours_par_mois.sql',
   'BLOC_20_bureau_paie.sql', 'BLOC_21_deux_types_contrat.sql', 'BLOC_22_date_fin_obligatoire.sql',
-  'BLOC_23_validation_par_scan.sql',
+  'BLOC_23_validation_par_scan.sql', 'BLOC_24_effet_au_depot.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -303,6 +303,18 @@ ok('numéro de contrat automatique au format CT-AAAA-NNNN', /^CT-\d{4}-\d{4}$/.t
 
 const statutDe = async (emp) => (await q1(
   `select statut, jours_restants from public.contrats_courants where employee_id=$1`, [emp]))
+
+// Tant que le contrat signé n'est pas déposé, il n'engage rien : il ne
+// figure pas parmi les contrats en cours et ne déclenche aucune alerte.
+ok('un contrat non signé n’est pas le contrat en cours',
+   (await statutDe(ePlein)) === undefined)
+
+const scanCt1 = (await q1(
+  `insert into public.documents(company_id, employee_id, type, contrat_id,
+                                chemin, nom_fichier, mime)
+   values ($1,$2,'contrat',$3,$4,'contrat-signe.pdf','application/pdf') returning id`,
+  [co, ePlein, ct1.id, `scan/ct-${ct1.id}.pdf`])).id
+ok('déposer le contrat signé le met en vigueur', !!(await statutDe(ePlein)))
 await db.query(`update public.contrats set date_fin = current_date + 5 where id=$1`, [ct1.id])
 ok('fin dans 5 jours → « bientôt » (ligne bleue)', (await statutDe(ePlein)).statut === 'bientot')
 await db.query(`update public.contrats set date_fin = current_date - 1 where id=$1`, [ct1.id])
@@ -317,7 +329,13 @@ await refuse('un contrat sans date de fin est refusé',
 // Renouvellement : nouveau contrat, ancien archivé
 await db.query(`update public.contrats set date_fin='2026-06-30' where id=$1`, [ct1.id])
 const ct2 = await contratDe(ePlein, '2026-07-01', '2027-06-30')
+await db.query(
+  `insert into public.documents(company_id, employee_id, type, contrat_id,
+                                chemin, nom_fichier, mime)
+   values ($1,$2,'contrat',$3,$4,'contrat-signe.pdf','application/pdf')`,
+  [co, ePlein, ct2.id, `scan/ct2-${ct2.id}.pdf`])
 await db.query(`update public.contrats set archive=true where id=$1`, [ct1.id])
+void scanCt1
 ok('après renouvellement, seul le nouveau contrat fait foi',
   (await q1(`select id from public.contrats_courants where employee_id=$1`, [ePlein])).id === ct2.id)
 
@@ -328,22 +346,35 @@ const c1 = (await q1(`select public.creer_conge($1,'2026-03-02'::date,'2026-03-0
 const c2 = (await q1(`select public.creer_conge($1,'2026-04-01'::date,'2026-04-03'::date,'C','Deuxième') as id`, [eMixte])).id
 ok('un employé cumule plusieurs congés', !!c1 && !!c2)
 await refuse('deux congés qui se chevauchent sont refusés',
-  `select public.creer_conge($1,'2026-03-04'::date,'2026-03-09'::date,'C',null)`, [eMixte], /existe déjà/i)
+  `select public.creer_conge($1,'2026-03-04'::date,'2026-03-09'::date,'C',null)`, [eMixte],
+  /chevauche|existe déjà/i)
 const c3 = (await q1(`select public.creer_conge($1,'2026-03-07'::date,'2026-03-09'::date,'C','Enchaîné') as id`, [eMixte])).id
 ok('un congé qui enchaîne juste après est accepté', !!c3)
-ok('les jours du congé sont écrits dans le pointage',
+// Un congé enregistré n'est pas encore en vigueur : rien n'est écrit au
+// pointage tant que l'engagement signé n'a pas été déposé.
+ok('un congé enregistré ne touche PAS encore au pointage',
+  Number((await q1(`select count(*) as c from public.pointages where conge_id=$1`, [c1])).c) === 0)
+
+await db.query(`insert into public.documents(company_id,employee_id,type,conge_id,chemin,nom_fichier,mime)
+                values($1,$2,'engagement',$3,'a/b/eng.pdf','engagement-signe.pdf','application/pdf')`,
+               [co, eMixte, c1])
+ok('déposer l’engagement signé inscrit les jours au pointage',
   Number((await q1(`select count(*) as c from public.pointages where conge_id=$1`, [c1])).c) > 0)
 ok('le jour de repos hebdomadaire n’est pas consommé',
   Number((await q1(`select count(*) as c from public.pointages
                     where conge_id=$1 and extract(isodow from pointed_on)=7`, [c1])).c) === 0)
 
-// Documents rattachés
+// Retirer le scan défait exactement ce qu'il avait fait.
+await db.query(`delete from public.documents where conge_id=$1 and type='engagement'`, [c1])
+ok('retirer l’engagement retire les jours du pointage',
+  Number((await q1(`select count(*) as c from public.pointages where conge_id=$1`, [c1])).c) === 0)
+ok('… et le congé redevient non validé',
+  (await q1(`select valide_le from public.conges where id=$1`, [c1])).valide_le === null)
 await db.query(`insert into public.documents(company_id,employee_id,type,conge_id,chemin,nom_fichier,mime)
-                values($1,$2,'engagement',$3,'a/b/eng.pdf','engagement-signe.pdf','application/pdf')`, [co, eMixte, c1])
-await db.query(`insert into public.documents(company_id,employee_id,type,contrat_id,chemin,nom_fichier,mime)
-                values($1,$2,'contrat',$3,'a/b/ct.pdf','contrat-legalise.pdf','application/pdf')`, [co, ePlein, ct2.id])
-ok('scans rattachés au congé et au contrat',
-  Number((await q1(`select count(*) as c from public.documents where company_id=$1`, [co])).c) === 2)
+                values($1,$2,'engagement',$3,'a/b/eng.pdf','engagement-signe.pdf','application/pdf')`,
+               [co, eMixte, c1])
+ok('le redéposer les remet', 
+  Number((await q1(`select count(*) as c from public.pointages where conge_id=$1`, [c1])).c) > 0)
 await q1(`select public.supprimer_conge($1)`, [c3])
 ok('supprimer un congé retire aussi ses jours de pointage',
   Number((await q1(`select count(*) as c from public.pointages where conge_id=$1`, [c3])).c) === 0)
@@ -762,8 +793,11 @@ ok('… en posant le dernier jour travaillé',
 ok('la fiche n’est PAS supprimée',
    !!(await q1(`select 1 from public.employees where id=$1`, [partant])))
 
-await refuse('une sortie validée ne se revalide pas',
-  `select public.valider_sortie($1)`, [sortie], /introuvable|déjà validée/i)
+// Le scan vaut validation : appeler la fonction ensuite ne fait que
+// constater, sans rien changer.
+await q1(`select public.valider_sortie($1)`, [sortie])
+ok('revalider après coup ne change rien',
+   (await q1(`select valide from public.sorties where id=$1`, [sortie])).valide === true)
 
 // Retirer le scan défait la validation : la pièce n'est plus au dossier.
 await db.query(`delete from public.documents where id=$1`, [scanSortie])
@@ -833,6 +867,85 @@ ok('… et l’employé n’a jamais bougé',
    (await q1(`select actif from public.employees where id=$1`, [partant])).actif === true)
 
 await db.query(`delete from public.employees where id=$1`, [partant])
+
+// ═══════════════════════ 9 sexies. LE SCAN MET EN VIGUEUR ═════
+
+section('Le parcours complet : créer, imprimer, signer, déposer')
+await connecte(bureau)
+
+// ── Un congé du 5 au 9 : rien au pointage tant qu'il n'est pas signé.
+const eParcours = await creerEmploye('PARCOURS COMPLET', aRiad, { cin: 'PC1' })
+const cgP = (await q1(
+  `select public.creer_conge($1,'2026-05-05'::date,'2026-05-09'::date,'C',null) as id`,
+  [eParcours])).id
+ok('le congé du 5 au 9 est enregistré', !!cgP)
+ok('… mais ces jours ne sont PAS des congés au pointage',
+   Number((await q1(
+     `select count(*) as c from public.pointages
+       where employee_id=$1 and pointed_on between '2026-05-05' and '2026-05-09'`,
+     [eParcours])).c) === 0)
+ok('… et le congé compte zéro jour', 
+   Number((await q1(`select jours from public.conges where id=$1`, [cgP])).jours) === 0)
+
+const scanCg = await deposerScan('engagement', eParcours, { colonne: 'conge_id', id: cgP })
+ok('le scan déposé, les jours deviennent des congés au pointage',
+   Number((await q1(
+     `select count(*) as c from public.pointages
+       where employee_id=$1 and pointed_on between '2026-05-05' and '2026-05-09'
+         and type_garde='C'`, [eParcours])).c) > 0)
+ok('… et le congé compte ses jours',
+   Number((await q1(`select jours from public.conges where id=$1`, [cgP])).jours) > 0)
+
+await db.query(`delete from public.documents where id=$1`, [scanCg])
+ok('retirer le scan efface ces jours du pointage',
+   Number((await q1(
+     `select count(*) as c from public.pointages
+       where employee_id=$1 and pointed_on between '2026-05-05' and '2026-05-09'`,
+     [eParcours])).c) === 0)
+
+// ── Un contrat : sans scan, il n'est le contrat de personne.
+const ctP = (await q1(
+  `insert into public.contrats(company_id,employee_id,type_contrat,date_debut,date_fin,created_by)
+   values ($1,$2,'CONTRAT','2026-01-01','2026-12-31',$3) returning id`,
+  [co, eParcours, bureau])).id
+ok('le contrat enregistré n’est pas encore le contrat en cours',
+   (await rows(`select 1 from public.contrats_courants where employee_id=$1`, [eParcours])).length === 0)
+const scanCt = await deposerScan('contrat', eParcours, { colonne: 'contrat_id', id: ctP })
+const courant = await q1(
+  `select date_debut, date_fin, statut from public.contrats_courants where employee_id=$1`,
+  [eParcours])
+ok('le scan déposé, le contrat s’applique avec ses dates', !!courant)
+ok('… et ses dates portent enfin le statut', ['actif', 'bientot', 'termine'].includes(courant.statut))
+await db.query(`delete from public.documents where id=$1`, [scanCt])
+ok('retirer le scan le remet en attente',
+   (await rows(`select 1 from public.contrats_courants where employee_id=$1`, [eParcours])).length === 0)
+
+// ── Une sortie : il part, mais rien n'est acté sans le reçu signé.
+const stP = (await q1(
+  `select public.enregistrer_sortie($1,'2026-05-29'::date,3000,'Virement',null,'{}'::jsonb) as id`,
+  [eParcours])).id
+ok('la sortie est enregistrée : il s’en va',
+   (await q1(`select valide from public.sorties where id=$1`, [stP])).valide === false)
+ok('… mais il est toujours en poste',
+   (await q1(`select actif from public.employees where id=$1`, [eParcours])).actif === true)
+
+const scanSt = await deposerScan('sortie', eParcours, { colonne: 'sortie_id', id: stP })
+ok('le reçu signé déposé, la sortie est validée d’elle-même',
+   (await q1(`select valide from public.sorties where id=$1`, [stP])).valide === true)
+ok('… il est acté comme parti',
+   (await q1(`select actif from public.employees where id=$1`, [eParcours])).actif === false)
+
+await connecte(admin)
+ok('… et il rejoint la liste des fiches à retirer en fin de mois',
+   (await q1(`select public.apercu_archivage($1,2026,5) as a`, [co])).a
+     .some((d) => d.employee_id === eParcours))
+await connecte(bureau)
+
+await db.query(`delete from public.documents where id=$1`, [scanSt])
+ok('retirer le reçu le remet en poste',
+   (await q1(`select actif from public.employees where id=$1`, [eParcours])).actif === true)
+
+await db.query(`delete from public.employees where id=$1`, [eParcours])
 
 // ═════════════════════════════════ 9 quinquies. CLÔTURE DU MOIS ═════
 
