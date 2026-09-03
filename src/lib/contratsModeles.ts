@@ -16,7 +16,7 @@ export interface ChampContrat {
   label: string
   type: TypeChamp
   /** Ce que le champ vaut au départ, quand on peut le déduire du dossier. */
-  depuis?: 'nom_prenom' | 'cin' | 'date_naissance' | 'adresse' | 'salaire' | 'ville'
+  depuis?: 'nom_prenom' | 'cin' | 'date_naissance' | 'adresse' | 'salaire' | 'ville' | 'mode_reglement'
   aide?: string
 }
 
@@ -428,10 +428,19 @@ function familleD(cooperative: string, siege: string, metier: string, objet: str
     langue: 'ar',
     gauche: `توقيع التعاونية ${cooperative}`,
     droite: 'توقيع الأجيرة',
+    // Les mentions qui se tapent en arabe portent leur intitulé arabe :
+    // sans cela deux champs « Fait à » se retrouvent dans le formulaire,
+    // l'un pour la base, l'autre pour le document.
     champs: [
-      MARCHE, NOM, CIN, NAISSANCE, ADRESSE, DEBUT, FIN,
-      { id: 'heures', label: 'Heures par mois', type: 'nombre' },
-      SALAIRE, FAIT_A, FAIT_LE,
+      { id: 'marche', label: 'رقم الصفقة — Marché n°', type: 'texte' },
+      { id: 'nom', label: 'اسم الأجيرة — Nom, en arabe', type: 'texte' },
+      CIN, NAISSANCE,
+      { id: 'adresse', label: 'العنوان — Domicile, en arabe', type: 'long' },
+      DEBUT, FIN,
+      { id: 'heures', label: 'ساعة شهريا — Heures par mois', type: 'nombre' },
+      SALAIRE,
+      { id: 'fait_a', label: 'حرر بـ — Fait à, en arabe', type: 'texte' },
+      FAIT_LE,
     ],
     blocs: [
       { type: 'section', texte: 'المادة 1- سياق التعاقد' },
@@ -646,6 +655,27 @@ export function modeleContrat(entreprise: string | null | undefined): ModeleCont
 
 export function entreprisesAvecContrat(): string[] {
   return Object.keys(MODELES)
+}
+
+/**
+ * Les jetons réellement présents dans un modèle.
+ *
+ * Tous les champs d'un formulaire ne finissent pas sur le papier : le
+ * contrat de BO ne mentionne ni période d'essai, ni mode de règlement.
+ * Savoir lesquels s'impriment évite de chercher pourquoi « rien ne change
+ * quand je tape ».
+ */
+export function jetonsDuModele(modele: ModeleContrat | null): Set<string> {
+  const vus = new Set<string>()
+  if (!modele) return vus
+  const lire = (t: string) => {
+    for (const m of t.matchAll(/\{\{(\w+)\}\}/g)) vus.add(m[1])
+  }
+  for (const b of modele.blocs) {
+    if (b.type === 'puces') b.items.forEach(lire)
+    else if (b.type !== 'espace') lire(b.texte)
+  }
+  return vus
 }
 
 /** Remplace les jetons par les valeurs saisies. Un champ vide reste en pointillés. */

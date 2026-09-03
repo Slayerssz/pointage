@@ -37,12 +37,15 @@ export function valeursEmploye(
   const v: Record<string, string> = {
     cin: employee.cin ?? '',
     naissance: employee.date_naissance ? formatDateFr(employee.date_naissance) : '',
+    mode_reglement: employee.mode_reglement ?? '',
   }
   if (!arabe) {
     v.nom = employee.nom_prenom ?? ''
     v.adresse = [employee.adresse, employee.ville].filter(Boolean).join(', ')
     v.fait_a = employee.ville ?? ''
   }
+  // Le reçu de solde nomme le mode de règlement dans sa phrase.
+  v.mode = employee.mode_reglement ?? ''
   return v
 }
 

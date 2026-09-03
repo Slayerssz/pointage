@@ -7,6 +7,7 @@ import CompanySelectPage from './pages/CompanySelectPage'
 import AgentPointagePage from './pages/agent/AgentPointagePage'
 import ValidationPage from './pages/validator/ValidationPage'
 import EmployesPage from './pages/validator/EmployesPage'
+import SortiesPage from './pages/validator/SortiesPage'
 import AnalyticsPage from './pages/admin/AnalyticsPage'
 import UsersPage from './pages/admin/UsersPage'
 import OrganisationsPage from './pages/admin/OrganisationsPage'
@@ -120,6 +121,14 @@ export default function App() {
                 element={
                   <RequireRole roles={['validator', 'admin', 'rh']}>
                     <EmployesPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="sorties"
+                element={
+                  <RequireRole roles={['validator', 'admin', 'rh']}>
+                    <SortiesPage />
                   </RequireRole>
                 }
               />

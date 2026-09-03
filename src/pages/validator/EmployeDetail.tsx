@@ -12,13 +12,14 @@ import {
 import { TYPES_CONTRAT, contratAffichage, contratStatut, joursRestants } from '../../lib/contrats'
 import { TYPES_ABSENCE, gardeLabel } from '../../lib/gardes'
 import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
-import { Chip, DateInputFr, ErrorNote, Spinner } from '../../components/ui'
+import { Chip, ErrorNote, Spinner } from '../../components/ui'
 import DocumentsSignes from '../../components/DocumentsSignes'
 import EngagementConge from '../../components/EngagementConge'
 import PanneauDocument from '../../components/PanneauDocument'
-import { modeleContrat } from '../../lib/contratsModeles'
+import { jetonsDuModele, modeleContrat } from '../../lib/contratsModeles'
 import { modeleEngagement } from '../../lib/engagementConge'
 import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
+import { useSites } from '../../lib/queries'
 import { useDocuments } from '../../lib/documents'
 
 const inputCls =
@@ -236,6 +237,9 @@ function ContratForm({
 }) {
   const qc = useQueryClient()
   const modele = modeleContrat(entreprise)
+  // Le lieu de travail se choisit parmi les annexes de la société : on ne
+  // demande à personne de retenir quatre-vingt-douze noms de sites.
+  const { data: sites } = useSites(employee.company_id)
   // Un renouvellement reprend tout l'ancien contrat, mais enchaîne les dates :
   // début = lendemain de l'ancienne fin, fin = un an plus tard.
   const base = contrat ?? renouvelle ?? null
@@ -270,8 +274,16 @@ function ContratForm({
   }))
 
   // Ce que le formulaire alimente tout seul sur le document.
-  const COUVERTS = ['nom', 'cin', 'naissance', 'adresse', 'debut', 'fin',
-                    'salaire', 'fonction', 'fait_a', 'fait_le']
+  // Sur un contrat en arabe, le nom, le domicile et le lieu de signature
+  // ne peuvent PAS venir du formulaire : le registre les écrit en
+  // caractères latins et la pièce se rédige en arabe. Ils rejoignent donc
+  // les mentions à saisir, au lieu de rester en pointillés pour toujours.
+  const enArabe = modele?.langue === 'ar'
+  const COUVERTS = enArabe
+    ? ['cin', 'naissance', 'debut', 'fin', 'salaire', 'fonction', 'fait_le']
+    : ['nom', 'cin', 'naissance', 'adresse', 'debut', 'fin',
+       'salaire', 'fonction', 'fait_a', 'fait_le']
+
   const valeursDoc: Record<string, string> = {
     ...(modele?.defauts ?? {}),
     ...valeursEmploye(employee, modele),
@@ -279,11 +291,19 @@ function ContratForm({
     fin: dateDoc(f.date_fin),
     salaire: f.salaire_mensuel,
     fonction: f.poste,
-    fait_a: f.signe_a,
     fait_le: dateDoc(f.signe_le),
+    ...(enArabe ? {} : { fait_a: f.signe_a }),
     ...docLibre,
   }
   const aSaisir = champsASaisir(modele, COUVERTS)
+
+  // Le contrat de BO ne parle ni de période d'essai ni de mode de règlement :
+  // ces champs existent au registre mais ne s'impriment pas. On le dit, plutôt
+  // que de laisser chercher pourquoi « rien ne change quand je tape ».
+  const jetons = jetonsDuModele(modele)
+  const surLePapier = (jeton: string) => jetons.has(jeton)
+  const marque = (label: string, jeton: string) =>
+    surLePapier(jeton) ? label : `${label} ⋯`
 
   const save = useMutation({
     mutationFn: async () => {
@@ -379,6 +399,12 @@ function ContratForm({
         </>
       }
     >
+      <p className="mb-3 text-xs text-slate-500">
+        Les champs suivis de <span className="text-slate-400">⋯</span> restent au
+        registre : ce modèle de contrat ne les imprime pas.
+      </p>
+
+      <Section titre="L’engagement">
       <div className="grid gap-3 sm:grid-cols-2">
         {field('Type de contrat', (
           <select value={f.type_contrat} onChange={(e) => set('type_contrat')(e.target.value)} className={inputCls}>
@@ -387,66 +413,94 @@ function ContratForm({
             ))}
           </select>
         ))}
-        {field('Poste / fonction', (
+        {field(marque('Poste / fonction', 'fonction'), (
           <input type="text" value={f.poste} onChange={(e) => set('poste')(e.target.value)} className={inputCls} />
         ))}
-        {field('Date de début *', (
-          <DateInputFr value={f.date_debut} onChange={set('date_debut')} className={inputCls} />
+        {/* Calendrier natif : plus sûr que la saisie au clavier, et déjà
+            ce que fait le formulaire des congés. */}
+        {field(marque('Date de début *', 'debut'), (
+          <input type="date" value={f.date_debut}
+                 onChange={(e) => set('date_debut')(e.target.value)} className={inputCls} />
         ))}
         {field(
-          f.type_contrat === 'CDI' ? 'Date de fin (vide = indéterminée)' : 'Date de fin *',
-          <DateInputFr value={f.date_fin} onChange={set('date_fin')} className={inputCls} />,
+          marque(f.type_contrat === 'CDI' ? 'Date de fin (vide = indéterminée)' : 'Date de fin *', 'fin'),
+          <input type="date" value={f.date_fin} min={f.date_debut || undefined}
+                 onChange={(e) => set('date_fin')(e.target.value)} className={inputCls} />,
         )}
-        {field("Période d'essai (jours)", (
+        {field("Période d'essai (jours)" + ' ⋯', (
           <input type="number" min="0" value={f.periode_essai_jours}
                  onChange={(e) => set('periode_essai_jours')(e.target.value)} className={inputCls} />
         ))}
-        {field('Lieu de travail', (
-          <input type="text" value={f.lieu_travail} onChange={(e) => set('lieu_travail')(e.target.value)}
-                 className={inputCls} placeholder="Site / adresse" />
+        {field('Lieu de travail' + ' ⋯', (
+          <select value={f.lieu_travail} onChange={(e) => set('lieu_travail')(e.target.value)}
+                  className={inputCls}>
+            <option value="">— Annexe de la société —</option>
+            {(sites ?? []).map((si) => (
+              <option key={si.id} value={si.name}>{si.name}</option>
+            ))}
+            {/* Un contrat plus ancien peut porter un lieu qui n'est plus une
+                annexe : on le garde plutôt que de l'effacer en silence. */}
+            {f.lieu_travail && !(sites ?? []).some((si) => si.name === f.lieu_travail) && (
+              <option value={f.lieu_travail}>{f.lieu_travail}</option>
+            )}
+          </select>
         ))}
-        {field('Salaire mensuel (DH)', (
+      </div>
+      </Section>
+
+      <Section titre="La rémunération">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {field(marque('Salaire mensuel (DH)', 'salaire'), (
           <input type="number" min="0" step="0.01" value={f.salaire_mensuel}
                  onChange={(e) => set('salaire_mensuel')(e.target.value)} className={inputCls} />
         ))}
-        {field('Heures par jour', (
+        {field('Heures par jour' + ' ⋯', (
           <input type="number" min="0" step="0.5" value={f.heures_par_jour}
                  onChange={(e) => set('heures_par_jour')(e.target.value)} className={inputCls} />
         ))}
-        {field('Mode de règlement', (
+        {field('Mode de règlement' + ' ⋯', (
           <input type="text" value={f.mode_reglement} onChange={(e) => set('mode_reglement')(e.target.value)}
                  className={inputCls} placeholder="Virement / Espèce" />
         ))}
-        {field('Représentant de l’employeur', (
+      </div>
+      </Section>
+
+      <Section titre="La signature">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {field('Représentant de l’employeur' + ' ⋯', (
           <input type="text" value={f.representant_employeur}
                  onChange={(e) => set('representant_employeur')(e.target.value)} className={inputCls} />
         ))}
-        {field('Fait à', (
+        {field(marque('Fait à', 'fait_a'), (
           <input type="text" value={f.signe_a} onChange={(e) => set('signe_a')(e.target.value)} className={inputCls} />
         ))}
-        {field('Fait le', (
-          <DateInputFr value={f.signe_le} onChange={set('signe_le')} className={inputCls} />
+        {field(marque('Fait le', 'fait_le'), (
+          <input type="date" value={f.signe_le}
+                 onChange={(e) => set('signe_le')(e.target.value)} className={inputCls} />
         ))}
         <div className="sm:col-span-2">
-          {field('Observations', (
+          {field('Observations (usage interne, ne s’imprime pas)', (
             <textarea value={f.observations} onChange={(e) => set('observations')(e.target.value)}
                       rows={2} className={inputCls} />
           ))}
         </div>
         {contrat && (
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
             <input type="checkbox" checked={f.archive} onChange={(e) => set('archive')(e.target.checked)}
                    className="h-4 w-4 rounded border-slate-300" />
             Archiver ce contrat (plus d’alerte de fin)
           </label>
         )}
       </div>
+      </Section>
 
       {aSaisir.length > 0 && (
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <p className="mb-3 text-sm font-semibold text-slate-900">
-            Mentions propres au contrat imprimé
-          </p>
+        <Section
+          titre="Ce qui ne figure que sur le contrat"
+          aide={enArabe
+            ? 'À saisir en arabe. Ces mentions n’existent nulle part ailleurs en base.'
+            : 'Ces mentions n’existent nulle part ailleurs en base.'}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             {aSaisir.map((c) => (
               <div key={c.id}>
@@ -474,9 +528,23 @@ function ContratForm({
           <p className="mt-2 text-xs text-slate-400">
             Un champ vide s’imprime en pointillés, comme sur le formulaire papier.
           </p>
-        </div>
+        </Section>
       )}
     </PanneauDocument>
+  )
+}
+
+/** Un groupe de champs, avec son intitulé — plutôt qu'une grille de douze
+ *  cases où rien ne dit ce qui va ensemble. */
+function Section({
+  titre, aide, children,
+}: { titre: string; aide?: string; children: ReactNode }) {
+  return (
+    <div className="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0 [&+&]:mt-4">
+      <p className="text-sm font-semibold text-slate-900">{titre}</p>
+      {aide && <p className="mt-0.5 mb-3 text-xs text-slate-500">{aide}</p>}
+      <div className={aide ? '' : 'mt-3'}>{children}</div>
+    </div>
   )
 }
 

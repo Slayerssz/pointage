@@ -9,6 +9,14 @@ const ICONS = {
       <path d="M12 8v4l2.5 2.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
     </svg>
   ),
+  sorties: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
   employes: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
       <path d="M17 20h5v-1a4 4 0 0 0-4-4h-1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 0a3 3 0 1 0-2-5.2M2 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1H2Z" />
@@ -74,6 +82,7 @@ export default function Layout() {
     profile?.role === 'admin'
       ? [
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+          { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
           { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
           { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
           { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
@@ -86,11 +95,15 @@ export default function Layout() {
       : profile?.role === 'validator'
         ? [
             { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+            { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
             { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
             { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           ]
         : profile?.role === 'rh'
-          ? [{ to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes }]
+          ? [
+              { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+              { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
+            ]
           : profile?.role === 'paie'
             ? [
                 { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },

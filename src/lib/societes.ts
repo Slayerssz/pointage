@@ -9,6 +9,13 @@ export interface Societe {
   siege: string
   /** Le siège en arabe, quand la société édite des pièces en arabe. */
   siegeAr?: string
+  /** Les identifiants qui figurent sur le reçu pour solde de tout compte.
+   *  Absents tant que la société ne les a pas communiqués : le reçu sort
+   *  alors avec des pointillés, à compléter à la main. */
+  rc?: string
+  patente?: string
+  if?: string
+  ice?: string
 }
 
 const SOCIETES: Record<string, Societe> = {
@@ -43,6 +50,7 @@ const SOCIETES: Record<string, Societe> = {
   'VIGILMA GARD MAROC': {
     raisonSociale: 'VIGILMA GARD MAROC SARL',
     siege: 'DRADEB 1 RUE 2 N°35 2ème ÉTAGE, TANGER',
+    rc: '135975', patente: '50211305', if: '53692100', ice: '003258325000054',
   },
   'AL SAFAE EL MAGHREB': {
     raisonSociale: 'AL SAFAE EL MAGHREB',

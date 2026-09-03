@@ -69,6 +69,7 @@ for (const [quoi, phrase] of [
 ]) ok(quoi + ' est reprise', src.includes(phrase))
 
 console.log('\n  ── Engagement de congé ────────────────────────────────')
+const detail0 = fs.readFileSync(new URL('../../src/pages/validator/EmployeDetail.tsx', import.meta.url), 'utf8')
 const eng = fs.readFileSync(new URL('../../src/lib/engagementConge.ts', import.meta.url), 'utf8')
 ok('l’engagement est en arabe', eng.includes("langue: 'ar'"))
 ok('le titre est « التزام »', eng.includes("titre: 'التزام'"))
@@ -81,6 +82,24 @@ for (const [quoi, phrase] of [
   ['la signature', "gauche: 'التوقيع'"],
 ]) ok(quoi + ' est reprise', eng.includes(phrase))
 ok('la société et son siège sont préremplis', eng.includes('defauts:'))
+
+console.log('\n  ── Un contrat arabe peut être rempli ──────────────────')
+ok('le nom, le domicile et le lieu de signature s’y saisissent en arabe',
+   src.includes("label: 'اسم الأجيرة — Nom, en arabe'")
+   && src.includes("label: 'العنوان — Domicile, en arabe'")
+   && src.includes("label: 'حرر بـ — Fait à, en arabe'"))
+ok('ils ne sont pas repris du formulaire, qui les écrit en latin',
+   detail0.includes("const COUVERTS = enArabe"))
+ok('… et le lieu de signature du formulaire ne les écrase pas',
+   detail0.includes("...(enArabe ? {} : { fait_a: f.signe_a })"))
+
+console.log('\n  ── Le formulaire du contrat ───────────────────────────')
+ok('les champs sont groupés par sujet',
+   ["L’engagement", 'La rémunération', 'La signature'].every((t) => detail0.includes(t)))
+ok('le lieu de travail se choisit parmi les annexes',
+   detail0.includes('— Annexe de la société —'))
+ok('un lieu qui n’est plus une annexe reste proposé',
+   detail0.includes('!(sites ?? []).some((si) => si.name === f.lieu_travail)'))
 
 console.log('\n  ── Les modèles générés maison ont disparu ─────────────')
 for (const f of ['src/components/ContratPrint.tsx', 'src/components/EngagementPrint.tsx',
@@ -115,6 +134,26 @@ ok('le formulaire garde une largeur fixe, le reste va au document',
 ok('la fenêtre s’élargit quand le document est à côté',
    fs.readFileSync(new URL('../../src/pages/validator/EmployesPage.tsx', import.meta.url), 'utf8')
      .includes("max-w-[104rem]"))
+
+console.log('\n  ── Reçu pour solde de tout compte ─────────────────────')
+const solde = fs.readFileSync(new URL('../../src/lib/soldeToutCompte.ts', import.meta.url), 'utf8')
+for (const [quoi, phrase] of [
+  ['le titre', 'RECU POUR SOLDE DE TOUT COMPTE'],
+  ['la reconnaissance de réception', 'Reconnais avoir reçu de la société'],
+  ['le certificat de travail', 'Mon certificat de travail'],
+  ['l’article 75 et les 60 jours', 'article 75 du Code du travail'],
+  ['les deux exemplaires', 'établi en deux exemplaires'],
+  ['la patente et le R.C.', 'N° Patente : {{patente}}     RC : {{rc}}'],
+]) ok(quoi + ' est repris', solde.includes(phrase))
+ok('l’identité de la société est préremplie', solde.includes('patente: s?.patente'))
+
+const sortiesPage = fs.readFileSync(new URL('../../src/pages/validator/SortiesPage.tsx', import.meta.url), 'utf8')
+ok('on choisit l’employé, et sa fiche remplit le reçu',
+   sortiesPage.includes('— Choisir un employé —') && sortiesPage.includes('valeursEmploye'))
+ok('le reçu se compose pendant la saisie', sortiesPage.includes('<PanneauDocument'))
+ok('la validation demande une confirmation', sortiesPage.includes('Confirmer : il quitte les listes'))
+ok('… et dit ce qu’elle emporte et ce qu’elle garde',
+   sortiesPage.includes('restent consultables'))
 
 console.log('\n' + '═'.repeat(66))
 console.log(F === 0 ? `  ✅  ${P} vérifications, toutes réussies` : `  ❌  ${F} échec(s) sur ${P + F}`)

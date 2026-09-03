@@ -108,7 +108,7 @@ const ORDRE = [
   'BLOC_10_role_personnel.sql', 'BLOC_11_personnel_departement.sql',
   'BLOC_12_matricule.sql', 'BLOC_13_verrou_analytics.sql',
   'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
-  'BLOC_16_champs_document.sql',
+  'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -163,6 +163,10 @@ const SENSIBLES = [
   ['supprimer_employe',         `select public.supprimer_employe(gen_random_uuid())`],
   ['apercu_suppression_employe',`select public.apercu_suppression_employe(gen_random_uuid())`],
   ['maj_parametres_paie',       `select public.maj_parametres_paie(gen_random_uuid(),26,true,true,8)`],
+  ['enregistrer_sortie',        `select public.enregistrer_sortie(gen_random_uuid(),current_date,0,null,null,'{}'::jsonb)`],
+  ['valider_sortie',            `select public.valider_sortie(gen_random_uuid())`],
+  ['annuler_sortie',            `select public.annuler_sortie(gen_random_uuid())`],
+  ['reintegrer_employe',        `select public.reintegrer_employe(gen_random_uuid())`],
   ['analytics_paie',            `select public.analytics_paie(null,2026)`],
   ['bulletin_paie',             `select public.bulletin_paie(gen_random_uuid())`],
   ['maj_bareme_igr',            `select public.maj_bareme_igr('[]'::jsonb)`],
@@ -668,6 +672,92 @@ await connecte(paie)
 await connecte(admin)
 await q1(`select public.maj_bareme_igr('[]'::jsonb)`)
 await connecte(paie)
+
+// ═════════════════════════════════════ 9 quater. LES SORTIES ═════
+
+section('Sorties et solde de tout compte')
+await connecte(bureau)
+
+const partant = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,cin,salaire,mode_reglement)
+   values ($1,$2,'PARTANT SALAH','SS111222',3500,'Virement') returning id`, [co, aRiad])).id
+
+const sortie = (await q1(
+  `select public.enregistrer_sortie($1,'2026-04-30'::date,7450,'Virement','Démission',
+          '{"patente":"50211305"}'::jsonb) as id`, [partant])).id
+ok('une sortie se prépare à l’avance', !!sortie)
+ok('… et l’employé reste EN POSTE d’ici là',
+   (await q1(`select actif from public.employees where id=$1`, [partant])).actif === true)
+ok('… il n’a pas encore de date de sortie',
+   (await q1(`select date_sortie from public.employees where id=$1`, [partant])).date_sortie === null)
+
+// Corriger avant validation : le montant change, pas la ligne.
+await q1(`select public.enregistrer_sortie($1,'2026-04-30'::date,8000,'Virement','Démission','{}'::jsonb)`,
+         [partant])
+ok('la corriger ne crée pas de seconde sortie',
+   Number((await q1(`select count(*) as c from public.sorties where employee_id=$1`, [partant])).c) === 1)
+ok('… et le montant est bien repris',
+   Number((await q1(`select montant from public.sorties where employee_id=$1`, [partant])).montant) === 8000)
+
+await refuse('un montant négatif est refusé',
+  `select public.enregistrer_sortie($1,'2026-04-30'::date,-100,'Virement',null,'{}'::jsonb)`,
+  [partant], /négatif/i)
+await refuse('une sortie sans date est refusée',
+  `select public.enregistrer_sortie($1,null,100,'Virement',null,'{}'::jsonb)`,
+  [partant], /obligatoire/i)
+
+// L'agent n'a rien à faire là-dedans.
+await connecte(agent)
+await refuse('l’agent ne prépare pas de sortie',
+  `select public.enregistrer_sortie($1,'2026-04-30'::date,100,'Virement',null,'{}'::jsonb)`,
+  [partant], REFUS)
+await connecte(bureau)
+
+// Valider : la personne quitte les listes, sans rien perdre.
+await q1(`select public.valider_sortie($1)`, [sortie])
+const apresSortie = await q1(`select actif, date_sortie from public.employees where id=$1`, [partant])
+ok('valider fait quitter les listes actives', apresSortie.actif === false)
+// Le pilote rend un Date : on le relit en date locale. Passer par
+// toISOString() reculerait d'un jour au Maroc (UTC+1).
+const jourLocal = (d) => {
+  const x = new Date(d)
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+}
+ok('… en posant le dernier jour travaillé',
+   jourLocal(apresSortie.date_sortie) === '2026-04-30', jourLocal(apresSortie.date_sortie))
+ok('la fiche n’est PAS supprimée',
+   !!(await q1(`select 1 from public.employees where id=$1`, [partant])))
+
+await refuse('une sortie validée ne se revalide pas',
+  `select public.valider_sortie($1)`, [sortie], /introuvable|déjà validée/i)
+await refuse('… ni ne s’annule',
+  `select public.annuler_sortie($1)`, [sortie], /déjà validée|introuvable/i)
+await refuse('… et on ne prépare pas une seconde sortie pour lui',
+  `select public.enregistrer_sortie($1,'2026-05-31'::date,100,'Virement',null,'{}'::jsonb)`,
+  [partant], /déjà validée/i)
+
+// Réintégrer : réservé à l'administrateur, pour une erreur de saisie.
+await refuse('le bureau ne réintègre pas de lui-même',
+  `select public.reintegrer_employe($1)`, [partant], REFUS)
+await connecte(admin)
+await q1(`select public.reintegrer_employe($1)`, [partant])
+ok('l’administrateur peut remettre en poste',
+   (await q1(`select actif from public.employees where id=$1`, [partant])).actif === true)
+ok('… et la sortie disparaît avec',
+   Number((await q1(`select count(*) as c from public.sorties where employee_id=$1`, [partant])).c) === 0)
+await connecte(bureau)
+
+// Une sortie annulée libère la place pour une nouvelle.
+const s2 = (await q1(
+  `select public.enregistrer_sortie($1,'2026-06-30'::date,500,'Espece',null,'{}'::jsonb) as id`,
+  [partant])).id
+await q1(`select public.annuler_sortie($1)`, [s2])
+ok('annuler une sortie en préparation la retire',
+   Number((await q1(`select count(*) as c from public.sorties where employee_id=$1`, [partant])).c) === 0)
+ok('… et l’employé n’a jamais bougé',
+   (await q1(`select actif from public.employees where id=$1`, [partant])).actif === true)
+
+await db.query(`delete from public.employees where id=$1`, [partant])
 
 // ═══════════════════════════════════════════════ 10. BULLETIN & RESET ═
 

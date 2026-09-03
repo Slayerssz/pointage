@@ -85,6 +85,7 @@ export function RedactionDocument({
       adresse: [employee.adresse, employee.ville].filter(Boolean).join(', '),
       salaire: employee.salaire != null ? String(employee.salaire) : '',
       ville: employee.ville ?? '',
+      mode_reglement: employee.mode_reglement ?? '',
     }
     const initial: Record<string, string> = { ...(modele.defauts ?? {}) }
     for (const c of modele.champs) {
