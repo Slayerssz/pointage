@@ -20,16 +20,19 @@ import type { Bulletin } from '../lib/bulletin'
 export default function BulletinPaiePrint({
   bulletins,
   entreprise,
+  modeleDocument,
   onClose,
 }: {
   bulletins: Bulletin[]
   entreprise: string
+  /** Clé de modèle de la société : elle prime sur son nom. */
+  modeleDocument?: string | null
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
   useModeImpression()
 
-  const entete = enteteDe(entreprise)
+  const entete = enteteDe(entreprise, modeleDocument)
   const { pret, imprimer } = useImpression(entete.logo ? bulletins.length : 0)
 
   const b0 = bulletins[0]

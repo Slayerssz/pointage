@@ -12,8 +12,11 @@ import { societeDe } from './societes'
  * Il réutilise la même structure que les contrats, donc le même écran de
  * saisie et le même rendu.
  */
-export function modeleEngagement(entreprise: string | null | undefined): ModeleContrat {
-  const s = societeDe(entreprise)
+export function modeleEngagement(
+  entreprise: string | null | undefined,
+  modeleDocument?: string | null,
+): ModeleContrat {
+  const s = societeDe(entreprise, modeleDocument)
 
   return {
     titre: 'التزام',

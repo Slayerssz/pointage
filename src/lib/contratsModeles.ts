@@ -664,8 +664,22 @@ for (const [autre, officiel] of Object.entries(ALIAS)) {
   if (m) PAR_CLE.set(cle(autre), m)
 }
 
-/** Le modèle de contrat d'une société, ou null si elle n'en a pas encore. */
-export function modeleContrat(entreprise: string | null | undefined): ModeleContrat | null {
+/**
+ * Le modèle de contrat d'une société.
+ *
+ * On cherche d'abord par sa clé de modèle — écrite une fois en base et
+ * indépendante du nom d'affichage, de sorte qu'une société renommée
+ * garde ses documents. À défaut, on retombe sur le nom, pour les bases
+ * où le BLOC 25 n'a pas encore été passé.
+ */
+export function modeleContrat(
+  entreprise: string | null | undefined,
+  modeleDocument?: string | null,
+): ModeleContrat | null {
+  if (modeleDocument) {
+    const m = PAR_CLE.get(cle(modeleDocument))
+    if (m) return m
+  }
   if (!entreprise) return null
   return PAR_CLE.get(cle(entreprise)) ?? null
 }

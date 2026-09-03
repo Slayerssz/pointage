@@ -95,7 +95,15 @@ for (const [autre, officiel] of Object.entries(ALIAS)) {
   if (s2) PAR_CLE.set(cle(autre), s2)
 }
 
-export function societeDe(nom: string | null | undefined): Societe | null {
+/** L'identité légale d'une société. La clé de modèle prime sur le nom. */
+export function societeDe(
+  nom: string | null | undefined,
+  modeleDocument?: string | null,
+): Societe | null {
+  if (modeleDocument) {
+    const s = PAR_CLE.get(cle(modeleDocument))
+    if (s) return s
+  }
   if (!nom) return null
   return PAR_CLE.get(cle(nom)) ?? null
 }

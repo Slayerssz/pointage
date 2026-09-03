@@ -129,7 +129,7 @@ ok('la durée du congé se déduit des dates', detail.includes('${jours} يوم�
 ok('les mentions saisies partent avec le congé', detail.includes('champsDocument: docLibre'))
 ok('… et avec le contrat', detail.includes('champs_document: docLibre'))
 ok('les valeurs connues d’avance remplissent aussi le formulaire',
-   detail.includes('modeleEngagement(entreprise).defauts'))
+   detail.includes('modeleEngagement(entreprise, cleModele)'))
 
 const panneau = fs.readFileSync(new URL('../../src/components/PanneauDocument.tsx', import.meta.url), 'utf8')
 ok('la page est mise à l’échelle sans être déformée', panneau.includes('transform: `scale('))

@@ -95,8 +95,18 @@ for (const [autre, officiel] of Object.entries(ALIAS)) {
   if (e) PAR_CLE.set(cle(autre), e)
 }
 
-/** L'en-tête d'une entreprise, ou un en-tête neutre si elle n'en a pas encore. */
-export function enteteDe(nomEntreprise: string | undefined | null): Entete {
+/**
+ * L'en-tête d'une entreprise. La clé de modèle prime sur le nom : une
+ * société renommée garde son en-tête.
+ */
+export function enteteDe(
+  nomEntreprise: string | undefined | null,
+  modeleDocument?: string | null,
+): Entete {
+  if (modeleDocument) {
+    const e = PAR_CLE.get(cle(modeleDocument))
+    if (e) return e
+  }
   if (!nomEntreprise) return NEUTRE
   return PAR_CLE.get(cle(nomEntreprise)) ?? NEUTRE
 }

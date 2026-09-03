@@ -21,6 +21,7 @@ import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import BulletinPaiePrint from '../../components/BulletinPaiePrint'
 import RecapPaiePrint from '../../components/RecapPaiePrint'
 import { useBulletins } from '../../lib/bulletin'
+import { useModeleSociete } from '../../lib/modeleSociete'
 
 export default function PaiePage() {
   const { companyId } = useParams()
@@ -565,6 +566,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           periodeId={periode.id}
           employeeId={bulletinPour || null}
           entreprise={company?.name ?? 'Entreprise'}
+          companyId={companyId}
           onClose={() => setBulletinPour(null)}
         />
       )}
@@ -577,8 +579,12 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
  * jamais partir sur une page à moitié remplie.
  */
 function BulletinsModale({
-  periodeId, employeeId, entreprise, onClose,
-}: { periodeId: string; employeeId: string | null; entreprise: string; onClose: () => void }) {
+  periodeId, employeeId, entreprise, companyId, onClose,
+}: {
+  periodeId: string; employeeId: string | null; entreprise: string
+  companyId: string | undefined; onClose: () => void
+}) {
+  const { data: cleModele } = useModeleSociete(companyId)
   const { data, isLoading, error } = useBulletins(periodeId, employeeId)
   // Un seul employé : on va droit à son bulletin. Toute la période : on
   // demande d'abord si c'est un bulletin par personne ou l'état d'ensemble.
@@ -669,9 +675,11 @@ function BulletinsModale({
   }
 
   return forme === 'recap' ? (
-    <RecapPaiePrint bulletins={data} entreprise={entreprise} onClose={onClose} />
+    <RecapPaiePrint bulletins={data} entreprise={entreprise}
+                    modeleDocument={cleModele} onClose={onClose} />
   ) : (
-    <BulletinPaiePrint bulletins={data} entreprise={entreprise} onClose={onClose} />
+    <BulletinPaiePrint bulletins={data} entreprise={entreprise}
+                       modeleDocument={cleModele} onClose={onClose} />
   )
 }
 

@@ -11,8 +11,11 @@ import { societeDe } from './societes'
  * salarié soixante jours pour dénoncer ce reçu. Ce n'est pas une formule
  * de style : c'est ce qui rend le document opposable.
  */
-export function modeleSolde(entreprise: string | null | undefined): ModeleContrat {
-  const s = societeDe(entreprise)
+export function modeleSolde(
+  entreprise: string | null | undefined,
+  modeleDocument?: string | null,
+): ModeleContrat {
+  const s = societeDe(entreprise, modeleDocument)
 
   return {
     titre: 'RECU POUR SOLDE DE TOUT COMPTE',

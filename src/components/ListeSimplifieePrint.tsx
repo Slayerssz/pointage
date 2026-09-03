@@ -19,6 +19,7 @@ import type { Employee } from '../lib/types'
 export default function ListeSimplifieePrint({
   employees,
   entreprise,
+  modeleDocument,
   marche,
   intitule,
   etablissement,
@@ -28,6 +29,8 @@ export default function ListeSimplifieePrint({
 }: {
   employees: Employee[]
   entreprise: string
+  /** Clé de modèle de la société : elle prime sur son nom. */
+  modeleDocument?: string | null
   /** « 04/ECIB/2024 » */
   marche: string
   /** « Liste Des Agents De Gardiennage » */
@@ -41,7 +44,7 @@ export default function ListeSimplifieePrint({
   useFermerSurEchap(onClose)
   useModeImpression()
 
-  const entete = enteteDe(entreprise)
+  const entete = enteteDe(entreprise, modeleDocument)
   const { pret, imprimer } = useImpression(entete.logo ? 1 : 0)
   const pied = entete.pied
 

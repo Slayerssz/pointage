@@ -19,6 +19,7 @@ import PanneauDocument from '../../components/PanneauDocument'
 import { jetonsDuModele, modeleContrat } from '../../lib/contratsModeles'
 import { modeleEngagement } from '../../lib/engagementConge'
 import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
+import { useModeleSociete } from '../../lib/modeleSociete'
 import { useDocuments } from '../../lib/documents'
 
 const inputCls =
@@ -238,7 +239,10 @@ function ContratForm({
   onClose: () => void
 }) {
   const qc = useQueryClient()
-  const modele = modeleContrat(entreprise)
+  // La clé de modèle prime sur le nom : renommer la société ne fait pas
+  // disparaître son contrat.
+  const { data: cleModele } = useModeleSociete(employee.company_id)
+  const modele = modeleContrat(entreprise, cleModele)
   // Un renouvellement reprend tout l'ancien contrat, mais enchaîne les dates :
   // début = lendemain de l'ancienne fin, fin = un an plus tard.
   const base = contrat ?? renouvelle ?? null
@@ -262,7 +266,7 @@ function ContratForm({
   // marché, la durée en toutes lettres… On les conserve avec le contrat,
   // faute de quoi une réimpression donnerait un autre document.
   const [docLibre, setDocLibre] = useState<Record<string, string>>(() => ({
-    ...(modeleContrat(entreprise)?.defauts ?? {}),
+    ...(modeleContrat(entreprise, cleModele)?.defauts ?? {}),
     ...((contrat?.champs_document ?? renouvelle?.champs_document ?? {}) as Record<string, string>),
   }))
 
@@ -582,9 +586,10 @@ function CongesPanel({
   // L'engagement se remplit ICI, en même temps que le congé : ce sont les
   // dates saisies sur ce formulaire qui alimentent le document, et le
   // document qui se compose sous les yeux pendant la saisie.
-  const modele = useMemo(() => modeleEngagement(entreprise), [entreprise])
+  const { data: cleModele } = useModeleSociete(employee.company_id)
+  const modele = useMemo(() => modeleEngagement(entreprise, cleModele), [entreprise, cleModele])
   const [docLibre, setDocLibre] = useState<Record<string, string>>(
-    () => ({ ...(modeleEngagement(entreprise).defauts ?? {}) }),
+    () => ({ ...(modeleEngagement(entreprise, cleModele).defauts ?? {}) }),
   )
 
   const jours = f.debut && f.fin && f.fin >= f.debut

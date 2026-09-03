@@ -15,6 +15,7 @@ import { MOIS_FR } from '../../lib/paie'
 import PanneauDocument from '../../components/PanneauDocument'
 import DocumentsSignes from '../../components/DocumentsSignes'
 import { useDocuments } from '../../lib/documents'
+import { useModeleSociete } from '../../lib/modeleSociete'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
 
@@ -270,7 +271,8 @@ function FormulaireSortie({
   companyId: string | undefined
   sortie: Sortie | null
 }) {
-  const modele = useMemo(() => modeleSolde(entreprise), [entreprise])
+  const { data: cleModele } = useModeleSociete(employee.company_id)
+  const modele = useMemo(() => modeleSolde(entreprise, cleModele), [entreprise, cleModele])
   const enregistrer = useEnregistrerSortie(companyId)
 
   const [f, setF] = useState({
@@ -279,7 +281,7 @@ function FormulaireSortie({
     mode: sortie?.mode_reglement ?? employee.mode_reglement ?? 'Virement',
   })
   const [docLibre, setDocLibre] = useState<Record<string, string>>(() => ({
-    ...(modeleSolde(entreprise).defauts ?? {}),
+    ...(modeleSolde(entreprise, cleModele).defauts ?? {}),
     ...((sortie?.champs_document ?? {}) as Record<string, string>),
   }))
 

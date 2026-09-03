@@ -111,7 +111,7 @@ const ORDRE = [
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
   'BLOC_18_archivage_sorties.sql', 'BLOC_19_jours_par_mois.sql',
   'BLOC_20_bureau_paie.sql', 'BLOC_21_deux_types_contrat.sql', 'BLOC_22_date_fin_obligatoire.sql',
-  'BLOC_23_validation_par_scan.sql', 'BLOC_24_effet_au_depot.sql',
+  'BLOC_23_validation_par_scan.sql', 'BLOC_24_effet_au_depot.sql', 'BLOC_25_modele_par_societe.sql', 'BLOC_26_net_jamais_negatif.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -460,9 +460,14 @@ ok('mode de règlement, banque et site principal repris dans la paie',
    lPlein.site_principal_nom === 'LA COMMUNE')
 
 section('Retenues, dette et validation de la paie')
+// Le bureau couvre désormais la paie : il modifie les lignes comme elle.
+// On remet la ligne à zéro derrière, pour ne pas fausser la validation.
 await connecte(bureau)
-await refuse('le bureau ne touche pas aux montants de la paie',
-  `select public.maj_ligne_paie($1,0,100,0,null)`, [lPartiel.id], REFUS)
+await q1(`select public.maj_ligne_paie($1,150,0,0,'Prime du bureau')`, [lPartiel.id])
+ok('le bureau peut ajuster une ligne de paie',
+   Number((await ligne(ePartiel)).prime) === 150,
+   String((await ligne(ePartiel)).prime))
+await q1(`select public.maj_ligne_paie($1,0,0,0,null)`, [lPartiel.id])
 
 await connecte(paie)
 const lDette = await ligne(eDette)
