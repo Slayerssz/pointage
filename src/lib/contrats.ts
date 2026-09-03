@@ -10,12 +10,8 @@ import type { ContratStatut, TypeContrat } from './types'
 export const CONTRAT_ALERTE_JOURS = 10
 
 export const TYPES_CONTRAT: { code: TypeContrat; label: string }[] = [
-  { code: 'CDI', label: 'CDI — durée indéterminée' },
-  { code: 'CDD', label: 'CDD — durée déterminée' },
-  { code: 'ANAPEC', label: 'Contrat ANAPEC' },
+  { code: 'CONTRAT', label: 'Contrat' },
   { code: 'STAGE', label: 'Stage' },
-  { code: 'INTERIM', label: 'Intérim' },
-  { code: 'ESSAI', label: "Période d'essai" },
 ]
 
 /** Calcule le statut côté client (même règle que `contrat_statut()` en base). */

@@ -242,7 +242,7 @@ function ContratForm({
   const debutRenouv =
     renouvelle?.date_fin ? lendemain(renouvelle.date_fin) : todayIso()
   const [f, setF] = useState({
-    type_contrat: (base?.type_contrat ?? 'CDI') as TypeContrat,
+    type_contrat: (base?.type_contrat ?? 'CONTRAT') as TypeContrat,
     date_debut: renouvelle ? debutRenouv : (contrat?.date_debut ?? employee.date_embauche ?? todayIso()),
     date_fin: renouvelle
       ? (renouvelle.date_fin ? unAnApres(debutRenouv) : '')
@@ -296,9 +296,6 @@ function ContratForm({
   const save = useMutation({
     mutationFn: async () => {
       if (!f.date_debut) throw new Error('La date de début est obligatoire.')
-      if (f.type_contrat !== 'CDI' && !f.date_fin) {
-        throw new Error('Un contrat à durée déterminée doit avoir une date de fin.')
-      }
       const payload = {
         company_id: employee.company_id,
         employee_id: employee.id,
@@ -398,7 +395,7 @@ function ContratForm({
                    onChange={(e) => set('date_debut')(e.target.value)} className={inputCls} />
           ))}
           {field(
-            f.type_contrat === 'CDI' ? 'Date de fin (vide = indéterminée)' : 'Date de fin *',
+            'Date de fin (vide = pas d’alerte)',
             <input type="date" value={f.date_fin} min={f.date_debut || undefined}
                    onChange={(e) => set('date_fin')(e.target.value)} className={inputCls} />,
           )}
@@ -415,8 +412,9 @@ function ContratForm({
           ))}
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          Seul le type de contrat ne s’imprime pas : c’est lui qui distingue un CDI
-          d’un CDD, donc qui déclenche l’alerte de fin et permet le renouvellement.
+          Seul le type de contrat ne s’imprime pas. Les couleurs de fin suivent la
+          date de fin, quel que soit le type : bleu à dix jours du terme, jaune une
+          fois échu.
         </p>
       </Section>
 
@@ -569,6 +567,7 @@ function CongesPanel({
   const supprimer = useSupprimerConge(employee.id)
   const [f, setF] = useState({ debut: '', fin: '' })
   const [engagement, setEngagement] = useState<Conge | null>(null)
+  const [nouveau, setNouveau] = useState(false)
 
   // L'engagement se remplit ICI, en même temps que le congé : ce sont les
   // dates saisies sur ce formulaire qui alimentent le document, et le
@@ -599,6 +598,18 @@ function CongesPanel({
 
   return (
     <div>
+      {!nouveau && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={() => setNouveau(true)}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            + Nouveau congé
+          </button>
+        </div>
+      )}
+
+      {nouveau && (
       <div className="mb-4">
       <PanneauDocument
         modele={modele}
@@ -622,6 +633,12 @@ function CongesPanel({
               </div>
             )}
             <button
+              onClick={() => { setF({ debut: '', fin: '' }); setNouveau(false) }}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+            >
+              Annuler
+            </button>
+            <button
               onClick={() =>
                 creer.mutate(
                   { ...f, type: 'C', motif: '', champsDocument: docLibre },
@@ -629,6 +646,7 @@ function CongesPanel({
                     onSuccess: () => {
                       setF({ debut: '', fin: '' })
                       setDocLibre({ ...(modele.defauts ?? {}) })
+                      setNouveau(false)
                     },
                   },
                 )
@@ -700,6 +718,7 @@ function CongesPanel({
         </div>
       </PanneauDocument>
       </div>
+      )}
 
       {supprimer.error && (
         <div className="mb-3">

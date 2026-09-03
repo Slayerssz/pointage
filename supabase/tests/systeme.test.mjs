@@ -110,7 +110,7 @@ const ORDRE = [
   'BLOC_14_analytics_paie.sql', 'BLOC_15_bulletin_paie.sql',
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
   'BLOC_18_archivage_sorties.sql', 'BLOC_19_jours_par_mois.sql',
-  'BLOC_20_bureau_paie.sql',
+  'BLOC_20_bureau_paie.sql', 'BLOC_21_deux_types_contrat.sql',
 ]
 for (const b of ORDRE) {
   try {
@@ -295,7 +295,7 @@ ok('tout le personnel d’un site principal se lit d’un coup',
 section('Contrats')
 const contratDe = async (emp, debut, fin) => (await q1(
   `insert into public.contrats(company_id,employee_id,type_contrat,date_debut,date_fin,created_by)
-   values($1,$2,'CDD',$3,$4,$5) returning id, numero`, [co, emp, debut, fin, bureau]))
+   values($1,$2,'CONTRAT',$3,$4,$5) returning id, numero`, [co, emp, debut, fin, bureau]))
 
 const ct1 = await contratDe(ePlein, '2026-01-01', '2026-12-31')
 ok('numéro de contrat automatique au format CT-AAAA-NNNN', /^CT-\d{4}-\d{4}$/.test(ct1.numero))
@@ -1057,6 +1057,45 @@ await refuse('impossible de clôturer un mois à venir',
   `select public.valider_pointage_mois($1,2099,1)`, [co], /pas encore commencé/i)
 
 // ═══════════════════════════════════════════════════════ RÉSULTAT ═════
+
+section('Scripts de ménage')
+await connecte(admin)
+for (const t of ['companies','sites','sites_principaux','employees','pointages',
+                 'periodes_paie','lignes_paie']) {
+  await db.exec(`alter table public.${t} disable row level security;`)
+}
+
+const avantPointages = Number((await q1(`select count(*) as c from public.pointages`)).c)
+ok('la base d’essai porte bien des pointages', avantPointages > 0, String(avantPointages))
+
+await db.exec(fs.readFileSync(path.join(BLOCS, 'NETTOYER_pointages_essai.sql'), 'utf8'))
+ok('le ménage efface tous les pointages',
+   Number((await q1(`select count(*) as c from public.pointages`)).c) === 0)
+ok('… ainsi que les périodes de paie qui en dépendaient',
+   Number((await q1(`select count(*) as c from public.periodes_paie`)).c) === 0)
+ok('… et remet les compteurs de jours à zéro',
+   Number((await q1(`select count(*) as c from public.employees where jours_travailles <> 0`)).c) === 0)
+ok('… sans toucher aux employés',
+   Number((await q1(`select count(*) as c from public.employees`)).c) > 0)
+ok('… ni aux sites', Number((await q1(`select count(*) as c from public.sites`)).c) > 0)
+
+// Une annexe vide et une annexe peuplée, pour distinguer les deux sorts.
+const coM = (await q1(`select id from public.companies limit 1`)).id
+await db.query(`insert into public.sites(company_id,name) values ($1,'ANNEXE FANTOME')`, [coM])
+const avantSites = Number((await q1(`select count(*) as c from public.sites`)).c)
+const peuplees = Number((await q1(
+  `select count(distinct site_id) as c from public.employees where site_id is not null`)).c)
+
+await db.exec(fs.readFileSync(path.join(BLOCS, 'NETTOYER_sites_vides.sql'), 'utf8'))
+const apresSites = Number((await q1(`select count(*) as c from public.sites`)).c)
+ok('le ménage supprime l’annexe sans personne', apresSites < avantSites,
+   `${avantSites} → ${apresSites}`)
+ok('… et garde toutes celles qui ont des employés', apresSites === peuplees,
+   `${apresSites} restantes pour ${peuplees} peuplées`)
+ok('aucun employé n’a perdu son site',
+   Number((await q1(`select count(*) as c from public.employees e
+                      where e.site_id is not null
+                        and not exists (select 1 from public.sites s where s.id = e.site_id)`)).c) === 0)
 
 console.log('\n' + '═'.repeat(66))
 if (F === 0) {

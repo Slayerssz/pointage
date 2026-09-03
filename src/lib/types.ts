@@ -119,7 +119,7 @@ export interface ParametresPaie {
 
 // --- Contrats ---------------------------------------------------------------
 
-export type TypeContrat = 'CDI' | 'CDD' | 'ANAPEC' | 'STAGE' | 'INTERIM' | 'ESSAI'
+export type TypeContrat = 'CONTRAT' | 'STAGE'
 
 /** `bientot` → bleu (fin dans ≤ 10 j) · `termine` → jaune (fin dépassée) */
 export type ContratStatut = 'actif' | 'bientot' | 'termine' | 'a_venir'

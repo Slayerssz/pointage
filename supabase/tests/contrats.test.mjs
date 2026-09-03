@@ -150,11 +150,27 @@ for (const parti of [
 ]) ok(`le contrat ne demande plus « ${parti.split(':')[0]} »`, !detail0.includes(parti))
 ok('le contrat n’affiche un champ que si le modèle l’imprime',
    detail0.includes("surLePapier('salaire') && field") && detail0.includes("surLePapier('fait_a') && field"))
-ok('le type de contrat reste : il porte les alertes de fin',
-   detail0.includes("c’est lui qui distingue un CDI"))
+ok('le formulaire dit que les couleurs suivent la date, pas le type',
+   detail0.includes('quel que soit le type'))
 ok('le congé ne demande plus ni type ni motif',
    !detail0.includes("{field('Type', (") && !detail0.includes("{field('Motif', ("))
 ok('… et il enregistre bien un congé payé', detail0.includes("type: 'C', motif: ''"))
+
+console.log('\n  ── Deux types de contrat, couleurs par la date ────────')
+const ctr = fs.readFileSync(new URL('../../src/lib/contrats.ts', import.meta.url), 'utf8')
+ok('il ne reste que Contrat et Stage',
+   ctr.includes("code: 'CONTRAT'") && ctr.includes("code: 'STAGE'")
+   && !ctr.includes("code: 'CDI'") && !ctr.includes("code: 'ANAPEC'"))
+ok('à dix jours du terme : bleu', ctr.includes("chip: 'blue'") && ctr.includes("bg-blue-100"))
+ok('une fois échu : jaune', ctr.includes("bg-yellow-100"))
+ok('le statut ne regarde jamais le type de contrat',
+   !ctr.slice(ctr.indexOf('export function contratStatut')).includes('type_contrat'))
+ok('la date de fin reste facultative',
+   !detail0.includes('doit avoir une date de fin'))
+
+console.log('\n  ── Le formulaire de congé s’ouvre à la demande ────────')
+ok('un bouton précède le formulaire', detail0.includes('+ Nouveau congé'))
+ok('… et il se referme après enregistrement', detail0.includes('setNouveau(false)'))
 
 console.log('\n  ── Reçu pour solde de tout compte ─────────────────────')
 const solde = fs.readFileSync(new URL('../../src/lib/soldeToutCompte.ts', import.meta.url), 'utf8')
