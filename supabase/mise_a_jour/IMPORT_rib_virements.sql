@@ -10,6 +10,10 @@
 --  employés déjà en virement. Il n'écrase pas un R.I.B. déjà saisi qui
 --  différerait : ceux-là sont listés à la fin, à vous de trancher.
 --
+--  Collez tout le fichier et faites Run. La table de travail reste ensuite
+--  en place pour que vous puissiez relancer les requêtes marquées « ▶ ».
+--  Le bloc de MÉNAGE en fin de fichier la supprime.
+--
 --  MANQUE ENCORE (58 employés en virement sans R.I.B.) :
 --    · DUO — 9 employé(s), aucun état de virement fourni
 --    · MEGA — 2 employé(s), aucun état de virement fourni
@@ -28,17 +32,20 @@
 --    · EDEN VERT SERVICE mat 127 — EL ABBASI NAZIHA (absent de son état)
 -- ============================================================================
 
-begin;
+drop table if exists public.import_virements;
 
-create temporary table virements_recus (
+create table public.import_virements (
   societe    text,
   matricule  integer,
   nom_prenom text,
   banque     text,
   rib        text
-) on commit drop;
+);
 
-insert into virements_recus (societe, matricule, nom_prenom, banque, rib) values
+-- Table de travail : personne d'autre que l'éditeur SQL n'y accède.
+alter table public.import_virements enable row level security;
+
+insert into public.import_virements (societe, matricule, nom_prenom, banque, rib) values
   ('AL SAFAE EL MAGHREB', 1, 'AOUFI SOUMAYA', 'BMCI', '013640100000000028449960'),
   ('AL SAFAE EL MAGHREB', 2, 'AOUFI MERIEM', 'BMCI', '013640100000000028448214'),
   ('AL SAFAE EL MAGHREB', 3, 'EL BOUCHTI SALIMA', 'BANQUE POPULAIRE', '164640211117056860000422'),
@@ -407,7 +414,7 @@ select count(*) filter (where e.rib is null or trim(e.rib) = '') as a_renseigner
                           and replace(e.rib,' ','') = v.rib)      as deja_identiques,
        count(*) filter (where e.rib is not null and trim(e.rib) <> ''
                           and replace(e.rib,' ','') <> v.rib)     as differents
-  from virements_recus v
+  from public.import_virements v
   join public.companies c on upper(trim(c.name)) = upper(v.societe)
                           or upper(trim(coalesce(c.modele_document,''))) = upper(v.societe)
   join public.employees e on e.company_id = c.id and e.matricule = v.matricule;
@@ -417,7 +424,7 @@ select count(*) filter (where e.rib is null or trim(e.rib) = '') as a_renseigner
 update public.employees e
    set rib    = v.rib,
        banque = v.banque
-  from virements_recus v
+  from public.import_virements v
   join public.companies c on upper(trim(c.name)) = upper(v.societe)
                           or upper(trim(coalesce(c.modele_document,''))) = upper(v.societe)
  where e.company_id = c.id
@@ -425,15 +432,13 @@ update public.employees e
    and lower(coalesce(e.mode_reglement,'')) like 'vir%'
    and (e.rib is null or trim(e.rib) = '');
 
-commit;
-
 
 -- ▶ Les R.I.B. déjà saisis qui NE correspondent PAS à l'état reçu.
 --   Rien n'a été touché : comparez et corrigez à la main si besoin.
 -- select c.name as societe, e.matricule, e.nom_prenom,
 --        e.rib as rib_en_base, v.rib as rib_de_l_etat,
 --        e.banque as banque_en_base, v.banque as banque_de_l_etat
---   from virements_recus v
+--   from public.import_virements v
 --   join public.companies c on upper(trim(c.name)) = upper(v.societe)
 --   join public.employees e on e.company_id = c.id and e.matricule = v.matricule
 --  where e.rib is not null and trim(e.rib) <> '' and replace(e.rib,' ','') <> v.rib;
@@ -447,3 +452,9 @@ select c.name as societe, e.matricule, e.nom_prenom, e.cnss
    and lower(coalesce(e.mode_reglement,'')) like 'vir%'
    and (e.rib is null or trim(e.rib) = '')
  order by c.name, e.nom_prenom;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+--  MÉNAGE — à lancer quand vous en avez fini avec les requêtes ci-dessus
+-- ═══════════════════════════════════════════════════════════════════════════
+-- drop table if exists public.import_virements;

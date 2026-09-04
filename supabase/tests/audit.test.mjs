@@ -638,16 +638,49 @@ const enEspeces = (await q1(
   `insert into public.employees(company_id,site_id,nom_prenom,matricule,mode_reglement)
    values ($1,$2,'EN ESPECES',9003,'Espece') returning id`, [coRib, sRib])).id
 
+// Le vrai script, rejoué INSTRUCTION PAR INSTRUCTION comme le fait
+// l'éditeur de Supabase : une table temporaire n'y survivrait pas.
+const scriptRib = fs.readFileSync(path.join(BLOCS, 'IMPORT_rib_virements.sql'), 'utf8')
+function instructions(sql) {
+  const out = []; let cur = '', i = 0, tag = null
+  while (i < sql.length) {
+    if (!tag) {
+      // Un « ; » dans un commentaire ou une chaîne ne sépare rien.
+      if (sql.startsWith('--', i)) {
+        const fin = sql.indexOf('\n', i)
+        const j = fin === -1 ? sql.length : fin + 1
+        cur += sql.slice(i, j); i = j; continue
+      }
+      if (sql[i] === "'") {
+        let j = i + 1
+        while (j < sql.length && !(sql[j] === "'" && sql[j + 1] !== "'")) j += sql[j] === "'" ? 2 : 1
+        cur += sql.slice(i, j + 1); i = j + 1; continue
+      }
+      const m = /^\$[A-Za-z_]*\$/.exec(sql.slice(i))
+      if (m) { tag = m[0]; cur += tag; i += tag.length; continue }
+      if (sql[i] === ';') { out.push(cur.trim()); cur = ''; i++; continue }
+    } else if (sql.startsWith(tag, i)) { cur += tag; i += tag.length; tag = null; continue }
+    cur += sql[i++]
+  }
+  if (cur.trim()) out.push(cur.trim())
+  return out.filter((x) => x && !/^(--|\s)*$/.test(x))
+}
+for (const st of instructions(scriptRib)) {
+  try { await db.query(st) }
+  catch (e) { ok('IMPORT_rib_virements passe instruction par instruction', false,
+                 e.message.slice(0, 70) + ' — sur : ' + st.slice(0, 60)) }
+}
+ok('IMPORT_rib_virements passe instruction par instruction', true)
+
+// Puis nos trois cas d'école, avec la même mécanique.
 await db.exec(`
-  create temporary table virements_recus (societe text, matricule integer,
-    nom_prenom text, banque text, rib text) on commit drop;
-  insert into virements_recus values
+  insert into public.import_virements values
     ('BO', 9001, 'SANS RIB',    'CIH BANK',  '111111111111111111111111'),
     ('BO', 9002, 'DEJA UN RIB', 'CIH BANK',  '222222222222222222222222'),
     ('BO', 9003, 'EN ESPECES',  'CIH BANK',  '333333333333333333333333');
   update public.employees e
      set rib = v.rib, banque = v.banque
-    from virements_recus v
+    from public.import_virements v
     join public.companies c on upper(trim(c.name)) = upper(v.societe)
    where e.company_id = c.id and e.matricule = v.matricule
      and lower(coalesce(e.mode_reglement,'')) like 'vir%'
@@ -666,6 +699,9 @@ ok('… ni sa banque',
    (await q1(`select banque from public.employees where id=$1`, [avecRib])).banque === 'ANCIENNE BANQUE')
 ok('un employé payé en espèces n’est pas touché',
    (await q1(`select rib from public.employees where id=$1`, [enEspeces])).rib === null)
+ok('la table de travail est protégée par RLS',
+   (await q1(`select relrowsecurity as r from pg_class where relname='import_virements'`))?.r === true)
+await db.exec(`drop table if exists public.import_virements;`)
 
 await connecte(bureau)
 
