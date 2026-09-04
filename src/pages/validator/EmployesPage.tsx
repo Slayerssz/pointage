@@ -15,7 +15,7 @@ import { formatGardes } from '../../lib/gardes'
 import { MOIS_FR, useContratsCourants, formatDH } from '../../lib/paie'
 import { contratAffichage } from '../../lib/contrats'
 import type { Contrat, Employee, SituationFamiliale } from '../../lib/types'
-import { SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
+import { HORAIRES, SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
 import ApercuEmploye from '../../components/ApercuEmploye'
@@ -160,7 +160,7 @@ export default function EmployesPage() {
       let query = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, horaire, situation_familiale, nombre_enfants, photo_path, date_sortie',
           { count: 'exact' },
         )
         .is('archive_le', null)
@@ -216,7 +216,7 @@ export default function EmployesPage() {
       let q = supabase
         .from('employees')
         .select(
-          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, situation_familiale, nombre_enfants, photo_path, date_sortie',
+          'id, company_id, site_id, matricule, nom_prenom, cin, cnss, date_naissance, date_embauche, qualification, departement, adresse, ville, mode_reglement, telephone, jour_de_repos, jours_travailles, actif, rib, banque, salaire, heures_par_jour, dette, horaire, situation_familiale, nombre_enfants, photo_path, date_sortie',
         )
         .is('archive_le', null)
         .order('matricule', { ascending: true, nullsFirst: false })
@@ -767,6 +767,7 @@ function EmployeeFormModal({
     ville: employee?.ville ?? '',
     mode_reglement: employee?.mode_reglement ?? 'Virement',
     jour_de_repos: employee?.jour_de_repos?.toString() ?? '',
+    horaire: employee?.horaire ?? '',
     jours_travailles: employee?.jours_travailles?.toString() ?? '0',
     rib: employee?.rib ?? '',
     banque: employee?.banque ?? '',
@@ -801,6 +802,7 @@ function EmployeeFormModal({
         ville: form.ville.trim().toUpperCase() || null,
         mode_reglement: form.mode_reglement || null,
         jour_de_repos: form.jour_de_repos ? Number(form.jour_de_repos) : null,
+        horaire: form.horaire || null,
         jours_travailles: Math.max(0, Number(form.jours_travailles) || 0),
         rib: form.rib.trim() || null,
         banque: form.banque.trim() || null,
@@ -976,6 +978,15 @@ function EmployeeFormModal({
               <option value="">Aucun</option>
               {JOURS_SEMAINE.map((jour, i) => (
                 <option key={jour} value={i + 1}>{jour}</option>
+              ))}
+            </select>
+          ))}
+          {/* Un agent de nuit ne se planifie pas comme une agente du matin. */}
+          {field('Horaire', (
+            <select value={form.horaire} onChange={(e) => set('horaire')(e.target.value)} className={inputCls}>
+              <option value="">Non fixé</option>
+              {HORAIRES.map((h) => (
+                <option key={h.code} value={h.code}>{h.label}</option>
               ))}
             </select>
           ))}

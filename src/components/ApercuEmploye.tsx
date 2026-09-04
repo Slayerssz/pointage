@@ -6,6 +6,7 @@ import { computeAge, formatDateFr, jourDeReposLabel } from '../lib/dates'
 import { formatDH } from '../lib/paie'
 import { formatGardes } from '../lib/gardes'
 import { useFermerSurEchap } from '../lib/impression'
+import { HORAIRES } from '../lib/types'
 import type { ContratCourant, Employee } from '../lib/types'
 import { Chip } from './ui'
 
@@ -135,6 +136,9 @@ export default function ApercuEmploye({
               {employee.date_embauche ? formatDateFr(employee.date_embauche) : '—'}
             </Champ>
             <Champ label="Jour de repos">{jourDeReposLabel(employee.jour_de_repos)}</Champ>
+            <Champ label="Horaire">
+              {HORAIRES.find((h) => h.code === employee.horaire)?.label ?? '—'}
+            </Champ>
             <Champ label="Heures par jour">
               {employee.heures_par_jour != null ? `${employee.heures_par_jour} h` : '—'}
             </Champ>

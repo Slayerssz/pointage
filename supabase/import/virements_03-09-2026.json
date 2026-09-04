@@ -1,0 +1,2192 @@
+{
+ "AL SAFAE EL MAGHRIB": [
+  {
+   "rang": 1,
+   "nom_prenom": "AOUFI SOUMAYA",
+   "banque": "BMCI",
+   "rib": "013640100000000028449960"
+  },
+  {
+   "rang": 2,
+   "nom_prenom": "AOUFI MERIEM",
+   "banque": "BMCI",
+   "rib": "013640100000000028448214"
+  },
+  {
+   "rang": 3,
+   "nom_prenom": "EL BOUCHTI SALIMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211117056860000422"
+  },
+  {
+   "rang": 4,
+   "nom_prenom": "ESSARYATI HAYAT",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001216591245"
+  },
+  {
+   "rang": 5,
+   "nom_prenom": "BENKHIYE BOUAZZA ZOHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001203427472"
+  },
+  {
+   "rang": 6,
+   "nom_prenom": "EL ATEKI FAWZIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001162416551"
+  },
+  {
+   "rang": 7,
+   "nom_prenom": "EL MOUSSAOUI HAFIDA",
+   "banque": "CIH BANK",
+   "rib": "230050507632121102630055"
+  },
+  {
+   "rang": 8,
+   "nom_prenom": "BENOUTMAN HANAN",
+   "banque": "CIH BANK",
+   "rib": "230150571837821102790059"
+  },
+  {
+   "rang": 9,
+   "nom_prenom": "EL KOUCHE SOUMAYA",
+   "banque": "AL BARID CASH",
+   "rib": "833731000000024680831545"
+  },
+  {
+   "rang": 10,
+   "nom_prenom": "ROUAIN BOUCHRA",
+   "banque": "CASH PLUS",
+   "rib": "835780030017235446630414"
+  },
+  {
+   "rang": 11,
+   "nom_prenom": "EL MESBAHI ZOHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001329442112"
+  },
+  {
+   "rang": 12,
+   "nom_prenom": "DEHIZA LATIFA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001201652857"
+  },
+  {
+   "rang": 13,
+   "nom_prenom": "AKHROUF MOHAMMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000759400030901257"
+  },
+  {
+   "rang": 14,
+   "nom_prenom": "ERRAHMANI AZIZA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001319973457"
+  },
+  {
+   "rang": 15,
+   "nom_prenom": "M'AICHOU IBTISSAM",
+   "banque": "SAHAM BANK",
+   "rib": "022640000215003029711521"
+  },
+  {
+   "rang": 16,
+   "nom_prenom": "MANSOURI SALMAN",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000602500030444181"
+  },
+  {
+   "rang": 17,
+   "nom_prenom": "EL MESELLEK MINA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150524211115690715001776"
+  },
+  {
+   "rang": 18,
+   "nom_prenom": "SAIDI HANANE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007501000522230040107846"
+  },
+  {
+   "rang": 19,
+   "nom_prenom": "CHARKI OUAFAE",
+   "banque": "CIH BANK",
+   "rib": "230501637750921101630048"
+  },
+  {
+   "rang": 20,
+   "nom_prenom": "KRIDA SAID",
+   "banque": "CIH BANK",
+   "rib": "230640691328321101170001"
+  },
+  {
+   "rang": 21,
+   "nom_prenom": "TAMIM MOUSSA",
+   "banque": "CIH BANK",
+   "rib": "230640456717621103430038"
+  },
+  {
+   "rang": 22,
+   "nom_prenom": "HARRAK ABDELHAFID",
+   "banque": "WAFACASH",
+   "rib": "007780000145508097083502"
+  },
+  {
+   "rang": 23,
+   "nom_prenom": "EL -KLAIE ZAKARIAE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001383231910"
+  },
+  {
+   "rang": 24,
+   "nom_prenom": "KHLIFI AMINE",
+   "banque": "CIH BANK",
+   "rib": "230735592153621101150001"
+  },
+  {
+   "rang": 25,
+   "nom_prenom": "ROUKHAMI AYOUB",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007735000435100030765360"
+  },
+  {
+   "rang": 26,
+   "nom_prenom": "ZITAN MOHAMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164150211110365000000739"
+  },
+  {
+   "rang": 27,
+   "nom_prenom": "AROUDAM RACHID",
+   "banque": "AL BARID CASH",
+   "rib": "833720000000012661237962"
+  },
+  {
+   "rang": 28,
+   "nom_prenom": "EL MAIN KERRICH RIDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001176487856"
+  },
+  {
+   "rang": 29,
+   "nom_prenom": "AKRICH ABDELKARIM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001223526745"
+  },
+  {
+   "rang": 30,
+   "nom_prenom": "EL BASTRIOUI OMAR",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211118790406000837"
+  },
+  {
+   "rang": 31,
+   "nom_prenom": "EL KOBI MOHAMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "164720211118909297001470"
+  },
+  {
+   "rang": 32,
+   "nom_prenom": "EL HADI ZGHIBA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001216700061231632"
+  },
+  {
+   "rang": 33,
+   "nom_prenom": "HAMMOUD ABDESLAM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001394369547"
+  },
+  {
+   "rang": 34,
+   "nom_prenom": "EL HADDOUCHI CHAFIA",
+   "banque": "CIH BANK",
+   "rib": "230050299358321100870051"
+  },
+  {
+   "rang": 35,
+   "nom_prenom": "KALKOUL SAMIRA",
+   "banque": "CIH BANK",
+   "rib": "230050565820121100870008"
+  },
+  {
+   "rang": 36,
+   "nom_prenom": "AOUASSAR RABIA",
+   "banque": "CIH BANK",
+   "rib": "230057592936021103650058"
+  },
+  {
+   "rang": 37,
+   "nom_prenom": "ECHAIBI SALOUA",
+   "banque": "CIH BANK",
+   "rib": "230057592945821103650053"
+  },
+  {
+   "rang": 38,
+   "nom_prenom": "OUAZZA NAJIA",
+   "banque": "CIH BANK",
+   "rib": "230050300432121100870002"
+  },
+  {
+   "rang": 39,
+   "nom_prenom": "ANDALOUSSI FADOUA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211112172269000169"
+  },
+  {
+   "rang": 40,
+   "nom_prenom": "MAHJOUBI NOURIA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211118631226000265"
+  },
+  {
+   "rang": 41,
+   "nom_prenom": "AL-LUCH ASMA-E",
+   "banque": "CIH BANK",
+   "rib": "230720523036821100890039"
+  },
+  {
+   "rang": 42,
+   "nom_prenom": "AJANNAY KARIMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211118108011000061"
+  },
+  {
+   "rang": 43,
+   "nom_prenom": "EL FAZAZI MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000759969274"
+  }
+ ],
+ "BO NETTOYAGE": [
+  {
+   "rang": 1,
+   "nom_prenom": "GHDAYDA FATIMA ZAHRA",
+   "banque": "WAFACASH",
+   "rib": "007780000136508098646816"
+  },
+  {
+   "rang": 2,
+   "nom_prenom": "TAHIRI ZOHAIR",
+   "banque": "CIH BANK",
+   "rib": "230353672709021102910075"
+  },
+  {
+   "rang": 3,
+   "nom_prenom": "ERRAKEB M'HAMED",
+   "banque": "CIH BANK",
+   "rib": "230353672973821102910027"
+  },
+  {
+   "rang": 4,
+   "nom_prenom": "LAHLOU ABDELHAK",
+   "banque": "CASH PLUS",
+   "rib": "835780030017031757799673"
+  },
+  {
+   "rang": 5,
+   "nom_prenom": "EABDELLATIN JAMILA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000616381629"
+  },
+  {
+   "rang": 6,
+   "nom_prenom": "EL GHAZI NAZIHA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000848740570"
+  },
+  {
+   "rang": 7,
+   "nom_prenom": "ACHAHBAR SAADIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609793680"
+  },
+  {
+   "rang": 8,
+   "nom_prenom": "TIGUNIT CHAHIDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001103406116"
+  },
+  {
+   "rang": 9,
+   "nom_prenom": "BELLALI ISMAIL",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000670796592"
+  },
+  {
+   "rang": 10,
+   "nom_prenom": "SATHIOUI MOHAMMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211111954869000790"
+  },
+  {
+   "rang": 11,
+   "nom_prenom": "AKKOUH HAMMADI",
+   "banque": "AL BARID CASH",
+   "rib": "833057000000035670092826"
+  },
+  {
+   "rang": 12,
+   "nom_prenom": "EL BAZ FATIHA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609900186"
+  },
+  {
+   "rang": 13,
+   "nom_prenom": "JANAH SIHAM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211112498951000327"
+  },
+  {
+   "rang": 14,
+   "nom_prenom": "ACHAHBAR FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609739069"
+  },
+  {
+   "rang": 15,
+   "nom_prenom": "AVALLI MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000779378101"
+  },
+  {
+   "rang": 16,
+   "nom_prenom": "KOUBIAA SAID",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000765002992"
+  },
+  {
+   "rang": 17,
+   "nom_prenom": "ELBOUKRI KARIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001075727166"
+  },
+  {
+   "rang": 18,
+   "nom_prenom": "BULLIF NAJIHA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609911050"
+  },
+  {
+   "rang": 19,
+   "nom_prenom": "EZZAHOUANI FOUAD",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000635035311"
+  },
+  {
+   "rang": 20,
+   "nom_prenom": "REBAJ NAIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609897664"
+  },
+  {
+   "rang": 21,
+   "nom_prenom": "AZOUZ NOUREDDINE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000769470812"
+  },
+  {
+   "rang": 22,
+   "nom_prenom": "TIGNIT BOUCHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000713009246"
+  },
+  {
+   "rang": 23,
+   "nom_prenom": "AHAMJIK BAKR",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609891359"
+  },
+  {
+   "rang": 24,
+   "nom_prenom": "EL BATTAOUI NAIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000711659394"
+  },
+  {
+   "rang": 25,
+   "nom_prenom": "BOUTKABOUT FATIHA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000609560395"
+  },
+  {
+   "rang": 26,
+   "nom_prenom": "EL BAZ NAJAT",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000876638061"
+  },
+  {
+   "rang": 27,
+   "nom_prenom": "AKOUH FADILA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211116671501001474"
+  },
+  {
+   "rang": 28,
+   "nom_prenom": "EL GHALBZOURI ANASS",
+   "banque": "CIH BANK",
+   "rib": "230050783352321100870008"
+  },
+  {
+   "rang": 29,
+   "nom_prenom": "DARBOUCHI FARID",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000856851031"
+  },
+  {
+   "rang": 30,
+   "nom_prenom": "ASSAIDI IMAD",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001250915471"
+  },
+  {
+   "rang": 31,
+   "nom_prenom": "FAKIHI EL BAJGA RAHMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211118246592000566"
+  },
+  {
+   "rang": 32,
+   "nom_prenom": "FQUIHI RAHMA",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000439003737189221"
+  },
+  {
+   "rang": 33,
+   "nom_prenom": "EC-CHEKH ZAHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001015895238"
+  },
+  {
+   "rang": 34,
+   "nom_prenom": "GRINE FATIMA",
+   "banque": "BMCE BANK",
+   "rib": "011640000022200000221796"
+  },
+  {
+   "rang": 35,
+   "nom_prenom": "AKHAZZAN RHIMOU",
+   "banque": "CASH PLUS",
+   "rib": "835780030016940749308186"
+  },
+  {
+   "rang": 36,
+   "nom_prenom": "AJBAR KHADDOUJ",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001244200030352053"
+  },
+  {
+   "rang": 37,
+   "nom_prenom": "BELAOUJA ZOHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001220791345"
+  },
+  {
+   "rang": 38,
+   "nom_prenom": "AIT EL MEKKI RQIA",
+   "banque": "CIH BANK",
+   "rib": "230640330739921101710030"
+  },
+  {
+   "rang": 39,
+   "nom_prenom": "FADILI FATIMA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000601300061038526"
+  },
+  {
+   "rang": 40,
+   "nom_prenom": "LAKHLIFI SOUKAINA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000305530040246960"
+  },
+  {
+   "rang": 41,
+   "nom_prenom": "EL-KIOUI KHAOULA",
+   "banque": "CIH BANK",
+   "rib": "230640496517721102810061"
+  },
+  {
+   "rang": 42,
+   "nom_prenom": "EL JOUNAINI RADIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001042835339"
+  },
+  {
+   "rang": 43,
+   "nom_prenom": "FETOUAKI AICHA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000973137929"
+  },
+  {
+   "rang": 44,
+   "nom_prenom": "BOUHOUSSE AMINA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000713697073"
+  },
+  {
+   "rang": 45,
+   "nom_prenom": "HAMDAOUI KARIMA",
+   "banque": "CIH BANK",
+   "rib": "230640526290221200600063"
+  },
+  {
+   "rang": 46,
+   "nom_prenom": "BAATOUT BAHIJA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001160023367"
+  },
+  {
+   "rang": 47,
+   "nom_prenom": "ELFAKIHI FATIMA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001004900030543856"
+  },
+  {
+   "rang": 48,
+   "nom_prenom": "NOUINOU MOHAMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000537200030801593"
+  },
+  {
+   "rang": 49,
+   "nom_prenom": "BOUJEMAA MARIAM",
+   "banque": "CIH BANK",
+   "rib": "230640614181121102560069"
+  },
+  {
+   "rang": 50,
+   "nom_prenom": "AROUSS AYMAN",
+   "banque": "CIH BANK",
+   "rib": "230057626623621103650083"
+  },
+  {
+   "rang": 51,
+   "nom_prenom": "ADDA MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000699924431"
+  },
+  {
+   "rang": 52,
+   "nom_prenom": "MAHTOUR MOHAMED ACHRAF",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211116515280000206"
+  },
+  {
+   "rang": 53,
+   "nom_prenom": "AOULAD MOUHAND NAJAT",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150057211113209071001618"
+  },
+  {
+   "rang": 54,
+   "nom_prenom": "SOUILAH LOUBNA",
+   "banque": "CIH BANK",
+   "rib": "230640643693321102400070"
+  },
+  {
+   "rang": 55,
+   "nom_prenom": "AHBOUCH BADRE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007057000064200030932323"
+  },
+  {
+   "rang": 56,
+   "nom_prenom": "BOUGARNE AMAL",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "181331211118511273000807"
+  },
+  {
+   "rang": 57,
+   "nom_prenom": "ESSAOUD MINA",
+   "banque": "AL BARID CASH",
+   "rib": "833640000000025405381144"
+  },
+  {
+   "rang": 58,
+   "nom_prenom": "BOUHRIBA NADIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001386258310"
+  },
+  {
+   "rang": 59,
+   "nom_prenom": "HADDAD FAKIH FATIMA ZOHRA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007720000661870030008117"
+  }
+ ],
+ "EDEN VERT SERVICE": [
+  {
+   "rang": 1,
+   "nom_prenom": "EL FKIHI LAMIAE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001289528940"
+  },
+  {
+   "rang": 2,
+   "nom_prenom": "OULD HAMRA BOUCHRA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000296900030694977"
+  },
+  {
+   "rang": 3,
+   "nom_prenom": "BEN ABDELLAH SOUHAILA",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000213002918054921"
+  },
+  {
+   "rang": 4,
+   "nom_prenom": "BOUAZZA ASMAE",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000203002882485521"
+  },
+  {
+   "rang": 5,
+   "nom_prenom": "AQBIB YAMNA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000844700061151486"
+  },
+  {
+   "rang": 6,
+   "nom_prenom": "AKBIB HOUDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001187227890"
+  },
+  {
+   "rang": 7,
+   "nom_prenom": "MARHOUNI AMAL",
+   "banque": "CASH PLUS",
+   "rib": "835780030017455716545804"
+  },
+  {
+   "rang": 8,
+   "nom_prenom": "EL HAJI LAILA",
+   "banque": "WAFACASH",
+   "rib": "007780000141108086426041"
+  },
+  {
+   "rang": 9,
+   "nom_prenom": "BOUCHOUAF LOUBNA",
+   "banque": "CIH BANK",
+   "rib": "230050644260321100870096"
+  },
+  {
+   "rang": 10,
+   "nom_prenom": "CHARIF NAJAT",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001143564310"
+  },
+  {
+   "rang": 11,
+   "nom_prenom": "EL ABOUDI BOUCHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001203436202"
+  },
+  {
+   "rang": 12,
+   "nom_prenom": "AAIDAN MARIAM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001143679158"
+  },
+  {
+   "rang": 13,
+   "nom_prenom": "CHTIOUI RAHMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000683436565"
+  },
+  {
+   "rang": 14,
+   "nom_prenom": "ZEKRI FATIMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164720211113339491000536"
+  },
+  {
+   "rang": 15,
+   "nom_prenom": "EL KANFAOUI FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001291100437"
+  },
+  {
+   "rang": 16,
+   "nom_prenom": "DOGOUN SAIDA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164727211110510770001460"
+  },
+  {
+   "rang": 17,
+   "nom_prenom": "EL MADHOUN TOURIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000663409848"
+  },
+  {
+   "rang": 18,
+   "nom_prenom": "AMAICH HOUDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001307374418"
+  },
+  {
+   "rang": 19,
+   "nom_prenom": "EL MESBAHI KHADYJA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164731211116617929000342"
+  },
+  {
+   "rang": 20,
+   "nom_prenom": "AMAZIANE ABDESLAM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001251963265"
+  },
+  {
+   "rang": 21,
+   "nom_prenom": "BARCHIN MOHAMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000235400030543725"
+  },
+  {
+   "rang": 22,
+   "nom_prenom": "BOUNAJMA MOSTAFA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001118129455"
+  },
+  {
+   "rang": 23,
+   "nom_prenom": "BELHACHMI ASMAE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000296800030716904"
+  },
+  {
+   "rang": 24,
+   "nom_prenom": "EL JAFRY HAYAT",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164720211117598325000474"
+  },
+  {
+   "rang": 25,
+   "nom_prenom": "ECHATTIBI CHADIA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164727211111419220001312"
+  },
+  {
+   "rang": 26,
+   "nom_prenom": "CHERAIAH RACHIDA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211118691635000183"
+  },
+  {
+   "rang": 27,
+   "nom_prenom": "EL HAJJAMI EZZOUHRA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007720000661500030752077"
+  },
+  {
+   "rang": 28,
+   "nom_prenom": "LBLALY IJJA",
+   "banque": "CIH BANK",
+   "rib": "230640699293421101710027"
+  },
+  {
+   "rang": 29,
+   "nom_prenom": "SOUSSAN ZOHRA",
+   "banque": "SAHAM BANK",
+   "rib": "022640000382003173151621"
+  },
+  {
+   "rang": 30,
+   "nom_prenom": "SAKHRI KHADIJA",
+   "banque": "CIH BANK",
+   "rib": "230640336401421101710001"
+  },
+  {
+   "rang": 31,
+   "nom_prenom": "EL-FATEHY MARYEM",
+   "banque": "CIH BANK",
+   "rib": "230640649856321102810011"
+  },
+  {
+   "rang": 32,
+   "nom_prenom": "ASSEM NAIMA",
+   "banque": "SAHAM BANK",
+   "rib": "022640000174002820877421"
+  },
+  {
+   "rang": 33,
+   "nom_prenom": "MEZARI FATIHA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000592300030742772"
+  },
+  {
+   "rang": 34,
+   "nom_prenom": "EL MOUEDENE BOUAZZAOUIA",
+   "banque": "CIH BANK",
+   "rib": "230640863394321100600047"
+  },
+  {
+   "rang": 35,
+   "nom_prenom": "EL ALOUFI OUSSAMA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000592900030742451"
+  },
+  {
+   "rang": 36,
+   "nom_prenom": "AL KHAMAR RACHID",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000945524551"
+  },
+  {
+   "rang": 37,
+   "nom_prenom": "ECH-CHAFFANI SAKINA",
+   "banque": "CIH BANK",
+   "rib": "230640405050821101180062"
+  },
+  {
+   "rang": 38,
+   "nom_prenom": "BENYOUSSEF NAJIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000707628074"
+  },
+  {
+   "rang": 39,
+   "nom_prenom": "EL BOUHZRATI EL MOFADDALA",
+   "banque": "WAFACASH",
+   "rib": "007780000146708065843913"
+  },
+  {
+   "rang": 40,
+   "nom_prenom": "KHARBOUCH NAIMA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000592200030742389"
+  },
+  {
+   "rang": 41,
+   "nom_prenom": "BEN HALIMA ZOHRA",
+   "banque": "CIH BANK",
+   "rib": "230640369465621102800048"
+  },
+  {
+   "rang": 42,
+   "nom_prenom": "MAKHLOUFI JEMAA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007780000016408068477382"
+  },
+  {
+   "rang": 43,
+   "nom_prenom": "OQAYL NAZHA",
+   "banque": "SAHAM BANK",
+   "rib": "022640000304002883455321"
+  },
+  {
+   "rang": 44,
+   "nom_prenom": "EL ASRY AZIZ",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211111568025000689"
+  },
+  {
+   "rang": 45,
+   "nom_prenom": "BEJJA SOUFIANE",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211117694504000438"
+  },
+  {
+   "rang": 46,
+   "nom_prenom": "AMAKRAN HAMZA",
+   "banque": "CIH BANK",
+   "rib": "230050428258121102630097"
+  },
+  {
+   "rang": 47,
+   "nom_prenom": "EL BARDI ABDELMALEK",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211117261904000868"
+  },
+  {
+   "rang": 48,
+   "nom_prenom": "OULAD ALI SAID",
+   "banque": "BMCE BANK",
+   "rib": "011050000003200000720777"
+  },
+  {
+   "rang": 49,
+   "nom_prenom": "LEHCHAICHI MOHAMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211111686959000656"
+  },
+  {
+   "rang": 50,
+   "nom_prenom": "AFAHSI MOUNIR",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211110045142000424"
+  },
+  {
+   "rang": 51,
+   "nom_prenom": "EL BARDI ABDERRAHIM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211114405244000362"
+  },
+  {
+   "rang": 52,
+   "nom_prenom": "EL OUALITI OUADIA",
+   "banque": "UMNIA BANK",
+   "rib": "360050000006866276001783"
+  },
+  {
+   "rang": 53,
+   "nom_prenom": "AOUATTAH MOHAMED",
+   "banque": "BMCE BANK",
+   "rib": "011050000003200000713793"
+  },
+  {
+   "rang": 54,
+   "nom_prenom": "ACHAHBAR ARRIDOUAN",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211112389274000487"
+  },
+  {
+   "rang": 55,
+   "nom_prenom": "EL BARDI YOUSSEF",
+   "banque": "CIH BANK",
+   "rib": "230050501361821100870001"
+  },
+  {
+   "rang": 56,
+   "nom_prenom": "EL ASRY DRISS",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211110356889000236"
+  },
+  {
+   "rang": 57,
+   "nom_prenom": "EL-ARYF MAGHNYA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211119561220000694"
+  },
+  {
+   "rang": 58,
+   "nom_prenom": "EL BAZBOUZ HADDA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211119584802002046"
+  },
+  {
+   "rang": 59,
+   "nom_prenom": "HAOUHAOU RADIA",
+   "banque": "CIH BANK",
+   "rib": "230050517593421102630085"
+  },
+  {
+   "rang": 60,
+   "nom_prenom": "BENALI MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000738944815"
+  },
+  {
+   "rang": 61,
+   "nom_prenom": "BAGHDAD ABDELHAFID",
+   "banque": "CREDIT DU MAROC",
+   "rib": "021050000007200112131454"
+  },
+  {
+   "rang": 62,
+   "nom_prenom": "EL OUAKILI FATIMA",
+   "banque": "CIH BANK",
+   "rib": "230050393994121100870018"
+  },
+  {
+   "rang": 63,
+   "nom_prenom": "EL YOUNOUSSY M'FEDDAL",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211111787445000430"
+  },
+  {
+   "rang": 64,
+   "nom_prenom": "BENAISA IBRAHIM",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007050000767530040027080"
+  },
+  {
+   "rang": 65,
+   "nom_prenom": "EL ALLAOUI ADIL",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007050000767400030155445"
+  },
+  {
+   "rang": 66,
+   "nom_prenom": "EL BOUAZZATI OMAR",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211119197462009737"
+  },
+  {
+   "rang": 67,
+   "nom_prenom": "ELLABIB IBRAHIM",
+   "banque": "CREDIT DU MAROC",
+   "rib": "021050000007200112628482"
+  },
+  {
+   "rang": 68,
+   "nom_prenom": "EL-YOUNOUSSY BRAHIM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001412194364"
+  },
+  {
+   "rang": 69,
+   "nom_prenom": "IBRAHIM MIMOUN",
+   "banque": "CREDIT DU MAROC",
+   "rib": "021050000007200113320965"
+  },
+  {
+   "rang": 70,
+   "nom_prenom": "EL MOUSSAOUI KARIM",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007050000767300030133625"
+  },
+  {
+   "rang": 71,
+   "nom_prenom": "KADDOURI MOHAMMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007050000287500061178894"
+  },
+  {
+   "rang": 72,
+   "nom_prenom": "BENHADI MOHAMED",
+   "banque": "BMCE BANK",
+   "rib": "011050000003200000642401"
+  },
+  {
+   "rang": 73,
+   "nom_prenom": "MSISSOU HAMID",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211117569860000605"
+  },
+  {
+   "rang": 74,
+   "nom_prenom": "CHELLOUBI MOHAMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007050000287300030275383"
+  },
+  {
+   "rang": 75,
+   "nom_prenom": "TAOUAT MOHAMMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001341995755"
+  },
+  {
+   "rang": 76,
+   "nom_prenom": "EL KHALLOUKI AYOUB",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000920580516"
+  },
+  {
+   "rang": 77,
+   "nom_prenom": "ARIARA OUSSAMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150051211113536604000020"
+  },
+  {
+   "rang": 78,
+   "nom_prenom": "EL HANNACH MOHAMED SAID",
+   "banque": "WAFACASH",
+   "rib": "007780000136908067647730"
+  },
+  {
+   "rang": 79,
+   "nom_prenom": "GHILAN MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001189983078"
+  },
+  {
+   "rang": 80,
+   "nom_prenom": "EL HAOUARI RACHID",
+   "banque": "AL BARID CASH",
+   "rib": "833640000000035308323283"
+  },
+  {
+   "rang": 81,
+   "nom_prenom": "ALILOU ZAHRA",
+   "banque": "CIH BANK",
+   "rib": "230640413870221101690080"
+  },
+  {
+   "rang": 82,
+   "nom_prenom": "FAHSI FARAH",
+   "banque": "CASH PLUS",
+   "rib": "835780030017881660210889"
+  },
+  {
+   "rang": 83,
+   "nom_prenom": "EL BADRAOUI HANANE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001167185653"
+  },
+  {
+   "rang": 84,
+   "nom_prenom": "OUJAKANE KHADIJA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001373519785"
+  },
+  {
+   "rang": 85,
+   "nom_prenom": "DALIL LALLA KHADIJA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000759500031181873"
+  },
+  {
+   "rang": 86,
+   "nom_prenom": "EL OUAHABI NAJAT",
+   "banque": "CIH BANK",
+   "rib": "230640322435621101690006"
+  },
+  {
+   "rang": 87,
+   "nom_prenom": "NASMI KALTOUM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000750657177"
+  },
+  {
+   "rang": 88,
+   "nom_prenom": "EL OUAHABI NAIMA",
+   "banque": "BMCE BANK",
+   "rib": "011640000006200000887046"
+  },
+  {
+   "rang": 89,
+   "nom_prenom": "LACHHAB MALIKA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001393488981"
+  },
+  {
+   "rang": 90,
+   "nom_prenom": "FACHLAK KHADIJA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001305814852"
+  },
+  {
+   "rang": 91,
+   "nom_prenom": "TARBIATE SAIDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001295600946"
+  },
+  {
+   "rang": 92,
+   "nom_prenom": "BEN YAHYA OUAFAE",
+   "banque": "CASH PLUS",
+   "rib": "835780030017879129869471"
+  },
+  {
+   "rang": 93,
+   "nom_prenom": "EL GHOUAL HANANE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000759500031182649"
+  },
+  {
+   "rang": 94,
+   "nom_prenom": "ABANDAR NOHAD",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000759800031182537"
+  },
+  {
+   "rang": 95,
+   "nom_prenom": "EL ABBASSI FAOUZIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001332882217"
+  },
+  {
+   "rang": 96,
+   "nom_prenom": "HINA NAJAT",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000759400031156755"
+  },
+  {
+   "rang": 97,
+   "nom_prenom": "ELHARARI FATIMA",
+   "banque": "WAFACASH",
+   "rib": "007780000149308067986707"
+  },
+  {
+   "rang": 98,
+   "nom_prenom": "HADDOU HAFIDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001291321306"
+  },
+  {
+   "rang": 99,
+   "nom_prenom": "AKACHHIT AYYADA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001168237521"
+  },
+  {
+   "rang": 100,
+   "nom_prenom": "EL FILALI HAFIDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001173500741"
+  },
+  {
+   "rang": 101,
+   "nom_prenom": "BOUCHLOUCHI FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001166663696"
+  },
+  {
+   "rang": 102,
+   "nom_prenom": "EL YOUSSOFI SALMA",
+   "banque": "CIH BANK",
+   "rib": "230360294389021100620088"
+  },
+  {
+   "rang": 103,
+   "nom_prenom": "LAAMOUM ZAKIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001241165904"
+  },
+  {
+   "rang": 104,
+   "nom_prenom": "BOULILA BOUCHRA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000997951693"
+  },
+  {
+   "rang": 105,
+   "nom_prenom": "DAHMOUMI HOUCINE",
+   "banque": "CIH BANK",
+   "rib": "230640392370121102800005"
+  },
+  {
+   "rang": 106,
+   "nom_prenom": "BENHATTAL FADOUA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001414268030"
+  },
+  {
+   "rang": 107,
+   "nom_prenom": "GOUFAL RACHIDA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001179193574"
+  },
+  {
+   "rang": 108,
+   "nom_prenom": "EN NOUDI KHADDOUJ",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000821388219"
+  },
+  {
+   "rang": 109,
+   "nom_prenom": "LAMAAITI MARIEM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000952606812"
+  },
+  {
+   "rang": 110,
+   "nom_prenom": "CHEKOUF FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000821381138"
+  },
+  {
+   "rang": 111,
+   "nom_prenom": "TAIMOUR WAFAA",
+   "banque": "CIH BANK",
+   "rib": "230810517127421100560094"
+  },
+  {
+   "rang": 112,
+   "nom_prenom": "AIT BELAID SAADIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000821311589"
+  },
+  {
+   "rang": 113,
+   "nom_prenom": "BOUGUARNE HALIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001159591814"
+  },
+  {
+   "rang": 114,
+   "nom_prenom": "EL RZOUI FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000763906892"
+  },
+  {
+   "rang": 115,
+   "nom_prenom": "LAMGHARI AYADA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000828583776"
+  },
+  {
+   "rang": 116,
+   "nom_prenom": "ADNANE KHADIJA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000821318864"
+  },
+  {
+   "rang": 117,
+   "nom_prenom": "RHOURAIB NADIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001207913043"
+  },
+  {
+   "rang": 118,
+   "nom_prenom": "RKAK AYOUB",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000767617627"
+  },
+  {
+   "rang": 119,
+   "nom_prenom": "DAROUICH FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000786579381"
+  },
+  {
+   "rang": 120,
+   "nom_prenom": "ETTALEBI SFIA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000762222778"
+  },
+  {
+   "rang": 121,
+   "nom_prenom": "MOUSOUF AMINA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000826227355"
+  },
+  {
+   "rang": 122,
+   "nom_prenom": "KHARBOUCH MOHAMMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001404082351"
+  },
+  {
+   "rang": 123,
+   "nom_prenom": "HAMADA AMINA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000821330601"
+  },
+  {
+   "rang": 124,
+   "nom_prenom": "DINAR NAIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000938122772"
+  },
+  {
+   "rang": 125,
+   "nom_prenom": "LAKRIMI FATIMA ZAHRA",
+   "banque": "CIH BANK",
+   "rib": "230810256316221100630008"
+  },
+  {
+   "rang": 126,
+   "nom_prenom": "BOUSSETTA FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000816644046"
+  },
+  {
+   "rang": 127,
+   "nom_prenom": "EL MEKKAOUI FATIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000704602159"
+  },
+  {
+   "rang": 128,
+   "nom_prenom": "AIT OUHAMCHICH SAIDA",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225070014711610661011415"
+  },
+  {
+   "rang": 129,
+   "nom_prenom": "MAGHROUS SAADIA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007070000762500030521928"
+  },
+  {
+   "rang": 130,
+   "nom_prenom": "ESSADIA AALAMI",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225070014712152661010738"
+  },
+  {
+   "rang": 131,
+   "nom_prenom": "FARRA ZAHRA",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225070014712126661012301"
+  },
+  {
+   "rang": 132,
+   "nom_prenom": "OUAKHDOU MERIEM",
+   "banque": "TRESORERIE GENERALE",
+   "rib": "310070102810260449220173"
+  },
+  {
+   "rang": 133,
+   "nom_prenom": "EL MESSAOUDI ABDELLATIF",
+   "banque": "CIH BANK",
+   "rib": "230690456839221100750068"
+  }
+ ],
+ "GTA": [
+  {
+   "rang": 1,
+   "nom_prenom": "BENGHANEM BOUSSELHAM",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225356023404995601011261"
+  },
+  {
+   "rang": 2,
+   "nom_prenom": "AGHRAIDA ABDESLAM",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000092700030851948"
+  },
+  {
+   "rang": 3,
+   "nom_prenom": "CHAIRI ABDESELAM",
+   "banque": "BMCE BANK",
+   "rib": "011640000017200000607621"
+  },
+  {
+   "rang": 4,
+   "nom_prenom": "DAHDOUH ABDESSELAM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211111862213001360"
+  },
+  {
+   "rang": 5,
+   "nom_prenom": "BEN AHMED MUSTAPHA",
+   "banque": "BMCE BANK",
+   "rib": "011640000027200000449787"
+  },
+  {
+   "rang": 6,
+   "nom_prenom": "BELMADANI ADIL",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225640064504020601011805"
+  },
+  {
+   "rang": 7,
+   "nom_prenom": "FOUNOUNOU MOHAMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000235800030467366"
+  },
+  {
+   "rang": 8,
+   "nom_prenom": "EL ABIAD MOHAMED",
+   "banque": "BMCE BANK",
+   "rib": "011640000017200000611986"
+  },
+  {
+   "rang": 9,
+   "nom_prenom": "BENCHRIF RACHID",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007330000772500030283724"
+  },
+  {
+   "rang": 10,
+   "nom_prenom": "AMGHAR ARAFA",
+   "banque": "WAFACASH",
+   "rib": "007780000135908065957264"
+  },
+  {
+   "rang": 11,
+   "nom_prenom": "MAZNAB ABDELJABBAR",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000992499129"
+  },
+  {
+   "rang": 12,
+   "nom_prenom": "EL IBRAHYMY KHALID",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000250900031244260"
+  },
+  {
+   "rang": 13,
+   "nom_prenom": "EL OUARDI MUSTAPHA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000728380642"
+  },
+  {
+   "rang": 14,
+   "nom_prenom": "SARGHINI RADIF",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225356023410603661010350"
+  },
+  {
+   "rang": 15,
+   "nom_prenom": "KHLIFI OMAR",
+   "banque": "CIH BANK",
+   "rib": "230570501032821101610060"
+  },
+  {
+   "rang": 16,
+   "nom_prenom": "KHLIFI MOHAMMED",
+   "banque": "CIH BANK",
+   "rib": "230570647446921101610042"
+  },
+  {
+   "rang": 17,
+   "nom_prenom": "EL KLAI ABDELHAK",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001115176775"
+  },
+  {
+   "rang": 18,
+   "nom_prenom": "LAHOUIRI ISMAEL",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225356023410690661010690"
+  },
+  {
+   "rang": 19,
+   "nom_prenom": "ROUAS SAID",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000524764935"
+  },
+  {
+   "rang": 20,
+   "nom_prenom": "OULAD M'HIROU ANASS",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001088863973"
+  },
+  {
+   "rang": 21,
+   "nom_prenom": "AGOUAL OTHMAN",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000959132487"
+  },
+  {
+   "rang": 22,
+   "nom_prenom": "EL GHAZI YOUNESS",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225356023409611661010613"
+  },
+  {
+   "rang": 23,
+   "nom_prenom": "DAFLAOUI MOUJIB",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000185003106216921"
+  },
+  {
+   "rang": 24,
+   "nom_prenom": "OUAFI IMAD",
+   "banque": "CIH BANK",
+   "rib": "230735416385021101700027"
+  },
+  {
+   "rang": 25,
+   "nom_prenom": "EL ACHIRI SAIDA",
+   "banque": "CIH BANK",
+   "rib": "230640679328121101180057"
+  },
+  {
+   "rang": 26,
+   "nom_prenom": "GUROUACH KHALID",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225353004630244601011388"
+  },
+  {
+   "rang": 27,
+   "nom_prenom": "BADDI MOUSSA",
+   "banque": "CASH PLUS",
+   "rib": "835780030017537921372484"
+  },
+  {
+   "rang": 28,
+   "nom_prenom": "HABCHI MOHAMMED",
+   "banque": "CASH PLUS",
+   "rib": "835780030017055778013269"
+  },
+  {
+   "rang": 29,
+   "nom_prenom": "EL HROUZ MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000958279760"
+  },
+  {
+   "rang": 30,
+   "nom_prenom": "DAIF BRAHIM",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225013074002916601012033"
+  },
+  {
+   "rang": 31,
+   "nom_prenom": "OUBRIK LAHOUCINE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000507339467"
+  },
+  {
+   "rang": 32,
+   "nom_prenom": "EL BAZ MUSTAPHA",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225013074000699601012139"
+  },
+  {
+   "rang": 33,
+   "nom_prenom": "ROUCHDI EL HASSAN",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225011070600779661010555"
+  },
+  {
+   "rang": 34,
+   "nom_prenom": "EL BAZ HICHAM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "101013211114576436000976"
+  },
+  {
+   "rang": 35,
+   "nom_prenom": "IBIDARNE MOHAMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "101011211111185659000235"
+  },
+  {
+   "rang": 36,
+   "nom_prenom": "BOUYA LAHOUCINE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000875477068"
+  },
+  {
+   "rang": 37,
+   "nom_prenom": "ELMOUDDEN JAMAL",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "101013211110789857000221"
+  },
+  {
+   "rang": 38,
+   "nom_prenom": "EL MAMOUNE ABDALLAH",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000148197840"
+  },
+  {
+   "rang": 39,
+   "nom_prenom": "LOTFI SABER",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007013000568800030629127"
+  },
+  {
+   "rang": 40,
+   "nom_prenom": "EL BAZ ATMANE",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225013074001667661011751"
+  },
+  {
+   "rang": 41,
+   "nom_prenom": "ELMAMOUNE REDOUAN",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007013000568700030876676"
+  },
+  {
+   "rang": 42,
+   "nom_prenom": "EL FAQIR AHMED",
+   "banque": "CIH BANK",
+   "rib": "230010672594421100040018"
+  },
+  {
+   "rang": 43,
+   "nom_prenom": "EL FACHAT AHMED",
+   "banque": "BMCE BANK",
+   "rib": "011013000001200000288349"
+  },
+  {
+   "rang": 44,
+   "nom_prenom": "EL -KACH JAOUAD",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000839717630"
+  },
+  {
+   "rang": 45,
+   "nom_prenom": "EL BAKRI NABIL",
+   "banque": "CASH PLUS",
+   "rib": "835780030017648541306511"
+  },
+  {
+   "rang": 46,
+   "nom_prenom": "BEL MEJDOUB OUMAIMA",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001031192138"
+  },
+  {
+   "rang": 47,
+   "nom_prenom": "ELKDIL BRAHIM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000781836857"
+  },
+  {
+   "rang": 48,
+   "nom_prenom": "OUINAS BOUSSELHAM",
+   "banque": "CASH PLUS",
+   "rib": "835780030017676122204061"
+  },
+  {
+   "rang": 49,
+   "nom_prenom": "ELHAMDAOUI ABDELMOULA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "101011211118020787000972"
+  },
+  {
+   "rang": 50,
+   "nom_prenom": "ENNAUALY MOHAMMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007732001022200030462635"
+  },
+  {
+   "rang": 51,
+   "nom_prenom": "AMINE HASSANE",
+   "banque": "CIH BANK",
+   "rib": "230735880272521101150011"
+  },
+  {
+   "rang": 52,
+   "nom_prenom": "EL HAMMOUMY ISSAM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164732211115986808000918"
+  },
+  {
+   "rang": 53,
+   "nom_prenom": "EL MADKOURY ABDERRAHIM",
+   "banque": "WAFACASH",
+   "rib": "007780000138808095649304"
+  },
+  {
+   "rang": 54,
+   "nom_prenom": "RAGRAGUI ABDELWAHAD",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "101013211116668230001855"
+  },
+  {
+   "rang": 55,
+   "nom_prenom": "OUHMOU ABDALLAH",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007013000568400030473753"
+  },
+  {
+   "rang": 56,
+   "nom_prenom": "GADIR LARBI",
+   "banque": "CREDIT AGRICOLE",
+   "rib": "225013074004231601010585"
+  },
+  {
+   "rang": 57,
+   "nom_prenom": "AL MADI MOHAMED",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007731000026400019104344"
+  },
+  {
+   "rang": 58,
+   "nom_prenom": "HANA KARIM",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001384507363"
+  },
+  {
+   "rang": 59,
+   "nom_prenom": "FATIHI MUSTAPHA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007011000957200030639858"
+  },
+  {
+   "rang": 60,
+   "nom_prenom": "BOUZOUAI ABDELLATIF",
+   "banque": "CREDIT DU MAROC",
+   "rib": "021021000004300130722678"
+  },
+  {
+   "rang": 61,
+   "nom_prenom": "EL BAHRAWI HAMZA",
+   "banque": "CIH BANK",
+   "rib": "230731718813321101160008"
+  },
+  {
+   "rang": 62,
+   "nom_prenom": "MAZOUZ IMAD",
+   "banque": "DAMANE CASH",
+   "rib": "837735557019219380775788"
+  },
+  {
+   "rang": 63,
+   "nom_prenom": "TEKHLIS ABDALLAH",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007013000568200030471047"
+  },
+  {
+   "rang": 64,
+   "nom_prenom": "ECHCHOUATERY YASSINE",
+   "banque": "CASH PLUS",
+   "rib": "835780030017317639574982"
+  },
+  {
+   "rang": 65,
+   "nom_prenom": "CHAHOUANI MOHAMMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000864859836"
+  },
+  {
+   "rang": 66,
+   "nom_prenom": "EZ-ZAARY LHACHMI",
+   "banque": "CASH PLUS",
+   "rib": "835780030017881818574059"
+  }
+ ],
+ "NORD PLANET NEGOCE": [
+  {
+   "rang": 1,
+   "nom_prenom": "ABBAS LAAZIZA",
+   "banque": "CASH PLUS",
+   "rib": "835780030017357318584035"
+  },
+  {
+   "rang": 2,
+   "nom_prenom": "ZAYOU RAHMA",
+   "banque": "CASH PLUS",
+   "rib": "835780030017046264582293"
+  },
+  {
+   "rang": 3,
+   "nom_prenom": "BOU AJAJ SOUKAINA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211117481941000760"
+  },
+  {
+   "rang": 4,
+   "nom_prenom": "AMALAL AZIZA",
+   "banque": "CIH BANK",
+   "rib": "230720541824721101730012"
+  },
+  {
+   "rang": 5,
+   "nom_prenom": "EL AISSATI JAMILA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211119212498002726"
+  },
+  {
+   "rang": 6,
+   "nom_prenom": "EL KHATTABI SOUAD",
+   "banque": "BMCE BANK",
+   "rib": "011050000001200000940291"
+  },
+  {
+   "rang": 7,
+   "nom_prenom": "EL BRAG SOUAD",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001356255725"
+  }
+ ],
+ "VIGILMA GARD MAROC": [
+  {
+   "rang": 1,
+   "nom_prenom": "EL JBARI ABDENNOUR",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211110369984000944"
+  },
+  {
+   "rang": 2,
+   "nom_prenom": "MHAMDI REDA",
+   "banque": "BMCE BANK",
+   "rib": "011735000003200000271521"
+  },
+  {
+   "rang": 3,
+   "nom_prenom": "BAKKOUR FATIMA",
+   "banque": "CIH BANK",
+   "rib": "230640526419221100600096"
+  },
+  {
+   "rang": 4,
+   "nom_prenom": "BENHADI NOUR EDDINE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007050000529500061205012"
+  },
+  {
+   "rang": 5,
+   "nom_prenom": "BEN ALI NOUR EDDINE",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000556292263"
+  },
+  {
+   "rang": 6,
+   "nom_prenom": "EL KHATTABI HICHAM",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000018003100448921"
+  },
+  {
+   "rang": 7,
+   "nom_prenom": "BAKHADDA ABDELILAH",
+   "banque": "BMCE BANK",
+   "rib": "011640000017200000629155"
+  },
+  {
+   "rang": 8,
+   "nom_prenom": "AOURIAGHEL HAMZA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001493700030429982"
+  },
+  {
+   "rang": 9,
+   "nom_prenom": "CHOUKRI BILAL",
+   "banque": "BMCE BANK",
+   "rib": "011640000017200000701517"
+  },
+  {
+   "rang": 10,
+   "nom_prenom": "MECHNINE HAMZA",
+   "banque": "CIH BANK",
+   "rib": "230640530696921102400028"
+  },
+  {
+   "rang": 11,
+   "nom_prenom": "BEN AYAD AYOUB",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001160752710"
+  },
+  {
+   "rang": 12,
+   "nom_prenom": "FANIR HOUSNI",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000255002809102421"
+  },
+  {
+   "rang": 13,
+   "nom_prenom": "BELHACHMI MOHAMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211119339059001172"
+  },
+  {
+   "rang": 14,
+   "nom_prenom": "M'RABET SOUFYAN",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000000799809890"
+  },
+  {
+   "rang": 15,
+   "nom_prenom": "AOURIAGHEL HANAN",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001161412601"
+  },
+  {
+   "rang": 16,
+   "nom_prenom": "BEN AMARI LOUIZ AYOUB",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000215002969105921"
+  },
+  {
+   "rang": 17,
+   "nom_prenom": "NEHIRA KACEM",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022640000255002809112121"
+  },
+  {
+   "rang": 18,
+   "nom_prenom": "ED-DAHBY NOUR EDDINE",
+   "banque": "CIH BANK",
+   "rib": "230640537092721101710086"
+  },
+  {
+   "rang": 19,
+   "nom_prenom": "EL ANZOUL WALID",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000601100030636214"
+  },
+  {
+   "rang": 20,
+   "nom_prenom": "RIFI MORCHID",
+   "banque": "WAFACASH",
+   "rib": "007780000148908066279430"
+  },
+  {
+   "rang": 21,
+   "nom_prenom": "BOU CHOUF MOHAMED RABIE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000614530040043427"
+  },
+  {
+   "rang": 22,
+   "nom_prenom": "OUACHIKH FOUAD",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000442900030822022"
+  },
+  {
+   "rang": 23,
+   "nom_prenom": "MESBAH ABDESLAM",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007780000137208068914244"
+  },
+  {
+   "rang": 24,
+   "nom_prenom": "MESBAH MHAMED REDA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007780000147200086415920"
+  },
+  {
+   "rang": 25,
+   "nom_prenom": "EL BENNOURI ISSAM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211115297386000179"
+  },
+  {
+   "rang": 26,
+   "nom_prenom": "ABCHIR JIHAD",
+   "banque": "CIH BANK",
+   "rib": "230720362607021100890017"
+  },
+  {
+   "rang": 27,
+   "nom_prenom": "EL HARCHNI AYOUB",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001077730040649506"
+  },
+  {
+   "rang": 28,
+   "nom_prenom": "AHDOUT ABDELILAH",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000601200030694991"
+  },
+  {
+   "rang": 29,
+   "nom_prenom": "EL KACHTOUL ABDESLAM",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164150211113064496000438"
+  },
+  {
+   "rang": 30,
+   "nom_prenom": "HAMICH TARIK",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001433530040387179"
+  },
+  {
+   "rang": 31,
+   "nom_prenom": "EL JAYIDI ABDELATIF",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211118027032000725"
+  },
+  {
+   "rang": 32,
+   "nom_prenom": "BOUHSAINA RACHID",
+   "banque": "SOCIETE GENERALE",
+   "rib": "022735000098002891021905"
+  },
+  {
+   "rang": 33,
+   "nom_prenom": "BENHADHOUM ABDELMORAD",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000913400030515354"
+  },
+  {
+   "rang": 34,
+   "nom_prenom": "BOUGHABA ESMAIL",
+   "banque": "CIH BANK",
+   "rib": "230640352328221100600060"
+  },
+  {
+   "rang": 35,
+   "nom_prenom": "DRIBEL ADIL",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640000913500030721183"
+  },
+  {
+   "rang": 36,
+   "nom_prenom": "LACHKAR HAMZA",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001086230040062813"
+  },
+  {
+   "rang": 37,
+   "nom_prenom": "ECHAIRI LAGHCHIM ABDELILAH",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211112569679000242"
+  },
+  {
+   "rang": 38,
+   "nom_prenom": "EL GUEDDARI AZEDDINE",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007640001077300030355645"
+  },
+  {
+   "rang": 39,
+   "nom_prenom": "EL YAMLAHI BILAL",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211115449454000547"
+  },
+  {
+   "rang": 40,
+   "nom_prenom": "EL MANSOURY MOHAMED",
+   "banque": "AL BARID BANK",
+   "rib": "350810000000001305750735"
+  },
+  {
+   "rang": 41,
+   "nom_prenom": "AOULAD BOLAICH NAOUFALE",
+   "banque": "WAFACASH",
+   "rib": "007780000135208066171087"
+  },
+  {
+   "rang": 42,
+   "nom_prenom": "AFSANE ASSAD",
+   "banque": "CIH BANK",
+   "rib": "230731718039621101160087"
+  },
+  {
+   "rang": 43,
+   "nom_prenom": "LAZRAK OUSSAMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "164640211119113958000491"
+  },
+  {
+   "rang": 44,
+   "nom_prenom": "MAROUAN RABIH",
+   "banque": "CIH BANK",
+   "rib": "230640652229221102810094"
+  },
+  {
+   "rang": 45,
+   "nom_prenom": "RIFFI NOUR EDDIN",
+   "banque": "WAFACASH",
+   "rib": "007780000135508066178444"
+  },
+  {
+   "rang": 46,
+   "nom_prenom": "FIKRI NAJOUA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150057211118608366000013"
+  },
+  {
+   "rang": 47,
+   "nom_prenom": "EL IDRISSI CHAHID",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150057211111267184001060"
+  },
+  {
+   "rang": 48,
+   "nom_prenom": "CHELTOUN MOHAMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211119325067001041"
+  },
+  {
+   "rang": 49,
+   "nom_prenom": "EL JEMLI ABDERRAHMANE",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211118100321002853"
+  },
+  {
+   "rang": 50,
+   "nom_prenom": "ACHALHI ABID",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150050211110614252000321"
+  },
+  {
+   "rang": 51,
+   "nom_prenom": "LAACHIR SALMA",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211111874192000546"
+  },
+  {
+   "rang": 52,
+   "nom_prenom": "EL MOURABIT MOHAMMED",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150056211111055336000858"
+  },
+  {
+   "rang": 53,
+   "nom_prenom": "AMGHAR ABDELKRIM",
+   "banque": "ATTIJARIWAFA BANK",
+   "rib": "007057000064300061175172"
+  },
+  {
+   "rang": 54,
+   "nom_prenom": "SOULIMANI OMAR",
+   "banque": "BANQUE POPULAIRE",
+   "rib": "150514211111723966001660"
+  },
+  {
+   "rang": 55,
+   "nom_prenom": "EL JEMLI OUSSAMA",
+   "banque": "CIH BANK",
+   "rib": "230057613282521103650069"
+  }
+ ]
+}

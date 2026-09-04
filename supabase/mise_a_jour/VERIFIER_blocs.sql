@@ -75,7 +75,10 @@ with attendu (numero, bloc, objet, present) as (
        exists (select 1 from information_schema.columns
                 where table_name = 'companies' and column_name = 'modele_document')),
   (26, 'Net jamais négatif',          'contrainte lignes_paie_net_positif',
-       exists (select 1 from pg_constraint where conname = 'lignes_paie_net_positif'))
+       exists (select 1 from pg_constraint where conname = 'lignes_paie_net_positif')),
+  (27, 'Horaire matin / nuit',        'colonne employees.horaire',
+       exists (select 1 from information_schema.columns
+                where table_name = 'employees' and column_name = 'horaire'))
 )
 select numero,
        bloc,

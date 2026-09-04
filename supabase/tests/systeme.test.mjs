@@ -111,7 +111,7 @@ const ORDRE = [
   'BLOC_16_champs_document.sql', 'BLOC_17_sorties.sql',
   'BLOC_18_archivage_sorties.sql', 'BLOC_19_jours_par_mois.sql',
   'BLOC_20_bureau_paie.sql', 'BLOC_21_deux_types_contrat.sql', 'BLOC_22_date_fin_obligatoire.sql',
-  'BLOC_23_validation_par_scan.sql', 'BLOC_24_effet_au_depot.sql', 'BLOC_25_modele_par_societe.sql', 'BLOC_26_net_jamais_negatif.sql',
+  'BLOC_23_validation_par_scan.sql', 'BLOC_24_effet_au_depot.sql', 'BLOC_25_modele_par_societe.sql', 'BLOC_26_net_jamais_negatif.sql', 'BLOC_27_horaire.sql',
 ]
 for (const b of ORDRE) {
   try {

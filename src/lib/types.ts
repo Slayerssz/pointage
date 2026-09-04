@@ -57,12 +57,22 @@ export interface Employee {
   heures_par_jour: number | null
   /** Ce que l'employé doit encore. La paie le fait baisser à la validation. */
   dette: number
+  /** Matin, nuit ou journée. Null quand l'horaire n'est pas fixe. */
+  horaire: Horaire | null
   situation_familiale: SituationFamiliale | null
   nombre_enfants: number
   /** Photo de profil, chemin dans le bucket « photos ». */
   photo_path: string | null
   date_sortie: string | null
 }
+
+export type Horaire = 'MATIN' | 'NUIT' | 'JOURNEE'
+
+export const HORAIRES: { code: Horaire; label: string }[] = [
+  { code: 'MATIN', label: 'Matin' },
+  { code: 'NUIT', label: 'Nuit' },
+  { code: 'JOURNEE', label: 'Journée' },
+]
 
 export type SituationFamiliale = 'Célibataire' | 'Marié(e)' | 'Divorcé(e)' | 'Veuf/Veuve'
 

@@ -604,6 +604,71 @@ await refuse('deux employés ne peuvent pas partager un matricule',
 ok('toutes les tables ont la sécurité au niveau ligne',
    sansRlsInstall.length === 0, sansRlsInstall.join(', '))
 
+section('Matin, nuit, ou rien')
+
+const eNuit = await employe('AGENT DE NUIT', { cin: 'AU7' })
+await db.query(`update public.employees set horaire='NUIT' where id=$1`, [eNuit])
+ok('un employé peut être de nuit',
+   (await q1(`select horaire from public.employees where id=$1`, [eNuit])).horaire === 'NUIT')
+for (const h of ['MATIN', 'JOURNEE']) {
+  ok(`« ${h} » est accepté`,
+     await reussit(`update public.employees set horaire=$1 where id=$2`, [h, eNuit]))
+}
+await refuse('un horaire inventé est refusé',
+  `update public.employees set horaire='APRES-MIDI' where id=$1`, [eNuit], /check|contrainte|violates/i)
+await db.query(`update public.employees set horaire=null where id=$1`, [eNuit])
+ok('l’horaire peut rester vide : tous les postes n’en ont pas',
+   (await q1(`select horaire from public.employees where id=$1`, [eNuit])).horaire === null)
+
+section('Import des R.I.B. de virement')
+
+// On rejoue le script sur deux employés : un sans R.I.B. (à remplir) et
+// un qui en a déjà un, différent (à ne surtout pas écraser).
+await connecte(admin)
+const coRib = (await q1(`select public.admin_creer_entreprise('BO') as id`)).id
+const sRib = (await q1(`insert into public.sites(company_id,name) values ($1,'S') returning id`, [coRib])).id
+const sansRib = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,matricule,mode_reglement)
+   values ($1,$2,'SANS RIB',9001,'Virement') returning id`, [coRib, sRib])).id
+const avecRib = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,matricule,mode_reglement,rib,banque)
+   values ($1,$2,'DEJA UN RIB',9002,'Virement','999999999999999999999999','ANCIENNE BANQUE')
+   returning id`, [coRib, sRib])).id
+const enEspeces = (await q1(
+  `insert into public.employees(company_id,site_id,nom_prenom,matricule,mode_reglement)
+   values ($1,$2,'EN ESPECES',9003,'Espece') returning id`, [coRib, sRib])).id
+
+await db.exec(`
+  create temporary table virements_recus (societe text, matricule integer,
+    nom_prenom text, banque text, rib text) on commit drop;
+  insert into virements_recus values
+    ('BO', 9001, 'SANS RIB',    'CIH BANK',  '111111111111111111111111'),
+    ('BO', 9002, 'DEJA UN RIB', 'CIH BANK',  '222222222222222222222222'),
+    ('BO', 9003, 'EN ESPECES',  'CIH BANK',  '333333333333333333333333');
+  update public.employees e
+     set rib = v.rib, banque = v.banque
+    from virements_recus v
+    join public.companies c on upper(trim(c.name)) = upper(v.societe)
+   where e.company_id = c.id and e.matricule = v.matricule
+     and lower(coalesce(e.mode_reglement,'')) like 'vir%'
+     and (e.rib is null or trim(e.rib) = '');
+`)
+
+ok('un R.I.B. manquant est renseigné',
+   (await q1(`select rib from public.employees where id=$1`, [sansRib])).rib
+     === '111111111111111111111111')
+ok('… avec sa banque',
+   (await q1(`select banque from public.employees where id=$1`, [sansRib])).banque === 'CIH BANK')
+ok('un R.I.B. déjà saisi n’est PAS écrasé',
+   (await q1(`select rib from public.employees where id=$1`, [avecRib])).rib
+     === '999999999999999999999999')
+ok('… ni sa banque',
+   (await q1(`select banque from public.employees where id=$1`, [avecRib])).banque === 'ANCIENNE BANQUE')
+ok('un employé payé en espèces n’est pas touché',
+   (await q1(`select rib from public.employees where id=$1`, [enEspeces])).rib === null)
+
+await connecte(bureau)
+
 section('Le contrôle des blocs dit-il vrai ?')
 
 // Sur cette base, tous les blocs viennent d'être passés : le contrôle
