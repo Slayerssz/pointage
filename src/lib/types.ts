@@ -247,6 +247,12 @@ export interface LignePaie {
   jours_payes: number
   heures_effectuees: number | null
   salaire_brut: number
+  /** Indemnités du mois, saisies à la paie. Hors assiette : elles
+   *  s'ajoutent au net sans passer par les cotisations. */
+  frais_transport: number
+  frais_panier: number
+  /** Jours fériés travaillés dans le mois : chacun compte double. */
+  jours_feries_travailles: number
   prime: number
   retenue_dette: number
   autres_retenues: number

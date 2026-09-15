@@ -1,19 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { formatDateFr } from '../lib/dates'
+import { formatDateFr, jourDeReposLabel } from '../lib/dates'
+import { formatDH } from '../lib/paie'
 import { enteteDe } from '../lib/entetes'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import { genererFichePdf } from '../lib/fichePdf'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
-import type { Employee } from '../lib/types'
+import { HORAIRES, type ContratCourant, type Employee } from '../lib/types'
 
 /**
  * FICHE D'INFORMATIONS PERSONNELLES
  *
- * Reprend le modèle officiel : en-tête et couleur de l'entreprise,
+ * Deux variantes, même en-tête.
+ *
+ * « simple » reprend le modèle officiel : couleur de l'entreprise,
  * emplacement photo, matricule, les neuf champs, puis la liste des
- * pièces administratives à fournir. Une fiche par page.
+ * pièces administratives à fournir. C'est celle qu'on classe ou remet.
+ *
+ * « detaillee » porte tout ce que le registre sait de la personne —
+ * téléphone, situation familiale, horaire, repos, salaire, banque,
+ * R.I.B., dette, contrat en cours. Elle reste au bureau. Une fiche par
+ * page dans les deux cas.
  */
 
 const PIECES = [
@@ -33,13 +41,22 @@ export default function FichePrint({
   employees,
   entreprise,
   sites,
+  variante = 'simple',
+  contrats,
+  sitePrincipalNom,
   onClose,
 }: {
   employees: Employee[]
   entreprise: string
   sites: { id: string; name: string }[]
+  variante?: 'simple' | 'detaillee'
+  /** Le contrat en cours de chaque employé, pour la fiche détaillée. */
+  contrats?: Map<string, ContratCourant> | null
+  /** Le site principal de l'annexe, quand la page le connaît. */
+  sitePrincipalNom?: (e: Employee) => string | null
   onClose: () => void
 }) {
+  const detaillee = variante === 'detaillee'
   const entete = enteteDe(entreprise)
   useFermerSurEchap(onClose)
   useModeImpression()
@@ -79,18 +96,19 @@ export default function FichePrint({
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
       <BarreImpression
         titre={
-          employees.length === 1
+          (employees.length === 1
             ? `Fiche — ${employees[0].nom_prenom}`
-            : `${employees.length} fiches d’informations personnelles`
+            : `${employees.length} fiches d’informations personnelles`) +
+          (detaillee ? ' (détaillée)' : '')
         }
         pret={pret && !photosEnCours}
         imprimer={imprimer}
         nomFichier={
-          employees.length === 1
+          (employees.length === 1
             ? `Fiche_${employees[0].nom_prenom.replace(/\s+/g, '_')}`
-            : `Fiches_${entreprise.replace(/\s+/g, '_')}`
+            : `Fiches_${entreprise.replace(/\s+/g, '_')}`) + (detaillee ? '_detaillee' : '')
         }
-        genererPdf={() =>
+        genererPdf={detaillee ? undefined : () =>
           genererFichePdf({
             employees,
             entreprise,
@@ -155,7 +173,7 @@ export default function FichePrint({
                     margin: '0 4mm', whiteSpace: 'nowrap',
                   }}
                 >
-                  Fiche d’informations personnelles
+                  {detaillee ? 'Fiche détaillée du salarié' : 'Fiche d’informations personnelles'}
                 </span>
                 <span style={{ flex: 1, height: 1, background: entete.accent, opacity: 0.45 }} />
               </div>
@@ -199,43 +217,55 @@ export default function FichePrint({
                 </div>
               </div>
 
-              {/* Les neuf champs */}
-              <dl>
-                {champs.map(([label, valeur]) => (
-                  <div key={label} className="flex items-baseline" style={{ marginBottom: '4.6mm' }}>
-                    <dt style={{ width: '52mm', color: entete.accent, fontWeight: 600, fontSize: '10.5pt' }}>
-                      {label}
-                    </dt>
-                    <dd style={{ width: '6mm', color: entete.accent }}>:</dd>
-                    <dd className="uppercase" style={{ fontWeight: 700, fontSize: '10.5pt', flex: 1 }}>
-                      {valeur || ' '}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              {detaillee ? (
+                <FicheDetaillee
+                  e={e}
+                  accent={entete.accent}
+                  siteNom={siteName(e.site_id)}
+                  sitePrincipal={sitePrincipalNom?.(e) ?? null}
+                  contrat={contrats?.get(e.id) ?? null}
+                />
+              ) : (
+                <>
+                  {/* Les neuf champs */}
+                  <dl>
+                    {champs.map(([label, valeur]) => (
+                      <div key={label} className="flex items-baseline" style={{ marginBottom: '4.6mm' }}>
+                        <dt style={{ width: '52mm', color: entete.accent, fontWeight: 600, fontSize: '10.5pt' }}>
+                          {label}
+                        </dt>
+                        <dd style={{ width: '6mm', color: entete.accent }}>:</dd>
+                        <dd className="uppercase" style={{ fontWeight: 700, fontSize: '10.5pt', flex: 1 }}>
+                          {valeur || ' '}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
 
-              {/* Pièces à fournir */}
-              <p
-                className="text-center uppercase"
-                style={{
-                  color: entete.accent, fontWeight: 600, fontSize: '12pt',
-                  letterSpacing: '.03em', textDecoration: 'underline',
-                  textUnderlineOffset: '2mm', margin: '10mm 0 6mm',
-                }}
-              >
-                Pièces administratives à fournir
-              </p>
-              {/* La liste des pièces reste en noir chez toutes les sociétés */}
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {PIECES.map((piece) => (
-                  <li key={piece} className="flex items-baseline" style={{ marginBottom: '3.5mm' }}>
-                    <span style={{ color: '#1a1a1a', marginRight: '4mm', fontSize: '11pt' }}>•</span>
-                    <span className="uppercase" style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '10pt' }}>
-                      {piece}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                  {/* Pièces à fournir */}
+                  <p
+                    className="text-center uppercase"
+                    style={{
+                      color: entete.accent, fontWeight: 600, fontSize: '12pt',
+                      letterSpacing: '.03em', textDecoration: 'underline',
+                      textUnderlineOffset: '2mm', margin: '10mm 0 6mm',
+                    }}
+                  >
+                    Pièces administratives à fournir
+                  </p>
+                  {/* La liste des pièces reste en noir chez toutes les sociétés */}
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {PIECES.map((piece) => (
+                      <li key={piece} className="flex items-baseline" style={{ marginBottom: '3.5mm' }}>
+                        <span style={{ color: '#1a1a1a', marginRight: '4mm', fontSize: '11pt' }}>•</span>
+                        <span className="uppercase" style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '10pt' }}>
+                          {piece}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </article>
           )
         })}
@@ -244,5 +274,110 @@ export default function FichePrint({
       <style>{`@media print { @page { size: A4 portrait; margin: 12mm; } }`}</style>
     </div>
     </PortailImpression>
+  )
+}
+
+/**
+ * Le corps de la fiche détaillée : tout ce que le registre sait, en
+ * sections. Une valeur absente s'imprime « — » plutôt que de laisser un
+ * blanc qu'on prendrait pour un oubli d'impression.
+ */
+function FicheDetaillee({
+  e, accent, siteNom, sitePrincipal, contrat,
+}: {
+  e: Employee
+  accent: string
+  siteNom: string
+  sitePrincipal: string | null
+  contrat: ContratCourant | null
+}) {
+  const ou = (v: string | number | null | undefined) =>
+    v == null || v === '' ? '—' : String(v)
+  const date = (v: string | null | undefined) => (v ? formatDateFr(v) : '—')
+  const horaire = HORAIRES.find((h) => h.code === e.horaire)?.label ?? '—'
+
+  const sections: { titre: string; champs: [string, string][] }[] = [
+    {
+      titre: 'Identité',
+      champs: [
+        ['Nom et prénom', e.nom_prenom],
+        ['N° C.I.N.', ou(e.cin)],
+        ['N° C.N.S.S.', ou(e.cnss)],
+        ['Date de naissance', date(e.date_naissance)],
+        ['Situation familiale', ou(e.situation_familiale)],
+        ['Enfants à charge', ou(e.nombre_enfants)],
+      ],
+    },
+    {
+      titre: 'Contact',
+      champs: [
+        ['Téléphone', ou(e.telephone)],
+        ['Adresse', ou(e.adresse)],
+        ['Ville', ou(e.ville)],
+      ],
+    },
+    {
+      titre: 'Poste',
+      champs: [
+        ['Site', ou(siteNom)],
+        ['Site principal', ou(sitePrincipal)],
+        ['Département', ou(departementDe(e))],
+        ['Qualification', ou(e.qualification)],
+        ['Date d’embauche', date(e.date_embauche)],
+        ['Horaire', horaire],
+        ['Jour de repos', jourDeReposLabel(e.jour_de_repos)],
+        ['Heures par jour', e.heures_par_jour != null ? `${e.heures_par_jour} h` : '—'],
+        ['Jours travaillés (cumul)', ou(e.jours_travailles)],
+        ['Statut', e.actif ? 'En poste' : `Sorti${e.date_sortie ? ` le ${formatDateFr(e.date_sortie)}` : ''}`],
+      ],
+    },
+    {
+      titre: 'Rémunération',
+      champs: [
+        ['Salaire mensuel', e.salaire != null ? formatDH(e.salaire) : '—'],
+        ['Mode de règlement', ou(e.mode_reglement)],
+        ['Banque', ou(e.banque)],
+        ['R.I.B.', ou(e.rib)],
+        ['Dette en cours', e.dette > 0 ? formatDH(e.dette) : 'Aucune'],
+      ],
+    },
+    {
+      titre: 'Contrat en cours',
+      champs: contrat
+        ? [
+            ['Type', contrat.type_contrat],
+            ['N°', ou(contrat.numero)],
+            ['Du', date(contrat.date_debut)],
+            ['Au', date(contrat.date_fin)],
+            ['Jours restants', contrat.jours_restants != null ? String(contrat.jours_restants) : '—'],
+          ]
+        : [['Contrat', 'Aucun contrat validé']],
+    },
+  ]
+
+  return (
+    <div style={{ columnCount: 2, columnGap: '10mm', fontSize: '9.5pt' }}>
+      {sections.map((sec) => (
+        <section key={sec.titre} style={{ breakInside: 'avoid', marginBottom: '5mm' }}>
+          <p
+            className="uppercase"
+            style={{
+              color: accent, fontWeight: 700, fontSize: '9pt', letterSpacing: '.06em',
+              borderBottom: `1px solid ${accent}`, paddingBottom: '1mm', marginBottom: '2mm',
+            }}
+          >
+            {sec.titre}
+          </p>
+          <dl>
+            {sec.champs.map(([label, valeur]) => (
+              <div key={label} className="flex items-baseline" style={{ marginBottom: '1.8mm', gap: '2mm' }}>
+                <dt style={{ width: '34mm', flexShrink: 0, color: '#555' }}>{label}</dt>
+                <dd style={{ fontWeight: 600, flex: 1, wordBreak: 'break-word' }}>{valeur}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
   )
 }

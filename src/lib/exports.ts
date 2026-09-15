@@ -58,7 +58,8 @@ export async function exporterPaieExcel(opts: {
   const colonnes = [
     'Matricule', 'Nom & Prénom', 'Annexe', 'Site principal', 'Qualification', 'CIN', 'CNSS',
     'Salaire de base', 'Base (j)', 'Jours', 'Congé', 'Malade',
-    'Jours payés', 'Heures', 'Salaire brut', 'Prime', 'Retenue dette',
+    'Jours payés', 'Fériés trav.', 'Heures', 'Salaire brut', 'Frais transport',
+    'Frais panier', 'Prime', 'Retenue dette',
     'Autres retenues', 'NET À PAYER', 'Règlement', 'Banque', 'RIB', 'Observations',
   ]
   rows.push(colonnes.map((c) => ({ value: c, ...ENTETE })))
@@ -78,8 +79,11 @@ export async function exporterPaieExcel(opts: {
       { type: Number, value: Number(l.jours_conge) },
       { type: Number, value: Number(l.jours_maladie) },
       { type: Number, value: Number(l.jours_payes), fontWeight: 'bold' },
+      { type: Number, value: Number(l.jours_feries_travailles) },
       { type: Number, value: l.heures_effectuees == null ? undefined : Number(l.heures_effectuees) },
       { ...money, value: Number(l.salaire_brut) },
+      { ...money, value: Number(l.frais_transport) },
+      { ...money, value: Number(l.frais_panier) },
       { ...money, value: Number(l.prime) },
       { ...money, value: Number(l.retenue_dette) },
       { ...money, value: Number(l.autres_retenues) },
@@ -98,8 +102,10 @@ export async function exporterPaieExcel(opts: {
     { value: 'TOTAL', fontWeight: 'bold', columnSpan: 7, backgroundColor: '#F1F5F9' },
     null, null, null, null, null, null,
     { ...money, value: somme((l) => l.salaire_base), fontWeight: 'bold' },
-    null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null,
     { ...money, value: somme((l) => l.salaire_brut), fontWeight: 'bold' },
+    { ...money, value: somme((l) => l.frais_transport), fontWeight: 'bold' },
+    { ...money, value: somme((l) => l.frais_panier), fontWeight: 'bold' },
     { ...money, value: somme((l) => l.prime), fontWeight: 'bold' },
     { ...money, value: somme((l) => l.retenue_dette), fontWeight: 'bold' },
     { ...money, value: somme((l) => l.autres_retenues), fontWeight: 'bold' },
@@ -166,27 +172,53 @@ export async function exporterPaiePdf(opts: {
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   }))
 
-  doc.setFontSize(15).setFont('helvetica', 'bold')
-  doc.text(`ÉTAT DE PAIE — ${entreprise.toUpperCase()}`, largeur / 2, 14, { align: 'center' })
-  doc.setFontSize(11).setFont('helvetica', 'normal')
-  doc.text(
-    opts.filtre ? `${MOIS_FR[mois - 1]} ${annee} — ${opts.filtre}` : `${MOIS_FR[mois - 1]} ${annee}`,
-    largeur / 2, 20, { align: 'center' },
-  )
-  doc.setFontSize(8).setTextColor(110)
-  doc.text(
-    `${lignes.length} employé(s) · Édité le ${new Date().toLocaleDateString('fr-FR')}`,
-    largeur / 2, 25, { align: 'center' },
-  )
-  doc.setTextColor(0)
+  // Un mode de règlement par page : les virements partent à la banque, les
+  // espèces se comptent en caisse — chacun tient sa feuille. Un état déjà
+  // limité à un seul mode tient sur une seule série de pages.
+  const modeDe = (m: string | null) => {
+    const v = (m ?? '').toLowerCase()
+    if (v.startsWith('vir')) return 'Virement'
+    if (v.startsWith('vers')) return 'Versement'
+    if (v.startsWith('esp')) return 'Espèces'
+    return m?.trim() || 'Sans mode de règlement'
+  }
+  const ORDRE = ['Virement', 'Versement', 'Espèces']
+  const parMode = new Map<string, LignePaie[]>()
+  for (const l of lignes) parMode.set(modeDe(l.mode_reglement), [...(parMode.get(modeDe(l.mode_reglement)) ?? []), l])
+  const groupes = [...parMode.entries()].sort(([a], [b]) => {
+    const ia = ORDRE.indexOf(a), ib = ORDRE.indexOf(b)
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'fr')
+  })
+
+  const entete = (sousTitre: string, nombre: number) => {
+    doc.setFontSize(15).setFont('helvetica', 'bold')
+    doc.text(`ÉTAT DE PAIE — ${entreprise.toUpperCase()}`, largeur / 2, 14, { align: 'center' })
+    doc.setFontSize(11).setFont('helvetica', 'normal')
+    doc.text(sousTitre, largeur / 2, 20, { align: 'center' })
+    doc.setFontSize(8).setTextColor(110)
+    doc.text(
+      `${nombre} employé(s) · Édité le ${new Date().toLocaleDateString('fr-FR')}`,
+      largeur / 2, 25, { align: 'center' },
+    )
+    doc.setTextColor(0)
+  }
+
+  groupes.forEach(([mode, liste], i) => {
+  if (i > 0) doc.addPage('a4', 'landscape')
+  const periodeLibelle = opts.filtre
+    ? `${MOIS_FR[mois - 1]} ${annee} — ${opts.filtre}`
+    : `${MOIS_FR[mois - 1]} ${annee}`
+  // Le mode n'est répété que s'il n'est pas déjà dans le filtre.
+  entete(opts.filtre?.includes(mode) ? periodeLibelle : `${periodeLibelle} — ${mode}`, liste.length)
 
   autoTable(doc, {
     startY: 29,
     head: [[
       'Mat.', 'Nom & Prénom', 'Site', 'Sal. base', 'Jours', 'C', 'M',
-      'J. payés', 'Heures', 'Brut', 'Prime', 'Dette', 'Autres', 'NET', 'Règlement', 'Banque',
+      'J. payés', 'Heures', 'Brut', 'Transp.', 'Panier', 'Prime', 'Dette', 'Autres', 'NET',
+      'Règlement', 'Banque',
     ]],
-    body: lignes.map((l) => [
+    body: liste.map((l) => [
       l.matricule ?? '',
       l.nom_prenom,
       l.site_nom ?? '',
@@ -197,6 +229,8 @@ export async function exporterPaiePdf(opts: {
       formatNombre(Number(l.jours_payes)),
       l.heures_effectuees == null ? '' : formatNombre(Number(l.heures_effectuees)),
       n2(l.salaire_brut),
+      n2(l.frais_transport),
+      n2(l.frais_panier),
       n2(l.prime),
       n2(l.retenue_dette),
       n2(l.autres_retenues),
@@ -205,12 +239,14 @@ export async function exporterPaiePdf(opts: {
       l.banque ?? '',
     ]),
     foot: [[
-      '', 'TOTAL', '', '', '', '', '', '', '',
-      n2(lignes.reduce((s, l) => s + Number(l.salaire_brut), 0)),
-      n2(lignes.reduce((s, l) => s + Number(l.prime), 0)),
-      n2(lignes.reduce((s, l) => s + Number(l.retenue_dette), 0)),
-      n2(lignes.reduce((s, l) => s + Number(l.autres_retenues), 0)),
-      n2(lignes.reduce((s, l) => s + Number(l.net_a_payer), 0)),
+      '', `TOTAL ${mode.toUpperCase()}`, '', '', '', '', '', '', '',
+      n2(liste.reduce((s, l) => s + Number(l.salaire_brut), 0)),
+      n2(liste.reduce((s, l) => s + Number(l.frais_transport), 0)),
+      n2(liste.reduce((s, l) => s + Number(l.frais_panier), 0)),
+      n2(liste.reduce((s, l) => s + Number(l.prime), 0)),
+      n2(liste.reduce((s, l) => s + Number(l.retenue_dette), 0)),
+      n2(liste.reduce((s, l) => s + Number(l.autres_retenues), 0)),
+      n2(liste.reduce((s, l) => s + Number(l.net_a_payer), 0)),
       '', '',
     ]],
     styles: { fontSize: 7, cellPadding: 1.4, overflow: 'linebreak' },
@@ -241,6 +277,7 @@ export async function exporterPaiePdf(opts: {
       doc.text(`Page ${page}`, largeur - 14, doc.internal.pageSize.getHeight() - 7, { align: 'right' })
       doc.setTextColor(0)
     },
+  })
   })
 
   // Récapitulatif sur une page dédiée

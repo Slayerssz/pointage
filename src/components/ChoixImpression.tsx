@@ -69,7 +69,7 @@ export default function ChoixImpression({
   )
 }
 
-function Choix({
+export function Choix({
   titre, pour, detail, avertissement, recommande, onClick,
 }: {
   titre: string

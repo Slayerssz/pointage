@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { MOIS_FR } from '../../lib/paie'
 import PanneauDocument from '../../components/PanneauDocument'
 import DocumentsSignes from '../../components/DocumentsSignes'
+import ArchiveSorties from '../../components/ArchiveSorties'
 import { useDocuments } from '../../lib/documents'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
@@ -139,6 +140,8 @@ export default function SortiesPage() {
       {employes?.length === 0 && (
         <EmptyState>Aucun employé en poste : rien à préparer ici.</EmptyState>
       )}
+
+      <ArchiveSorties companyId={companyId} />
     </div>
   )
 }

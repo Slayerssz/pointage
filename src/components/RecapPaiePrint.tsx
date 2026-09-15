@@ -49,6 +49,8 @@ export default function RecapPaiePrint({
       cnss: l('068')?.retenue ?? 0,
       amo: l('069')?.retenue ?? 0,
       igr: l('070')?.retenue ?? 0,
+      transport: Number(b.frais_transport ?? 0),
+      panier: Number(b.frais_panier ?? 0),
       net: b.pied.net_a_payer,
       jours: b.pied.jours_travailles,
     }
@@ -68,16 +70,20 @@ export default function RecapPaiePrint({
         const m = montants(b)
         return {
           brut: s.brut + m.brut, cnss: s.cnss + m.cnss, amo: s.amo + m.amo,
-          igr: s.igr + m.igr, net: s.net + m.net,
+          igr: s.igr + m.igr, transport: s.transport + m.transport,
+          panier: s.panier + m.panier, net: s.net + m.net,
         }
       },
-      { brut: 0, cnss: 0, amo: 0, igr: 0, net: 0 },
+      { brut: 0, cnss: 0, amo: 0, igr: 0, transport: 0, panier: 0, net: 0 },
     )
   const total = cumul(bulletins)
   const baremeManquant = bulletins.some((b) => b.bareme_igr_absent)
 
+  // Transport et panier ont leur colonne : sans elles, brut moins retenues
+  // ne tomberait plus sur le net, et l'état serait illisible à la lecture.
   const COLONNES = ['N°', 'Mat.', 'Nom & Prénom', 'C.I.N.', 'N° C.N.S.S.', 'J.Trav',
-                    'Salaire brut', 'C.N.S.S.', 'A.M.O.', 'I.G.R.', 'Net à payer', 'Banque']
+                    'Salaire brut', 'C.N.S.S.', 'A.M.O.', 'I.G.R.', 'Transp.', 'Panier',
+                    'Net à payer', 'Banque']
 
   let rang = 0
 
@@ -141,7 +147,7 @@ export default function RecapPaiePrint({
                     className="px-1 py-1 font-bold uppercase"
                     style={{
                       border: '1px solid #444', fontSize: '6.5pt',
-                      textAlign: i <= 4 || i === 11 ? 'left' : 'right',
+                      textAlign: i <= 4 || i === 13 ? 'left' : 'right',
                       whiteSpace: 'nowrap',
                     }}
                   >
@@ -157,7 +163,7 @@ export default function RecapPaiePrint({
                 <tbody key={site} style={{ breakInside: 'avoid' }}>
                   <tr>
                     <td
-                      colSpan={12}
+                      colSpan={14}
                       className="px-1 py-1 font-bold uppercase"
                       style={{
                         border: '1px solid #444', background: '#eee', fontSize: '7.5pt',
@@ -183,6 +189,8 @@ export default function RecapPaiePrint({
                         <C droite>{n2(m.cnss)}</C>
                         <C droite>{n2(m.amo)}</C>
                         <C droite>{n2(m.igr)}</C>
+                        <C droite>{n2(m.transport)}</C>
+                        <C droite>{n2(m.panier)}</C>
                         <C droite fort>{n2(m.net)}</C>
                         <C>{b.employe.banque || '—'}</C>
                       </tr>
@@ -200,6 +208,8 @@ export default function RecapPaiePrint({
                     <C droite>{n2(st.cnss)}</C>
                     <C droite>{n2(st.amo)}</C>
                     <C droite>{n2(st.igr)}</C>
+                    <C droite>{n2(st.transport)}</C>
+                    <C droite>{n2(st.panier)}</C>
                     <C droite>{n2(st.net)}</C>
                     <C />
                   </tr>
@@ -222,6 +232,8 @@ export default function RecapPaiePrint({
                 <td className="px-1 py-1.5 text-right" style={{ border: '1px solid #444' }}>{n2(total.cnss)}</td>
                 <td className="px-1 py-1.5 text-right" style={{ border: '1px solid #444' }}>{n2(total.amo)}</td>
                 <td className="px-1 py-1.5 text-right" style={{ border: '1px solid #444' }}>{n2(total.igr)}</td>
+                <td className="px-1 py-1.5 text-right" style={{ border: '1px solid #444' }}>{n2(total.transport)}</td>
+                <td className="px-1 py-1.5 text-right" style={{ border: '1px solid #444' }}>{n2(total.panier)}</td>
                 <td className="px-1 py-1.5 text-right" style={{ border: '1px solid #444' }}>
                   {n2(total.net)} {devise}
                 </td>

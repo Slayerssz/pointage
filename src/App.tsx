@@ -11,6 +11,7 @@ import SortiesPage from './pages/validator/SortiesPage'
 import AnalyticsPage from './pages/admin/AnalyticsPage'
 import UsersPage from './pages/admin/UsersPage'
 import OrganisationsPage from './pages/admin/OrganisationsPage'
+import FeriesPage from './pages/admin/FeriesPage'
 import SitesPage from './pages/validator/SitesPage'
 import PaiePage from './pages/paie/PaiePage'
 import BulletinsPage from './pages/paie/BulletinsPage'
@@ -174,6 +175,14 @@ export default function App() {
                 element={
                   <RequireRole roles={['admin']}>
                     <OrganisationsPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="feries"
+                element={
+                  <RequireRole roles={['admin']}>
+                    <FeriesPage />
                   </RequireRole>
                 }
               />

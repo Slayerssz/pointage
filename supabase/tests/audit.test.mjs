@@ -705,6 +705,263 @@ await db.exec(`drop table if exists public.import_virements;`)
 
 await connecte(bureau)
 
+// ═════════════════════════ LA PHOTO SUIT-ELLE LA FICHE ? ═══════════════════
+// Le bug de production : le personnel pouvait modifier une fiche mais pas
+// envoyer la photo — deux listes de rôles tenues séparément, dont une seule
+// avait été mise à jour. Ce qui suit vérifie qu'il n'y en a plus qu'une.
+
+// ═══════════════════════════ LES JOURS FÉRIÉS COMPTENT-ILS JUSTE ? ═════════
+// Règle voulue : un férié est payé à tout le monde (F, 1 jour) ; celui qui
+// tient quand même le poste fait une garde qui compte double (XF, 2 jours).
+
+section('Les jours fériés')
+
+// Mercredi 13 mai 2026 : jour ouvré, mois qu'aucun autre test ne clôture,
+// repos hebdomadaire le dimanche pour tout le monde sauf fD.
+const FERIE = '2026-05-13'
+
+await connecte(bureau)
+const fA = await employe('FERIE CHOME',     { cin: 'FR1', cnss: '910000001' })
+const fB = await employe('FERIE TRAVAILLE', { cin: 'FR2', cnss: '910000002' })
+const fC = await employe('DEJA POINTE',     { cin: 'FR3', cnss: '910000003' })
+const fD = await employe('REPOS CE JOUR',   { cin: 'FR4', cnss: '910000004', repos: 3 })
+const fE = await employe('PAS ENCORE LA',   { cin: 'FR5', cnss: '910000005' })
+await db.query(`update public.employees set date_embauche = '2026-08-01' where id = $1`, [fE])
+
+// fC a déjà travaillé ce jour-là : le férié ne doit pas l'écraser.
+await q1(`select public.marquer_present($1,$2::date,'X')`, [fC, FERIE])
+const joursAvant = async (id) =>
+  num((await q1(`select jours_travailles j from public.employees where id=$1`, [id])).j)
+const avantA = await joursAvant(fA)
+const avantC = await joursAvant(fC)
+
+await connecte(admin)
+const cree = await q1(
+  `select public.admin_creer_ferie($1,'FETE DU TRAVAIL',$2::date,$2::date) as r`, [co, FERIE])
+const rapport = cree.r
+const ferieId = rapport.ferie_id
+
+ok('le férié inscrit des journées', num(rapport.jours_ecrits) > 0, JSON.stringify(rapport))
+ok('il signale le jour déjà pointé', num(rapport.deja_pointes) >= 1, JSON.stringify(rapport))
+
+const typeLe = async (id) => (await q1(
+  `select type_garde t from public.pointages where employee_id=$1 and pointed_on=$2::date`,
+  [id, FERIE]))?.t ?? null
+
+ok('celui qui ne travaille pas reçoit F', (await typeLe(fA)) === 'F')
+ok('… et sa journée est payée', (await joursAvant(fA)) === avantA + 1)
+ok('le jour déjà pointé n’est pas écrasé', (await typeLe(fC)) === 'X')
+ok('… et son compteur n’a pas bougé', (await joursAvant(fC)) === avantC)
+ok('le repos hebdomadaire ne devient pas un jour payé', (await typeLe(fD)) === null)
+ok('celui qui n’était pas encore embauché n’a rien', (await typeLe(fE)) === null)
+
+// Reposer le même férié ne doit rien inscrire une deuxième fois.
+const rejoue = (await q1(`select public.appliquer_ferie($1) as r`, [ferieId])).r
+ok('reposer le même férié n’inscrit rien', num(rejoue.jours_ecrits) === 0)
+
+// Le validateur note qui a tenu le poste : F → XF, la journée compte double.
+await connecte(bureau)
+const pB = (await q1(
+  `select id from public.pointages where employee_id=$1 and pointed_on=$2::date`,
+  [fB, FERIE])).id
+const avantB = await joursAvant(fB)
+await q1(`select public.changer_type_garde($1,'XF')`, [pB])
+ok('le validateur passe le férié en travaillé', (await typeLe(fB)) === 'XF')
+ok('la journée compte double', (await joursAvant(fB)) === avantB + 1,
+   `${await joursAvant(fB)} au lieu de ${avantB + 1}`)
+ok('la ligne cesse d’appartenir au férié',
+   (await q1(`select ferie_id from public.pointages where id=$1`, [pB])).ferie_id === null)
+
+// Le férié déclaré après coup : passer les gardes déjà saisies en XF.
+await connecte(admin)
+const converties = num((await q1(`select public.convertir_travail_ferie($1) as n`, [ferieId])).n)
+ok('les gardes déjà saisies passent en férié travaillé', converties >= 1, String(converties))
+ok('celle de fC aussi', (await typeLe(fC)) === 'XF')
+ok('… et sa journée compte double', (await joursAvant(fC)) === avantC + 1)
+
+// La paie compte F et XF comme des jours travaillés.
+const perF = (await q1(`select public.valider_pointage_mois($1,2026,5) as id`, [co])).id
+const ligneF = async (id) => await q1(
+  `select gardes_travaillees g, jours_payes jp from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [perF, id])
+ok('la paie compte le férié chômé comme un jour', num((await ligneF(fA)).g) === 1,
+   String((await ligneF(fA)).g))
+ok('la paie compte le férié travaillé pour deux', num((await ligneF(fB)).g) === 2,
+   String((await ligneF(fB)).g))
+
+// Supprimer le férié retire ses F, et rien d'autre.
+await connecte(admin)
+const retirees = num((await q1(`select public.admin_supprimer_ferie($1) as n`, [ferieId])).n)
+ok('supprimer le férié retire ses journées', retirees >= 1, String(retirees))
+ok('le F disparaît', (await typeLe(fA)) === null)
+ok('… et le compteur revient à son point de départ', (await joursAvant(fA)) === avantA)
+ok('le jour réellement travaillé survit', (await typeLe(fB)) === 'XF')
+ok('celui converti aussi', (await typeLe(fC)) === 'XF')
+
+// Seul l'administrateur déclare un férié.
+await connecte(bureau)
+await refuse('le bureau ne déclare pas de férié',
+  `select public.admin_creer_ferie($1,'X','2026-05-20'::date,'2026-05-20'::date)`,
+  [co], /réservé|autoris|administrateur|Seul l/i)
+
+// ═══════════════════════ TRANSPORT, PANIER : LE NET SUIT-IL ? ══════════════
+// Règle voulue : ces indemnités se saisissent à la paie (le montant varie
+// d'un mois à l'autre), s'ajoutent au net APRÈS les retenues, et n'entrent
+// dans aucune assiette. Le brut, la C.N.S.S., l'A.M.O. et l'I.G.R. doivent
+// donc être exactement les mêmes avec et sans indemnité.
+
+section('Frais de transport et de panier')
+
+await connecte(bureau)
+const tSans = await employe('SANS INDEMNITE', { cin: 'TP1', cnss: '920000001' })
+const tAvec = await employe('AVEC INDEMNITE', { cin: 'TP2', cnss: '920000002' })
+const tFerie = await employe('FERIE AU BULLETIN', { cin: 'TP3', cnss: '920000003' })
+
+// Mêmes jours pour les deux : seule l'indemnité les distingue.
+const JOURS_MARS = ['2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05', '2026-03-06']
+for (const j of JOURS_MARS) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [tSans, j])
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [tAvec, j])
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [tFerie, j])
+}
+// Le férié travaillé va sur un troisième : tSans et tAvec doivent garder
+// exactement les mêmes jours, sinon comparer leurs retenues ne prouve rien.
+await q1(`select public.marquer_present($1,'2026-03-09'::date,'XF')`, [tFerie])
+
+const perTP = (await q1(`select public.valider_pointage_mois($1,2026,3) as id`, [co])).id
+const lig = async (id) => await q1(
+  `select salaire_brut b, frais_transport ft, frais_panier fp,
+          jours_feries_travailles jf, net_a_payer net, gardes_travaillees g
+     from public.lignes_paie where periode_id=$1 and employee_id=$2`, [perTP, id])
+
+const lSans = await lig(tSans)
+let lAvec = await lig(tAvec)
+const brutAvec = num(lAvec.b)
+
+ok('une ligne fraîchement générée n’a aucune indemnité',
+   num(lAvec.ft) === 0 && num(lAvec.fp) === 0)
+
+// C'est le service paie qui saisit les deux montants, ce mois-ci.
+const idAvec = (await q1(
+  `select id from public.lignes_paie where periode_id=$1 and employee_id=$2`,
+  [perTP, tAvec])).id
+await connecte(paie)
+await q1(`select public.maj_ligne_paie($1, null, null, null, null, 300, 200)`, [idAvec])
+lAvec = await lig(tAvec)
+
+ok('la paie saisit le transport et le panier',
+   num(lAvec.ft) === 300 && num(lAvec.fp) === 200, `${lAvec.ft} / ${lAvec.fp}`)
+ok('celui à qui on n’a rien saisi reste à zéro',
+   num(lSans.ft) === 0 && num(lSans.fp) === 0)
+ok('le net porte les deux indemnités',
+   num(lAvec.net) === brutAvec + 500, `${lAvec.net} vs ${brutAvec} + 500`)
+await refuse('un montant négatif est refusé',
+  `select public.maj_ligne_paie($1, null, null, null, null, -50, null)`, [idAvec], /négatif/i)
+const lFerie = await lig(tFerie)
+ok('le jour férié travaillé compte deux gardes',
+   num(lFerie.g) === num(lSans.g) + 2, `${lFerie.g} vs ${lSans.g}`)
+ok('la ligne de paie retient qu’un férié a été travaillé',
+   num(lFerie.jf) === 1, String(lFerie.jf))
+ok('celui qui n’en a pas travaillé reste à zéro', num(lAvec.jf) === 0)
+
+// Le point qui compte : les indemnités ne cotisent pas.
+const bul = async (id) => (await q1(
+  `select public.bulletin_paie($1,$2) as b`, [perTP, id])).b[0]
+const bSans = await bul(tSans)
+const bAvec = await bul(tAvec)
+const ligneDe = (b, libelle) => b.lignes.find((l) => l.libelle === libelle)
+
+const retenue = (b, l) => Number(ligneDe(b, l).retenue)
+ok('la C.N.S.S. est la même avec et sans indemnité',
+   retenue(bSans, 'COTISATION C.N.S.S.') === retenue(bAvec, 'COTISATION C.N.S.S.'))
+ok('l’A.M.O. aussi', retenue(bSans, 'ASSURANCE A.M.O.') === retenue(bAvec, 'ASSURANCE A.M.O.'))
+ok('l’I.G.R. aussi', retenue(bSans, 'I.G.R.') === retenue(bAvec, 'I.G.R.'))
+ok('le salaire brut aussi',
+   Number(ligneDe(bSans, 'SALAIRE BRUT').gain) === Number(ligneDe(bAvec, 'SALAIRE BRUT').gain))
+
+ok('le bulletin porte la ligne transport',
+   Number(ligneDe(bAvec, 'FRAIS DE TRANSPORT').gain) === 300)
+ok('… et la ligne panier', Number(ligneDe(bAvec, 'FRAIS DE PANIER').gain) === 200)
+ok('le gain net les additionne',
+   Number(ligneDe(bAvec, 'GAIN NET').gain)
+     === Number(ligneDe(bSans, 'GAIN NET').gain) + 500,
+   `${ligneDe(bAvec, 'GAIN NET').gain} vs ${ligneDe(bSans, 'GAIN NET').gain} + 500`)
+ok('le pied annonce le net indemnités comprises',
+   Number(bAvec.pied.net_a_payer) === Number(bSans.pied.net_a_payer) + 500)
+ok('le pied mentionne le férié travaillé',
+   Number((await bul(tFerie)).pied.jours_feries_travailles) === 1,
+   String((await bul(tFerie)).pied.jours_feries_travailles))
+
+// Une prime saisie ensuite ne doit pas effacer les indemnités.
+await q1(`select public.maj_ligne_paie($1, 400, null, null, null)`, [idAvec])
+ok('une prime s’ajoute au net sans effacer les indemnités',
+   num((await lig(tAvec)).net) === brutAvec + 500 + 400,
+   String((await lig(tAvec)).net))
+
+// Le point qui fait mal en production : régénérer le mois. Les montants
+// saisis par la paie ne viennent pas du pointage — ils doivent survivre.
+await connecte(bureau)
+await q1(`select public.generer_lignes_paie($1)`, [perTP])
+const apres = await lig(tAvec)
+ok('régénérer le mois n’efface pas les indemnités saisies',
+   num(apres.ft) === 300 && num(apres.fp) === 200, `${apres.ft} / ${apres.fp}`)
+ok('… ni la prime, et le net reste juste',
+   num(apres.net) === brutAvec + 500 + 400, String(apres.net))
+ok('les indemnités ne sont plus sur la fiche employé',
+   (await rows(`select column_name from information_schema.columns
+                 where table_name = 'employees'
+                   and column_name in ('frais_transport','frais_panier')`)).length === 0)
+
+section('La photo suit-elle la fiche ?')
+
+const listeUnique = (await db.query(
+  `select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'peut_gerer_employes'`)).rows.length > 0
+ok('la liste des rôles existe en un seul endroit', listeUnique,
+   listeUnique ? '' : 'peut_gerer_employes() absente — le BLOC 28 n’est pas passé')
+
+if (listeUnique) {
+  for (const [nom, uid, attendu] of [
+    ['administrateur', admin, true], ['bureau', bureau, true], ['personnel', rh, true],
+    ['la paie', paie, false], ['un pointeur', agent, false],
+  ]) {
+    await connecte(uid)
+    const peut = (await q1(`select public.peut_gerer_employes() as p`)).p
+    ok(`${nom} ${attendu ? 'dépose' : 'ne dépose pas'} une photo`, peut === attendu)
+  }
+  await connecte(null)
+  ok('un visiteur non connecté ne dépose rien',
+     (await q1(`select public.peut_gerer_employes() as p`)).p === false)
+}
+
+// Et les règles interrogent bien cette liste-là, plutôt que d'en recopier une.
+const regles = (await db.query(`
+  select policyname, coalesce(qual, '') || ' ' || coalesce(with_check, '') as texte
+    from pg_policies
+   where policyname in ('employees_insert', 'employees_update',
+                        'photos_storage_insert', 'photos_storage_update',
+                        'photos_storage_delete')`)).rows
+ok('les cinq règles existent', regles.length === 5, `${regles.length} trouvée(s)`)
+const orphelines = regles.filter((r) => !r.texte.includes('peut_gerer_employes'))
+ok('aucune ne recopie sa propre liste de rôles',
+   orphelines.length === 0, orphelines.map((r) => r.policyname).join(' · '))
+
+// … mais le scan signé, lui, ne suit PAS la fiche : le déposer applique le
+// contrat et écrit les congés sur le pointage. Décision prise avec le
+// propriétaire — le personnel prépare le papier, le bureau le rend officiel.
+// Si ce contrôle casse un jour, c'est que quelqu'un a élargi ce droit.
+const scans = (await db.query(`
+  select policyname, coalesce(qual, '') || ' ' || coalesce(with_check, '') as texte
+    from pg_policies
+   where policyname in ('documents_insert', 'documents_storage_insert')`)).rows
+ok('les deux règles de dépôt de scan existent', scans.length === 2, `${scans.length} trouvée(s)`)
+const elargies = scans.filter((r) => r.texte.includes('peut_gerer_employes')
+                                  || r.texte.includes("'rh'"))
+ok('déposer un scan reste au bureau et à l’administrateur',
+   elargies.length === 0, elargies.map((r) => r.policyname).join(' · '))
+
+await connecte(bureau)
+
 section('Le contrôle des blocs dit-il vrai ?')
 
 // Sur cette base, tous les blocs viennent d'être passés : le contrôle

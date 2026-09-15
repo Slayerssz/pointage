@@ -200,23 +200,23 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     }
   }, [lignes])
 
-  /** Totaux de la sélection courante — c'est ce que le patron veut lire. */
-  const totauxFiltres = useMemo(() => {
+  /** Les totaux d'une liste de lignes — c'est ce que le patron veut lire. */
+  const totauxDe = (liste: LignePaie[]) => {
     const somme = (f: (l: LignePaie) => number) =>
-      filtrees.reduce((s, l) => s + Number(f(l)), 0)
+      liste.reduce((s, l) => s + Number(f(l)), 0)
     return {
-      employes: filtrees.length,
+      employes: liste.length,
       total_brut: somme((l) => l.salaire_brut),
       total_primes: somme((l) => l.prime),
       total_dettes: somme((l) => l.retenue_dette),
       total_autres_retenues: somme((l) => l.autres_retenues),
       total_net: somme((l) => l.net_a_payer),
-      total_virement: filtrees.filter((l) => estVirement(l.mode_reglement))
+      total_virement: liste.filter((l) => estVirement(l.mode_reglement))
         .reduce((s, l) => s + Number(l.net_a_payer), 0),
-      total_especes: filtrees.filter((l) => !estVirement(l.mode_reglement))
+      total_especes: liste.filter((l) => !estVirement(l.mode_reglement))
         .reduce((s, l) => s + Number(l.net_a_payer), 0),
       par_banque: Object.entries(
-        filtrees.filter((l) => estVirement(l.mode_reglement)).reduce((acc, l) => {
+        liste.filter((l) => estVirement(l.mode_reglement)).reduce((acc, l) => {
           const b = (l.banque ?? '').trim() || '(non renseignée)'
           acc[b] = acc[b] ?? { n: 0, montant: 0 }
           acc[b].n += 1
@@ -225,24 +225,56 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         }, {} as Record<string, { n: number; montant: number }>),
       ).map(([banque, v]) => ({ banque, ...v })).sort((a, b) => b.montant - a.montant),
     }
+  }
+  const totauxFiltres = useMemo(() => totauxDe(filtrees), [filtrees])
+
+  // Les lignes, un mode de règlement après l'autre : les virements
+  // ensemble, les versements ensemble, les espèces ensemble. Chacun se
+  // lit et s'imprime seul — l'espèce se compte en caisse, le virement
+  // part à la banque, ce ne sont pas les mêmes gens qui les traitent.
+  const groupes = useMemo(() => {
+    const cle = (m: string | null) => {
+      const v = (m ?? '').toLowerCase()
+      if (v.startsWith('vir')) return 'Virement'
+      if (v.startsWith('vers')) return 'Versement'
+      if (v.startsWith('esp')) return 'Espèces'
+      return m?.trim() || 'Sans mode de règlement'
+    }
+    const ORDRE = ['Virement', 'Versement', 'Espèces']
+    const par = new Map<string, LignePaie[]>()
+    for (const l of filtrees) {
+      const k = cle(l.mode_reglement)
+      par.set(k, [...(par.get(k) ?? []), l])
+    }
+    return [...par.entries()]
+      .sort(([a], [b]) => {
+        const ia = ORDRE.indexOf(a), ib = ORDRE.indexOf(b)
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'fr')
+      })
+      .map(([mode, liste]) => ({ mode, liste, totaux: totauxDe(liste) }))
   }, [filtrees])
 
-  const exporter = async (format: 'excel' | 'pdf') => {
+  const exporter = async (
+    format: 'excel' | 'pdf',
+    sousEnsemble?: { lignes: LignePaie[]; libelle: string },
+  ) => {
     if (!lignes) return
     setExportEnCours(format)
     setErreurExport(null)
     try {
       // L'export reprend exactement ce qui est affiché : si un filtre est
       // actif, on n'exporte que cette sélection, avec ses propres totaux.
+      // Un mode de règlement seul s'exporte de la même façon, à son nom.
+      const selection = sousEnsemble?.lignes ?? filtrees
+      const libelleFiltre = [filtrePrincipal, filtreSite, filtreReglement, sousEnsemble?.libelle]
+        .filter(Boolean).join(' · ')
       const opts = {
         entreprise: company?.name ?? 'Entreprise',
         annee: periode.annee,
         mois: periode.mois,
-        lignes: filtrees,
-        totaux: filtreActif ? totauxFiltres : totaux,
-        filtre: filtreActif
-          ? [filtrePrincipal, filtreSite, filtreReglement].filter(Boolean).join(' · ')
-          : undefined,
+        lignes: selection,
+        totaux: sousEnsemble ? totauxDe(selection) : filtreActif ? totauxFiltres : totaux,
+        filtre: libelleFiltre || undefined,
       }
       if (format === 'excel') await exporterPaieExcel(opts)
       else await exporterPaiePdf(opts)
@@ -517,6 +549,8 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
               <th className="px-3 py-3 text-center font-medium">J. payés</th>
               <th className="px-3 py-3 text-right font-medium">Heures</th>
               <th className="px-3 py-3 text-right font-medium">Brut</th>
+              <th className="px-3 py-3 text-right font-medium">Transport</th>
+              <th className="px-3 py-3 text-right font-medium">Panier</th>
               <th className="px-3 py-3 text-right font-medium">Prime</th>
               <th className="px-3 py-3 text-right font-medium">Dette</th>
               <th className="px-3 py-3 text-right font-medium">Autres</th>
@@ -525,18 +559,52 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
               <th className="fige-droite px-3 py-3 text-right font-medium">Bulletin</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtrees.map((l) => (
-              <LigneRow
-                key={l.id}
-                ligne={l}
-                modifiable={estPaie && !verrouille && !enDemande}
-                resteDette={dettes?.get(l.employee_id) ?? 0}
-                onSaved={invalider}
-                onBulletin={() => setBulletinPour(l.employee_id)}
-              />
-            ))}
-          </tbody>
+          {groupes.map((g) => (
+            <tbody key={g.mode} className="divide-y divide-slate-100">
+              <tr className="bg-slate-100">
+                <td colSpan={99} className="px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold tracking-wide text-slate-700 uppercase">
+                      {g.mode}
+                      <span className="ml-2 font-normal normal-case text-slate-500">
+                        {g.liste.length} employé{g.liste.length > 1 ? 's' : ''} ·{' '}
+                        {formatDH(g.totaux.total_net)}
+                      </span>
+                    </span>
+                    {groupes.length > 1 && (
+                      <span className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => exporter('pdf', { lignes: g.liste, libelle: g.mode })}
+                          disabled={exportEnCours != null}
+                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          title={`Imprimer uniquement les ${g.mode.toLowerCase()}`}
+                        >
+                          PDF {g.mode.toLowerCase()}
+                        </button>
+                        <button
+                          onClick={() => exporter('excel', { lignes: g.liste, libelle: g.mode })}
+                          disabled={exportEnCours != null}
+                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Excel
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+              {g.liste.map((l) => (
+                <LigneRow
+                  key={l.id}
+                  ligne={l}
+                  modifiable={estPaie && !verrouille && !enDemande}
+                  resteDette={dettes?.get(l.employee_id) ?? 0}
+                  onSaved={invalider}
+                  onBulletin={() => setBulletinPour(l.employee_id)}
+                />
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
 
@@ -731,12 +799,18 @@ function LigneRow({
   const [prime, setPrime] = useState(String(ligne.prime ?? 0))
   const [dette, setDette] = useState(String(ligne.retenue_dette ?? 0))
   const [autres, setAutres] = useState(String(ligne.autres_retenues ?? 0))
+  // Le montant change d'un mois à l'autre : il se saisit ici, pas sur la fiche.
+  const [transport, setTransport] = useState(String(ligne.frais_transport ?? 0))
+  const [panier, setPanier] = useState(String(ligne.frais_panier ?? 0))
 
   useEffect(() => {
     setPrime(String(ligne.prime ?? 0))
     setDette(String(ligne.retenue_dette ?? 0))
     setAutres(String(ligne.autres_retenues ?? 0))
-  }, [ligne.prime, ligne.retenue_dette, ligne.autres_retenues])
+    setTransport(String(ligne.frais_transport ?? 0))
+    setPanier(String(ligne.frais_panier ?? 0))
+  }, [ligne.prime, ligne.retenue_dette, ligne.autres_retenues,
+      ligne.frais_transport, ligne.frais_panier])
 
   const enregistrer = useMutation({
     mutationFn: async () => {
@@ -746,6 +820,8 @@ function LigneRow({
         p_retenue_dette: Number(dette) || 0,
         p_autres_retenues: Number(autres) || 0,
         p_observations: null,
+        p_frais_transport: Number(transport) || 0,
+        p_frais_panier: Number(panier) || 0,
       })
       if (error) throw error
     },
@@ -755,7 +831,9 @@ function LigneRow({
   const modifie =
     Number(prime) !== Number(ligne.prime) ||
     Number(dette) !== Number(ligne.retenue_dette) ||
-    Number(autres) !== Number(ligne.autres_retenues)
+    Number(autres) !== Number(ligne.autres_retenues) ||
+    Number(transport) !== Number(ligne.frais_transport) ||
+    Number(panier) !== Number(ligne.frais_panier)
 
   const champ = (v: string, set: (s: string) => void, max?: number) => (
     <input
@@ -818,6 +896,8 @@ function LigneRow({
         {ligne.heures_effectuees == null ? '—' : `${formatNombre(ligne.heures_effectuees)} h`}
       </td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-700">{formatDH(ligne.salaire_brut)}</td>
+      <td className="px-3 py-2 text-right">{champ(transport, setTransport)}</td>
+      <td className="px-3 py-2 text-right">{champ(panier, setPanier)}</td>
       <td className="px-3 py-2 text-right">{champ(prime, setPrime)}</td>
       <td className="px-3 py-2 text-right">
         {champ(dette, setDette, resteDette || undefined)}

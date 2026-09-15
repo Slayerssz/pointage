@@ -186,7 +186,11 @@ export default function BulletinPaiePrint({
                     </tr>
                   </thead>
                   <tbody>
-                    {b.lignes.map((l, j) => {
+                    {b.lignes
+                      // Une indemnité à zéro n'a rien à faire sur le bulletin :
+                      // celui qui n'en a pas retrouve exactement sa mise en page.
+                      .filter((l) => !(['010', '011'].includes(l.code) && !Number(l.gain)))
+                      .map((l, j) => {
                       const total = l.libelle === 'GAIN NET'
                       return (
                         <tr
@@ -280,6 +284,19 @@ export default function BulletinPaiePrint({
                     </tr>
                   </tbody>
                 </table>
+
+                {/* Le travail un jour férié : la journée compte double, et
+                    le bulletin doit le dire plutôt que de laisser un total
+                    de jours inexplicable. */}
+                {Number(b.pied.jours_feries_travailles) > 0 && (
+                  <p className="mt-1.5" style={{ fontSize: '7.5pt' }}>
+                    Dont <strong>{n2(b.pied.jours_feries_travailles)} jour
+                    {Number(b.pied.jours_feries_travailles) > 1 ? 's' : ''} férié
+                    {Number(b.pied.jours_feries_travailles) > 1 ? 's' : ''} travaillé
+                    {Number(b.pied.jours_feries_travailles) > 1 ? 's' : ''}</strong>, compté
+                    {Number(b.pied.jours_feries_travailles) > 1 ? 's' : ''} double.
+                  </p>
+                )}
 
                 {/* Ce qui a été réellement viré, quand primes ou retenues
                     internes font diverger le versement du net fiscal. */}

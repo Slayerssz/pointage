@@ -50,6 +50,12 @@ const ICONS = {
       <circle cx="12" cy="10" r="3" />
     </svg>
   ),
+  feries: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="m9 16 2 2 4-4" />
+    </svg>
+  ),
   entreprises: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
       <path d="M3 21h18M5 21V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14M9 9h2m2 0h2M9 13h2m2 0h2M9 17h2m2 0h2" />
@@ -84,6 +90,7 @@ export default function Layout() {
           { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
           { to: `/c/${companyId}/bulletins`, label: 'Bulletins', icon: ICONS.bulletins },
           { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
+          { to: `/c/${companyId}/feries`, label: 'Jours fériés', icon: ICONS.feries },
           { to: `/c/${companyId}/entreprises`, label: 'Entreprises', icon: ICONS.entreprises },
           { to: `/c/${companyId}/utilisateurs`, label: 'Utilisateurs', icon: ICONS.users },
           // Analytics en dernier : c'est l'écran le plus sensible

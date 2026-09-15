@@ -7,6 +7,7 @@ import {
   useSupprimerDocument,
 } from '../lib/documents'
 import { formatDateFr } from '../lib/dates'
+import { useAuth } from '../contexts/AuthContext'
 import type { Document } from '../lib/types'
 import { ErrorNote } from './ui'
 
@@ -15,6 +16,11 @@ import { ErrorNote } from './ui'
  *
  * Circuit : on imprime le document depuis l'application → l'employé signe
  * (et pour un contrat, on fait légaliser) → on scanne → on dépose le fichier ici.
+ *
+ * Le dépôt est réservé au bureau et à l'administrateur : c'est lui qui rend
+ * le document officiel — le contrat prend effet, les congés passent en C.
+ * Le personnel prépare le papier ; il ne le valide pas, et n'a donc ici ni
+ * bouton ni liste (la base lui refuse aussi la lecture de ces pièces).
  */
 export default function DocumentsSignes({
   companyId,
@@ -37,8 +43,22 @@ export default function DocumentsSignes({
   /** Phrase d'aide quand aucun fichier n'est encore déposé. */
   aide?: string
 }) {
-  const { data: docs, isLoading } = useDocuments({ employeeId, congeId, contratId, sortieId })
-  const deposer = useDeposerDocument({ companyId, employeeId, type, congeId, contratId, sortieId })
+  const { profile } = useAuth()
+  const peutDeposer = profile?.role === 'validator' || profile?.role === 'admin'
+  const { data: docs, isLoading } = useDocuments({
+    employeeId,
+    congeId,
+    contratId,
+    sortieId,
+  })
+  const deposer = useDeposerDocument({
+    companyId,
+    employeeId,
+    type,
+    congeId,
+    contratId,
+    sortieId,
+  })
   const supprimer = useSupprimerDocument()
   const champ = useRef<HTMLInputElement>(null)
   const [erreurOuverture, setErreurOuverture] = useState<string | null>(null)
@@ -61,13 +81,15 @@ export default function DocumentsSignes({
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Document signé
         </p>
-        <button
-          onClick={() => champ.current?.click()}
-          disabled={deposer.isPending}
-          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-        >
-          {deposer.isPending ? 'Envoi…' : '+ Joindre un scan'}
-        </button>
+        {peutDeposer && (
+          <button
+            onClick={() => champ.current?.click()}
+            disabled={deposer.isPending}
+            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {deposer.isPending ? 'Envoi…' : '+ Joindre un scan'}
+          </button>
+        )}
         <input
           ref={champ}
           type="file"
@@ -81,10 +103,16 @@ export default function DocumentsSignes({
         />
       </div>
 
-      {aucun && (
+      {!peutDeposer && (
         <p className="mt-2 text-xs text-slate-500">
-          {aide ?? `Aucun scan pour l’instant. Déposez ici ${intitule}.`}{' '}
-          PDF ou photo, 10 Mo maximum.
+          Le scan signé se dépose depuis le bureau : c'est ce dépôt qui applique le document.
+        </p>
+      )}
+
+      {peutDeposer && aucun && (
+        <p className="mt-2 text-xs text-slate-500">
+          {aide ?? `Aucun scan pour l’instant. Déposez ici ${intitule}.`} PDF ou photo, 10 Mo
+          maximum.
         </p>
       )}
 
@@ -108,11 +136,23 @@ export default function DocumentsSignes({
               >
                 <span className="shrink-0 text-slate-400">
                   {d.mime === 'application/pdf' ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      className="h-4 w-4"
+                    >
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6" />
                     </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      className="h-4 w-4"
+                    >
                       <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z" />
                       <path d="m3 16 5-5 4 4 3-3 6 6" />
                       <circle cx="9" cy="8" r="1.5" />
@@ -129,13 +169,15 @@ export default function DocumentsSignes({
                   </span>
                 </span>
               </button>
-              <button
-                onClick={() => supprimer.mutate(d)}
-                disabled={supprimer.isPending}
-                className="shrink-0 rounded px-1.5 py-1 text-[10px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-              >
-                Retirer
-              </button>
+              {peutDeposer && (
+                <button
+                  onClick={() => supprimer.mutate(d)}
+                  disabled={supprimer.isPending}
+                  className="shrink-0 rounded px-1.5 py-1 text-[10px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Retirer
+                </button>
+              )}
             </li>
           ))}
         </ul>

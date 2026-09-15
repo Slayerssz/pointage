@@ -280,11 +280,22 @@ function Groupe({ titre, children }: { titre: string; children: ReactNode }) {
   )
 }
 
+/**
+ * Un intitulé et sa valeur.
+ *
+ * L'intitulé occupe une colonne de largeur fixe et la valeur commence
+ * juste après : coller les deux aux bords opposés laissait un R.I.B. ou
+ * une adresse séparés de leur intitulé par toute la largeur du bloc.
+ */
 function Champ({ label, children, large }: { label: string; children: ReactNode; large?: boolean }) {
   return (
-    <div className={`flex justify-between gap-3 text-sm ${large ? 'sm:col-span-2' : ''}`}>
-      <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd className="min-w-0 text-right break-words text-slate-800">{children}</dd>
+    <div
+      className={`grid grid-cols-[minmax(0,9.5rem)_1fr] gap-x-3 text-sm ${
+        large ? 'sm:col-span-2' : ''
+      }`}
+    >
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="min-w-0 break-words text-slate-800">{children}</dd>
     </div>
   )
 }

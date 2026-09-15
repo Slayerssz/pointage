@@ -25,6 +25,7 @@ import {
 import type { Site } from '../../lib/types'
 import {
   TYPES_ABSENCE,
+  TYPES_FERIE,
   TYPES_TRAVAIL,
   gardeCouleur,
   gardeLabel,
@@ -89,7 +90,7 @@ export default function ValidationPage() {
 
       {/* Légende */}
       <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">
-        {[...TYPES_TRAVAIL, ...TYPES_ABSENCE].map((t) => (
+        {[...TYPES_TRAVAIL, ...TYPES_FERIE, ...TYPES_ABSENCE].map((t) => (
           <LegendItem key={t.code} cls={t.couleur} sym={t.symbole}>
             {t.label}
           </LegendItem>
@@ -434,6 +435,9 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
           <div className="mb-4">
             <p className="mb-1.5 text-sm font-medium text-slate-700">Jour travaillé</p>
             <div className="grid grid-cols-5 gap-1.5">{TYPES_TRAVAIL.map(boutonType)}</div>
+
+            <p className="mb-1.5 mt-3 text-sm font-medium text-slate-700">Jour férié</p>
+            <div className="grid grid-cols-4 gap-1.5">{TYPES_FERIE.map(boutonType)}</div>
 
             <p className="mb-1.5 mt-3 text-sm font-medium text-slate-700">Absence approuvée</p>
             <div className="grid grid-cols-4 gap-1.5">{TYPES_ABSENCE.map(boutonType)}</div>

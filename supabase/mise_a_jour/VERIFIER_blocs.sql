@@ -78,7 +78,16 @@ with attendu (numero, bloc, objet, present) as (
        exists (select 1 from pg_constraint where conname = 'lignes_paie_net_positif')),
   (27, 'Horaire matin / nuit',        'colonne employees.horaire',
        exists (select 1 from information_schema.columns
-                where table_name = 'employees' and column_name = 'horaire'))
+                where table_name = 'employees' and column_name = 'horaire')),
+  (28, 'Photo pour le personnel',     'fonction peut_gerer_employes()',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'peut_gerer_employes')),
+  (29, 'Jours fériés',               'table jours_feries',
+       exists (select 1 from information_schema.tables
+                where table_schema = 'public' and table_name = 'jours_feries')),
+  (30, 'Transport et panier',        'colonne lignes_paie.frais_transport',
+       exists (select 1 from information_schema.columns
+                where table_name = 'lignes_paie' and column_name = 'frais_transport'))
 )
 select numero,
        bloc,

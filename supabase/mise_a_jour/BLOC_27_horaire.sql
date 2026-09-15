@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 27 sur 27 — Matin ou nuit
+--  BLOC 27 sur 28 — Matin ou nuit
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 26.
 --

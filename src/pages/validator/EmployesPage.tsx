@@ -7,7 +7,6 @@ import {
   formatDateFr,
   jourDeReposLabel,
   retirementStatus,
-  todayIso,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites, useSitesPrincipaux, useTousLesSites } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
@@ -18,6 +17,7 @@ import type { Contrat, Employee, SituationFamiliale } from '../../lib/types'
 import { HORAIRES, SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../lib/types'
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
+import ChoixFiche from '../../components/ChoixFiche'
 import ApercuEmploye from '../../components/ApercuEmploye'
 import ListeSimplifieeDialogue from '../../components/ListeSimplifieeDialogue'
 import ChoixImpression from '../../components/ChoixImpression'
@@ -109,7 +109,9 @@ export default function EmployesPage() {
 
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
   // Fiche individuelle (une personne) et liste du personnel (la sélection)
-  const [fiche, setFiche] = useState<Employee | null>(null)
+  // Cliquer « Fiche » ouvre d'abord le choix simple / détaillée.
+  const [ficheAChoisir, setFicheAChoisir] = useState<Employee | null>(null)
+  const [fiche, setFiche] = useState<{ employe: Employee; variante: 'simple' | 'detaillee' } | null>(null)
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
@@ -622,7 +624,7 @@ export default function EmployesPage() {
                     >
                       <div className="flex justify-end gap-1.5">
                         <button
-                          onClick={() => setFiche(emp)}
+                          onClick={() => setFicheAChoisir(emp)}
                           title="Imprimer la fiche de cet employé"
                           className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
                         >
@@ -670,17 +672,32 @@ export default function EmployesPage() {
             const sp = sitesImpression.find((s) => s.id === apercu.site_id)?.site_principal_id
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
           })()}
-          onFiche={() => { setFiche(apercu); setApercu(null) }}
+          onFiche={() => { setFicheAChoisir(apercu); setApercu(null) }}
           onModifier={() => { setEditing(apercu); setApercu(null) }}
           onClose={() => setApercu(null)}
         />
       )}
 
+      {ficheAChoisir && (
+        <ChoixFiche
+          nom={ficheAChoisir.nom_prenom}
+          onSimple={() => { setFiche({ employe: ficheAChoisir, variante: 'simple' }); setFicheAChoisir(null) }}
+          onDetaillee={() => { setFiche({ employe: ficheAChoisir, variante: 'detaillee' }); setFicheAChoisir(null) }}
+          onClose={() => setFicheAChoisir(null)}
+        />
+      )}
+
       {fiche && (
         <FichePrint
-          employees={[fiche]}
-          entreprise={entrepriseDe(fiche)}
+          employees={[fiche.employe]}
+          entreprise={entrepriseDe(fiche.employe)}
           sites={sitesImpression}
+          variante={fiche.variante}
+          contrats={contrats ?? null}
+          sitePrincipalNom={(e) => {
+            const sp = sitesImpression.find((s) => s.id === e.site_id)?.site_principal_id
+            return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
+          }}
           onClose={() => setFiche(null)}
         />
       )}
@@ -768,15 +785,12 @@ function EmployeeFormModal({
     mode_reglement: employee?.mode_reglement ?? 'Virement',
     jour_de_repos: employee?.jour_de_repos?.toString() ?? '',
     horaire: employee?.horaire ?? '',
-    jours_travailles: employee?.jours_travailles?.toString() ?? '0',
     rib: employee?.rib ?? '',
     banque: employee?.banque ?? '',
     salaire: employee?.salaire?.toString() ?? '',
     heures_par_jour: employee?.heures_par_jour?.toString() ?? '8',
     situation_familiale: employee?.situation_familiale ?? '',
     nombre_enfants: employee?.nombre_enfants?.toString() ?? '0',
-    statut: employee && !employee.actif ? 'sorti' : 'actif',
-    date_sortie: employee?.date_sortie ?? '',
   })
 
   const set = (key: keyof typeof form) => (value: string) =>
@@ -803,7 +817,6 @@ function EmployeeFormModal({
         mode_reglement: form.mode_reglement || null,
         jour_de_repos: form.jour_de_repos ? Number(form.jour_de_repos) : null,
         horaire: form.horaire || null,
-        jours_travailles: Math.max(0, Number(form.jours_travailles) || 0),
         rib: form.rib.trim() || null,
         banque: form.banque.trim() || null,
         salaire: form.salaire.trim() ? Number(form.salaire) : null,
@@ -813,10 +826,6 @@ function EmployeeFormModal({
         nombre_enfants: SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale)
           ? Math.max(0, Number(form.nombre_enfants) || 0)
           : 0,
-        // « actif » est dérivé automatiquement de la date de sortie côté base.
-        // Statut « sorti » sans date → date du jour.
-        date_sortie:
-          form.statut === 'sorti' ? form.date_sortie || todayIso() : null,
       }
       if (employee) {
         const { error } = await supabase.from('employees').update(payload).eq('id', employee.id)
@@ -990,9 +999,6 @@ function EmployeeFormModal({
               ))}
             </select>
           ))}
-          {field('Jours travaillés', (
-            <input type="number" min="0" step="0.5" value={form.jours_travailles} onChange={(e) => set('jours_travailles')(e.target.value)} className={inputCls} />
-          ))}
 
           <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
             <p className="text-sm font-semibold text-slate-700">Paie & banque</p>
@@ -1011,20 +1017,6 @@ function EmployeeFormModal({
               <input type="text" value={form.rib} onChange={(e) => set('rib')(e.target.value)} className={inputCls} placeholder="24 chiffres" />
             ))}
           </div>
-
-          <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
-            <p className="text-sm font-semibold text-slate-700">Statut</p>
-          </div>
-          {field('Statut', (
-            <select value={form.statut} onChange={(e) => set('statut')(e.target.value)} className={inputCls}>
-              <option value="actif">En poste</option>
-              <option value="sorti">Sorti</option>
-            </select>
-          ))}
-          {form.statut === 'sorti' &&
-            field('Date de sortie', (
-              <DateInputFr value={form.date_sortie} onChange={set('date_sortie')} className={inputCls} />
-            ))}
         </div>
 
         {save.error && (!employee || vue === 'fiche') && (
@@ -1132,8 +1124,8 @@ function SupprimerEmploye({
           <p className="mt-1 text-sm text-red-800">
             {apercu.nom_prenom} figure dans {apercu.lignes_paie} bulletin(s) de paie
             {apercu.mois_de_paie.length > 0 && ` (${apercu.mois_de_paie.join(', ')})`}. Le
-            supprimer effacerait cet historique de paie. Passez son statut à{' '}
-            <strong>« Sorti »</strong> : il quitte les listes sans rien perdre.
+            supprimer effacerait cet historique de paie. Déclarez plutôt son départ dans
+            l'onglet <strong>Sorties</strong> : il quitte les listes sans rien perdre.
           </p>
         </>
       )}
@@ -1156,7 +1148,8 @@ function SupprimerEmploye({
             )}
           </ul>
           <p className="mt-2 text-sm text-red-800">
-            Si cet employé a réellement travaillé, préférez le statut <strong>« Sorti »</strong>.
+            Si cet employé a réellement travaillé, déclarez plutôt son départ dans l'onglet{' '}
+            <strong>Sorties</strong>.
           </p>
         </>
       )}

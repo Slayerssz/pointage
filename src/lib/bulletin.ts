@@ -34,6 +34,8 @@ export interface Bulletin {
   lignes: LigneBulletin[]
   pied: {
     jours_travailles: number
+    /** Jours fériés travaillés dans le mois (XF) : chacun compte double. */
+    jours_feries_travailles: number
     cumul_igr: number
     cumul_cnss: number
     heures_salariales: number
@@ -44,6 +46,9 @@ export interface Bulletin {
   net_verse: number
   prime: number
   retenues_internes: number
+  /** Indemnités mensuelles, hors assiette de cotisation. */
+  frais_transport: number
+  frais_panier: number
   /** Vrai quand le brut dépasse le seuil mais qu'aucun barème n'est saisi. */
   bareme_igr_absent: boolean
 }
