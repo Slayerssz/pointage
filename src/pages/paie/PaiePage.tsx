@@ -16,6 +16,10 @@ import {
   useTotauxPeriode,
 } from '../../lib/paie'
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
+import ChoixOrdreVirement from '../../components/ChoixOrdreVirement'
+import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
+import ChoixListeVersements from '../../components/ChoixListeVersements'
+import ListeVersementsPrint, { type VersementsDeBanque } from '../../components/ListeVersementsPrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import BulletinPaiePrint from '../../components/BulletinPaiePrint'
@@ -82,6 +86,17 @@ export default function PaiePage() {
   )
 }
 
+/** Virement / Versement / Espèces, quelle que soit la façon dont c'est écrit. */
+function modeDe(m: string | null | undefined): string {
+  const v = (m ?? '').toLowerCase()
+  if (v.startsWith('vir')) return 'Virement'
+  if (v.startsWith('vers')) return 'Versement'
+  if (v.startsWith('esp')) return 'Espèces'
+  return m?.trim() || 'Sans mode de règlement'
+}
+const banqueDe = (l: LignePaie) =>
+  (l.banque ?? '').trim().replace(/\s+/g, ' ').toUpperCase() || '(BANQUE NON RENSEIGNÉE)'
+
 function couleurStatut(p: PeriodePaie): string {
   switch (p.statut) {
     case 'paie_validee': return '#10b981'
@@ -98,8 +113,11 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   const { data: dettes } = useDettesOuvertes(companyId)
   const invalider = usePaieInvalidation(companyId, periode.id)
   const [recherche, setRecherche] = useState('')
+  // Le parcours : un mode de règlement, puis un site (virement, espèces)
+  // ou une banque (versement). Chaque étape réduit le tableau.
   const [filtreReglement, setFiltreReglement] = useState('')
   const [filtreSite, setFiltreSite] = useState('')
+  const [filtreBanque, setFiltreBanque] = useState('')
   const [filtrePrincipal, setFiltrePrincipal] = useState('')
   const [motifReouverture, setMotifReouverture] = useState('')
   const [exportEnCours, setExportEnCours] = useState<string | null>(null)
@@ -174,8 +192,9 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   const filtrees = useMemo(() => {
     const q = recherche.trim().toLowerCase()
     return (lignes ?? []).filter((l) => {
-      if (filtreReglement && (l.mode_reglement ?? '') !== filtreReglement) return false
+      if (filtreReglement && modeDe(l.mode_reglement) !== filtreReglement) return false
       if (filtreSite && (l.site_nom ?? '') !== filtreSite) return false
+      if (filtreBanque && banqueDe(l) !== filtreBanque) return false
       if (filtrePrincipal && (l.site_principal_nom ?? '') !== filtrePrincipal) return false
       if (!q) return true
       return (
@@ -184,9 +203,55 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         (l.site_nom ?? '').toLowerCase().includes(q)
       )
     })
-  }, [lignes, recherche, filtreReglement, filtreSite, filtrePrincipal])
+  }, [lignes, recherche, filtreReglement, filtreSite, filtreBanque, filtrePrincipal])
 
-  const filtreActif = Boolean(filtreReglement || filtreSite || filtrePrincipal || recherche.trim())
+  const filtreActif = Boolean(
+    filtreReglement || filtreSite || filtreBanque || filtrePrincipal || recherche.trim(),
+  )
+
+  // Les étapes du parcours, comptées sur le mois entier (pas sur ce qui
+  // est déjà filtré) : on voit toujours tous les sites, toutes les banques.
+  const etapes = useMemo(() => {
+    const somme = (liste: LignePaie[]) => liste.reduce((s, l) => s + Number(l.net_a_payer), 0)
+    const modes = new Map<string, LignePaie[]>()
+    for (const l of lignes ?? []) {
+      const k = modeDe(l.mode_reglement)
+      modes.set(k, [...(modes.get(k) ?? []), l])
+    }
+    const ORDRE = ['Virement', 'Versement', 'Espèces']
+    const listeModes = [...modes.entries()]
+      .sort(([a], [b]) => {
+        const ia = ORDRE.indexOf(a), ib = ORDRE.indexOf(b)
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'fr')
+      })
+      .map(([mode, liste]) => ({ mode, n: liste.length, total: somme(liste) }))
+
+    const duMode = filtreReglement ? (modes.get(filtreReglement) ?? []) : []
+    const par = (cle: (l: LignePaie) => string) => {
+      const m = new Map<string, LignePaie[]>()
+      for (const l of duMode) m.set(cle(l), [...(m.get(cle(l)) ?? []), l])
+      return [...m.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+        .map(([nom, liste]) => ({ nom, n: liste.length, total: somme(liste) }))
+    }
+    return {
+      modes: listeModes,
+      // Le versement se range par banque ; le reste par site.
+      secondes: filtreReglement === 'Versement'
+        ? par(banqueDe)
+        : par((l) => l.site_nom?.trim() || '(sans site)'),
+    }
+  }, [lignes, filtreReglement])
+
+  const choisirMode = (m: string) => {
+    setFiltreReglement(m === filtreReglement ? '' : m)
+    setFiltreSite(''); setFiltreBanque('')
+  }
+  const choisirSeconde = (v: string) => {
+    if (filtreReglement === 'Versement') setFiltreBanque(v === filtreBanque ? '' : v)
+    else setFiltreSite(v === filtreSite ? '' : v)
+  }
+  const secondeActive = filtreReglement === 'Versement' ? filtreBanque : filtreSite
 
   // Les valeurs proposées viennent des lignes du mois : on ne propose que
   // ce qui existe réellement dans cette paie.
@@ -194,8 +259,6 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     const uniq = (f: (l: LignePaie) => string | null) =>
       [...new Set((lignes ?? []).map(f).filter((v): v is string => Boolean(v)))].sort()
     return {
-      reglements: uniq((l) => l.mode_reglement),
-      sites: uniq((l) => l.site_nom),
       principaux: uniq((l) => l.site_principal_nom),
     }
   }, [lignes])
@@ -232,6 +295,13 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   // ensemble, les versements ensemble, les espèces ensemble. Chacun se
   // lit et s'imprime seul — l'espèce se compte en caisse, le virement
   // part à la banque, ce ne sont pas les mêmes gens qui les traitent.
+  const [choixVirement, setChoixVirement] = useState(false)
+  const [ordres, setOrdres] = useState<{ ordres: OrdreDeSite[]; rib: string } | null>(null)
+  const [choixVersement, setChoixVersement] = useState(false)
+  const [versements, setVersements] = useState<VersementsDeBanque[] | null>(null)
+  // La clé de modèle prime sur le nom : une société renommée garde son siège.
+  const { data: cleModele } = useModeleSociete(companyId)
+
   const groupes = useMemo(() => {
     const cle = (m: string | null) => {
       const v = (m ?? '').toLowerCase()
@@ -266,7 +336,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
       // actif, on n'exporte que cette sélection, avec ses propres totaux.
       // Un mode de règlement seul s'exporte de la même façon, à son nom.
       const selection = sousEnsemble?.lignes ?? filtrees
-      const libelleFiltre = [filtrePrincipal, filtreSite, filtreReglement, sousEnsemble?.libelle]
+      const libelleFiltre = [filtrePrincipal, filtreSite, filtreBanque, filtreReglement, sousEnsemble?.libelle]
         .filter(Boolean).join(' · ')
       const opts = {
         entreprise: company?.name ?? 'Entreprise',
@@ -482,16 +552,64 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         </div>
       )}
 
-      {/* Recherche */}
+      {/* Le parcours. D'abord quatre cartes : tout, espèces, virement,
+          versement. Puis, selon la carte, le site ou la banque. Chaque
+          choix réduit le tableau ; on en change quand on veut. */}
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[{ mode: '', n: lignes?.length ?? 0, total: etapes.modes.reduce((t, m) => t + m.total, 0) }, ...['Espèces', 'Virement', 'Versement']
+          .map((m) => etapes.modes.find((x) => x.mode === m) ?? { mode: m, n: 0, total: 0 })]
+          .map((c) => {
+            const actif = filtreReglement === c.mode
+            return (
+              <button
+                key={c.mode || 'tout'}
+                onClick={() => choisirMode(c.mode)}
+                disabled={!c.mode ? false : c.n === 0}
+                className={`rounded-xl border p-3 text-left transition disabled:opacity-40 ${
+                  actif
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white hover:border-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-semibold tracking-wide uppercase">
+                  {c.mode || 'Tout'}
+                </span>
+                <span className={`mt-1 block text-lg font-semibold tabular-nums ${actif ? '' : 'text-slate-900'}`}>
+                  {formatDH(c.total)}
+                </span>
+                <span className={`block text-xs ${actif ? 'text-slate-300' : 'text-slate-500'}`}>
+                  {c.n} employé{c.n > 1 ? 's' : ''}
+                </span>
+              </button>
+            )
+          })}
+      </div>
+
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input
-          type="search"
-          value={recherche}
-          onChange={(e) => setRecherche(e.target.value)}
-          placeholder="Rechercher (nom, matricule, site)…"
-          className="w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        />
-        {valeurs.principaux.length > 0 && (
+        {filtreReglement && filtreReglement !== 'Espèces' && (
+          <>
+            <span className="text-sm text-slate-600">
+              {filtreReglement === 'Versement' ? 'Quelle banque ?' : 'Quel site ?'}
+            </span>
+            <select
+              value={secondeActive}
+              onChange={(e) => choisirSeconde(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium"
+            >
+              <option value="">
+                {filtreReglement === 'Versement' ? 'Toutes les banques' : 'Tous les sites'}
+                {' '}({etapes.secondes.length})
+              </option>
+              {etapes.secondes.map((x) => (
+                <option key={x.nom} value={x.nom}>
+                  {x.nom} — {x.n} · {formatDH(x.total)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        {!filtreReglement && valeurs.principaux.length > 0 && (
           <select
             value={filtrePrincipal}
             onChange={(e) => setFiltrePrincipal(e.target.value)}
@@ -503,30 +621,20 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             ))}
           </select>
         )}
-        <select
-          value={filtreSite}
-          onChange={(e) => setFiltreSite(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">Toutes les annexes</option>
-          {valeurs.sites.map((v) => (
-            <option key={v} value={v}>{v}</option>
-          ))}
-        </select>
-        <select
-          value={filtreReglement}
-          onChange={(e) => setFiltreReglement(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">Tous les règlements</option>
-          {valeurs.reglements.map((v) => (
-            <option key={v} value={v}>{v}</option>
-          ))}
-        </select>
+
+        <input
+          type="search"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher un nom, un matricule…"
+          className="w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        />
+
         {filtreActif && (
           <button
             onClick={() => {
-              setRecherche(''); setFiltreReglement(''); setFiltreSite(''); setFiltrePrincipal('')
+              setRecherche(''); setFiltreReglement(''); setFiltreSite('')
+              setFiltreBanque(''); setFiltrePrincipal('')
             }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
@@ -571,8 +679,27 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                         {formatDH(g.totaux.total_net)}
                       </span>
                     </span>
+                    <span className="flex items-center gap-1.5">
+                      {g.mode === 'Versement' && (
+                        <button
+                          onClick={() => setChoixVersement(true)}
+                          className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
+                          title="La liste pour chaque banque"
+                        >
+                          Liste des versements
+                        </button>
+                      )}
+                      {g.mode === 'Virement' && (
+                        <button
+                          onClick={() => setChoixVirement(true)}
+                          className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
+                          title="Le formulaire pour la banque, un par site"
+                        >
+                          Ordre de virement
+                        </button>
+                      )}
                     {groupes.length > 1 && (
-                      <span className="flex items-center gap-1.5">
+                      <>
                         <button
                           onClick={() => exporter('pdf', { lignes: g.liste, libelle: g.mode })}
                           disabled={exportEnCours != null}
@@ -588,8 +715,9 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                         >
                           Excel
                         </button>
-                      </span>
+                      </>
                     )}
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -607,6 +735,47 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           ))}
         </table>
       </div>
+
+      {choixVirement && (
+        <ChoixOrdreVirement
+          virements={(lignes ?? []).filter((l) => estVirement(l.mode_reglement))}
+          companyId={companyId!}
+          siteInitial={filtreSite || undefined}
+          onImprimer={(o, rib) => { setOrdres({ ordres: o, rib }); setChoixVirement(false) }}
+          onClose={() => setChoixVirement(false)}
+        />
+      )}
+
+      {choixVersement && (
+        <ChoixListeVersements
+          versements={(lignes ?? []).filter((l) => (l.mode_reglement ?? '').toLowerCase().startsWith('vers'))}
+          banqueInitiale={filtreBanque || undefined}
+          onImprimer={(g) => { setVersements(g); setChoixVersement(false) }}
+          onClose={() => setChoixVersement(false)}
+        />
+      )}
+
+      {versements && (
+        <ListeVersementsPrint
+          groupes={versements}
+          entreprise={company?.name ?? ''}
+          modeleDocument={cleModele}
+          annee={periode.annee}
+          mois={periode.mois}
+          onClose={() => setVersements(null)}
+        />
+      )}
+
+      {ordres && (
+        <OrdreVirementPrint
+          ordres={ordres.ordres}
+          entreprise={company?.name ?? ''}
+          ribOrdinateur={ordres.rib || null}
+          annee={periode.annee}
+          mois={periode.mois}
+          onClose={() => setOrdres(null)}
+        />
+      )}
 
       {/* Valider la paie */}
       {estPaie && !verrouille && !enDemande && lignes && lignes.length > 0 && (

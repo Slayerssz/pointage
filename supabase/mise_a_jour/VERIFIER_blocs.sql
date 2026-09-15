@@ -104,6 +104,9 @@ select numero,
 
 -- ▶ Et si le BLOC 25 est passé : quelles sociétés n'ont pas de clé de modèle ?
 --   Une société sans clé n'affichera pas son contrat.
-select name as societe, coalesce(modele_document, '⚠ AUCUNE CLÉ') as cle_de_modele
-  from public.companies
- order by (modele_document is null) desc, name;
+--   (En commentaire : Supabase n'affiche que le dernier résultat, et c'est
+--    la liste des blocs ci-dessus qu'on veut voir. Sélectionnez ces trois
+--    lignes seules pour la lancer.)
+-- select name as societe, coalesce(modele_document, '⚠ AUCUNE CLÉ') as cle_de_modele
+--   from public.companies
+--  order by (modele_document is null) desc, name;

@@ -9,6 +9,7 @@ import {
   retirementStatus,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites, useSitesPrincipaux, useTousLesSites } from '../../lib/queries'
+import { BANQUES, normaliserBanque } from '../../lib/banques'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
 import { MOIS_FR, useContratsCourants, formatDH } from '../../lib/paie'
@@ -1010,7 +1011,7 @@ function EmployeeFormModal({
             <input type="number" min="0" step="0.5" value={form.heures_par_jour} onChange={(e) => set('heures_par_jour')(e.target.value)} className={inputCls} placeholder="ex. 8" />
           ))}
           {field('Banque', (
-            <input type="text" value={form.banque} onChange={(e) => set('banque')(e.target.value)} className={inputCls} placeholder="ex. Attijariwafa Bank" />
+            <ChoixBanque value={form.banque} onChange={set('banque')} className={inputCls} />
           ))}
           <div className="sm:col-span-2">
             {field('RIB', (
@@ -1178,5 +1179,58 @@ function SupprimerEmploye({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * La banque : le menu des banques du groupe (liste fixe, lib/banques.ts),
+ * et « Autre banque… » pour en écrire une nouvelle. Une orthographe unique
+ * par banque, sinon la liste des versements la compte deux fois.
+ */
+function ChoixBanque({
+  value, onChange, className,
+}: { value: string; onChange: (v: string) => void; className: string }) {
+  const normalisee = normaliserBanque(value)
+  const connue = !value || (BANQUES as readonly string[]).includes(normalisee)
+  const [autre, setAutre] = useState(!connue)
+
+  if (autre) {
+    return (
+      <div className="flex gap-2">
+        <input
+          type="text"
+          autoFocus
+          value={value}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          className={className}
+          placeholder="Nom de la banque"
+        />
+        <button
+          type="button"
+          onClick={() => { setAutre(false); onChange('') }}
+          className="shrink-0 rounded-lg border border-slate-300 px-2 text-xs text-slate-600 hover:bg-slate-50"
+          title="Revenir à la liste"
+        >
+          Liste
+        </button>
+      </div>
+    )
+  }
+  return (
+    <select
+      value={normalisee}
+      onChange={(e) => {
+        if (e.target.value === '__autre__') { setAutre(true); onChange('') }
+        else onChange(e.target.value)
+      }}
+      className={className}
+    >
+      <option value="">— Aucune —</option>
+      {BANQUES.map((b) => <option key={b} value={b}>{b}</option>)}
+      {value && !(BANQUES as readonly string[]).includes(normalisee) && (
+        <option value={normalisee}>{normalisee}</option>
+      )}
+      <option value="__autre__">Autre banque…</option>
+    </select>
   )
 }
