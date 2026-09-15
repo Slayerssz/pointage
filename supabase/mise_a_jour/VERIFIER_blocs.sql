@@ -87,7 +87,10 @@ with attendu (numero, bloc, objet, present) as (
                 where table_schema = 'public' and table_name = 'jours_feries')),
   (30, 'Transport et panier',        'colonne lignes_paie.frais_transport',
        exists (select 1 from information_schema.columns
-                where table_name = 'lignes_paie' and column_name = 'frais_transport'))
+                where table_name = 'lignes_paie' and column_name = 'frais_transport')),
+  (31, 'R.I.B. de la société',       'colonne companies.rib_ordinateur',
+       exists (select 1 from information_schema.columns
+                where table_name = 'companies' and column_name = 'rib_ordinateur'))
 )
 select numero,
        bloc,

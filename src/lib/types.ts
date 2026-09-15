@@ -11,6 +11,8 @@ export interface Profile {
 export interface Company {
   id: string
   name: string
+  /** Le compte de la société, en tête de l'ordre de virement. */
+  rib_ordinateur?: string | null
 }
 
 /** Une « annexe » : c'est là que les employés sont rattachés. */

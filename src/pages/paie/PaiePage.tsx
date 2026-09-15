@@ -132,7 +132,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     enabled: Boolean(companyId),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('companies').select('id, name').eq('id', companyId!).single()
+        .from('companies').select('id, name, rib_ordinateur').eq('id', companyId!).single()
       if (error) throw error
       return data
     },
@@ -740,6 +740,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         <ChoixOrdreVirement
           virements={(lignes ?? []).filter((l) => estVirement(l.mode_reglement))}
           companyId={companyId!}
+          ribSociete={company?.rib_ordinateur ?? null}
           siteInitial={filtreSite || undefined}
           onImprimer={(o, rib) => { setOrdres({ ordres: o, rib }); setChoixVirement(false) }}
           onClose={() => setChoixVirement(false)}

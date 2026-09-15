@@ -9,15 +9,15 @@ import type { OrdreDeSite } from './OrdreVirementPrint'
  * le site, on imprime, on passe au suivant. « Tous les sites » sort tous
  * les ordres d'un coup, chacun sur ses pages.
  *
- * Le R.I.B. de la société (« RIB ORDINATEUR » sur le formulaire) se tape
- * ici : on ne l'a pas encore pour les dix sociétés. Le dernier saisi est
- * gardé dans ce navigateur, par société, pour ne pas le retaper chaque
- * mois — il n'est enregistré nulle part ailleurs.
+ * Le R.I.B. de la société (« RIB ORDINATEUR » sur le formulaire) vient de
+ * la fiche de la société (RIB_societes.sql). S'il y manque, on le tape
+ * ici, et le dernier saisi est gardé dans ce navigateur, par société.
  */
 const cleRib = (companyId: string) => `rib-ordinateur:${companyId}`
 export default function ChoixOrdreVirement({
   virements,
   companyId,
+  ribSociete,
   siteInitial,
   onImprimer,
   onClose,
@@ -25,6 +25,8 @@ export default function ChoixOrdreVirement({
   /** Les lignes payées par virement, ce mois-ci. */
   virements: LignePaie[]
   companyId: string
+  /** Le R.I.B. enregistré sur la société : quand il est là, rien à taper. */
+  ribSociete: string | null
   /** Le site déjà choisi dans le parcours de la paie, s'il y en a un. */
   siteInitial?: string
   onImprimer: (ordres: OrdreDeSite[], ribOrdinateur: string) => void
@@ -33,6 +35,7 @@ export default function ChoixOrdreVirement({
   useFermerSurEchap(onClose)
 
   const [rib, setRib] = useState(() => {
+    if (ribSociete) return ribSociete
     try { return localStorage.getItem(cleRib(companyId)) ?? '' } catch { return '' }
   })
   const ribPropre = rib.replace(/\s/g, '')
@@ -82,6 +85,14 @@ export default function ChoixOrdreVirement({
           primes et retenues comprises.
         </p>
 
+        {ribSociete ? (
+          <p className="mt-4 text-sm text-slate-600">
+            RIB ordinateur :{' '}
+            <span className="font-mono tabular-nums text-slate-900">
+              {ribSociete.replace(/(.{3})/g, '$1 ').trim()}
+            </span>
+          </p>
+        ) : (
         <label className="mt-4 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">
             R.I.B. de la société
@@ -102,6 +113,7 @@ export default function ChoixOrdreVirement({
             </span>
           )}
         </label>
+        )}
 
         <label className="mt-3 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Site</span>
