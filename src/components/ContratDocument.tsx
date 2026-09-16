@@ -110,6 +110,14 @@ export default function ContratDocument({
           </div>
         )}
       </div>
+
+      {/* À l'impression, une seule marge : celle de la page. Le contrat
+          gardait la sienne (20 mm / 18 mm) PAR-DESSUS celle du navigateur,
+          soit près de 3 cm de chaque côté — et trois pages au lieu de deux. */}
+      <style>{`@media print {
+        @page { size: A4 portrait; margin: 12mm 14mm; }
+        .contrat-imprimable { padding: 0 !important; }
+      }`}</style>
     </article>
   )
 }
