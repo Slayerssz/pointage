@@ -15,7 +15,7 @@ import { HORAIRES, type ContratCourant, type Employee } from '../lib/types'
  * Deux variantes, même en-tête.
  *
  * « simple » reprend le modèle officiel : couleur de l'entreprise,
- * emplacement photo, matricule, les neuf champs, puis la liste des
+ * emplacement photo, matricule, les dix champs (le téléphone en plus du modèle), puis la liste des
  * pièces administratives à fournir. C'est celle qu'on classe ou remet.
  *
  * « detaillee » porte tout ce que le registre sait de la personne —
@@ -131,6 +131,7 @@ export default function FichePrint({
             ['N° Carte Nationale', e.cin ?? ''],
             ['Adresse', e.adresse ?? ''],
             ['Ville', e.ville ?? ''],
+            ['Téléphone', e.telephone ?? ''],
             ['Date de Naissance', e.date_naissance ? formatDateFr(e.date_naissance) : ''],
             ['Département', departementDe(e)],
             ['Qualification', e.qualification ?? ''],
@@ -227,7 +228,7 @@ export default function FichePrint({
                 />
               ) : (
                 <>
-                  {/* Les neuf champs */}
+                  {/* Les dix champs */}
                   <dl>
                     {champs.map(([label, valeur]) => (
                       <div key={label} className="flex items-baseline" style={{ marginBottom: '4.6mm' }}>

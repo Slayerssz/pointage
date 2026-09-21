@@ -148,12 +148,13 @@ export async function genererFichePdf(opts: {
 
     y = yPhoto + photoH + 14
 
-    // ── Les neuf champs ───────────────────────────────────────────────
+    // ── Les dix champs ───────────────────────────────────────────────
     const champs: [string, string][] = [
       ['Nom et Prénom', e.nom_prenom],
       ['N° Carte Nationale', e.cin ?? ''],
       ['Adresse', e.adresse ?? ''],
       ['Ville', e.ville ?? ''],
+      ['Téléphone', e.telephone ?? ''],
       ['Date de Naissance', e.date_naissance ? formatDateFr(e.date_naissance) : ''],
       ['Département', departementDe(e)],
       ['Qualification', e.qualification ?? ''],

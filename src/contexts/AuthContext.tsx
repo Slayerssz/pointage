@@ -34,7 +34,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
       }
     })
-    return () => sub.subscription.unsubscribe()
+
+    // L'ordinateur s'est mis en veille, l'onglet revient : si le jeton est
+    // mort ou sur le point de l'être, on le renouvelle avant que quelqu'un
+    // ne clique — plutôt que de laisser la première requête échouer.
+    const auRetour = () => {
+      if (document.visibilityState !== 'visible') return
+      supabase.auth.getSession().then(({ data }) => {
+        const s = data.session
+        if (!s) return
+        const expireDans = (s.expires_at ?? 0) * 1000 - Date.now()
+        if (expireDans < 5 * 60_000) void supabase.auth.refreshSession()
+      })
+    }
+    document.addEventListener('visibilitychange', auRetour)
+    window.addEventListener('focus', auRetour)
+    return () => {
+      sub.subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', auRetour)
+      window.removeEventListener('focus', auRetour)
+    }
   }, [])
 
   useEffect(() => {
