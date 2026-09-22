@@ -423,55 +423,64 @@ export async function exporterBulletinExcel(opts: {
 
 export { estVirement }
 
-// ------------------------------------------- Liste simplifiée (Excel) -----
+// ------------------------------------------ Liste du personnel (Excel) -----
 
 /**
- * La liste simplifiée en tableur : les mêmes colonnes que le papier —
- * numéro, nom, C.I.N., C.N.S.S., et le salaire si on l'a demandé.
+ * La liste du personnel en tableur : les mêmes colonnes que le papier,
+ * un bloc par annexe, salaire compris, et le total général.
  */
-export async function exporterListeSimplifieeExcel(opts: {
+export async function exporterListePersonnelExcel(opts: {
   employees: Employee[]
   entreprise: string
-  intitule: string
-  etablissement: string
-  du: string
-  au: string
-  avecSalaire: boolean
+  intitule?: string
+  nomSite: (siteId: string) => string
 }) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
-  const { employees, entreprise, intitule, etablissement, du, au, avecSalaire } = opts
-  const largeur = avecSalaire ? 5 : 4
+  const { employees, entreprise, intitule, nomSite } = opts
 
+  const parSite = new Map<string, Employee[]>()
+  for (const e of employees) parSite.set(e.site_id, [...(parSite.get(e.site_id) ?? []), e])
+  const groupes = [...parSite.entries()].sort((a, b) =>
+    nomSite(a[0]).localeCompare(nomSite(b[0]), 'fr'))
+
+  const colonnes = ['N°', 'Nom & Prénom', 'Qualification', 'C.I.N.', 'N° CNSS', 'Naissance',
+                    'Embauche', 'Téléphone', 'Ville', 'Règlement', 'Salaire']
   const rows: SheetData = []
-  rows.push([{ value: intitule, fontWeight: 'bold', fontSize: 13, columnSpan: largeur }])
-  rows.push([{ value: `${entreprise}${etablissement ? ' — ' + etablissement : ''}`, columnSpan: largeur }])
-  rows.push([{ value: `Période du ${formatDateFr(du)} au ${formatDateFr(au)}`, columnSpan: largeur }])
+  rows.push([{ value: `LISTE DU PERSONNEL — ${entreprise}`, fontWeight: 'bold', fontSize: 14, columnSpan: colonnes.length }])
+  if (intitule) rows.push([{ value: intitule, columnSpan: colonnes.length }])
+  rows.push([{ value: `${employees.length} employé(s), ${groupes.length} site(s) · ${new Date().toLocaleDateString('fr-FR')}`, columnSpan: colonnes.length }])
   rows.push([])
-  rows.push(
-    ['N°', 'Nom et prénom', 'N° C.I.N.', 'N° C.N.S.S.', ...(avecSalaire ? ['Salaire'] : [])]
-      .map((c) => ({ value: c, ...ENTETE })),
-  )
-  employees.forEach((e, i) => {
-    const ligne: Row = [
-      { type: Number, value: i + 1 },
-      { type: String, value: e.nom_prenom },
-      { type: String, value: e.cin ?? undefined },
-      { type: String, value: e.cnss ?? undefined },
-    ]
-    if (avecSalaire) ligne.push({ ...MONTANT, value: e.salaire == null ? undefined : Number(e.salaire) })
-    rows.push(ligne)
-  })
-  if (avecSalaire) {
-    rows.push([])
-    rows.push([
-      { value: 'TOTAL', fontWeight: 'bold', columnSpan: 4, backgroundColor: '#F1F5F9' },
-      null, null, null,
-      { ...MONTANT, value: employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0), fontWeight: 'bold' },
-    ])
+  rows.push(colonnes.map((c) => ({ value: c, ...ENTETE })))
+
+  for (const [siteId, liste] of groupes) {
+    rows.push([{ value: `${nomSite(siteId)} — ${liste.length} employé(s)`, fontWeight: 'bold',
+                 backgroundColor: '#F1F5F9', columnSpan: colonnes.length }])
+    for (const e of liste) {
+      rows.push([
+        { type: Number, value: e.matricule ?? undefined },
+        { type: String, value: e.nom_prenom + (e.actif ? '' : ' (sorti)') },
+        { type: String, value: e.qualification ?? undefined },
+        { type: String, value: e.cin ?? undefined },
+        { type: String, value: e.cnss ?? undefined },
+        { type: String, value: e.date_naissance ? formatDateFr(e.date_naissance) : undefined },
+        { type: String, value: e.date_embauche ? formatDateFr(e.date_embauche) : undefined },
+        { type: String, value: e.telephone ?? undefined },
+        { type: String, value: e.ville ?? undefined },
+        { type: String, value: e.mode_reglement ?? undefined },
+        { ...MONTANT, value: e.salaire == null ? undefined : Number(e.salaire) },
+      ])
+    }
   }
+  rows.push([])
+  rows.push([
+    { value: `TOTAL GÉNÉRAL — ${employees.length} employé(s)`, fontWeight: 'bold', columnSpan: 10, backgroundColor: '#D1FAE5' },
+    null, null, null, null, null, null, null, null, null,
+    { ...MONTANT, value: employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0), fontWeight: 'bold', backgroundColor: '#D1FAE5' },
+  ])
 
   await writeXlsxFile(rows, {
-    columns: [{ width: 6 }, { width: 34 }, { width: 16 }, { width: 16 }, ...(avecSalaire ? [{ width: 14 }] : [])],
-    sheet: 'Liste',
-  }).toFile(`${slug(intitule)}_${slug(entreprise)}.xlsx`)
+    columns: [{ width: 7 }, { width: 30 }, { width: 24 }, { width: 12 }, { width: 13 }, { width: 12 },
+              { width: 12 }, { width: 15 }, { width: 16 }, { width: 12 }, { width: 13 }],
+    sheet: 'Personnel',
+  }).toFile(`Liste_personnel_${slug(entreprise)}.xlsx`)
 }

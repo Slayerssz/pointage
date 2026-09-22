@@ -2,6 +2,8 @@ import { formatDateFr } from '../lib/dates'
 import type { Employee, SitePrincipal } from '../lib/types'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
+import { formatDH } from '../lib/paie'
+import { exporterListePersonnelExcel } from '../lib/exports'
 import PortailImpression from './PortailImpression'
 
 /**
@@ -66,6 +68,7 @@ export default function ListePrint({
         imprimer={imprimer}
         nomFichier={`Liste_${entreprise.replace(/\s+/g, '_')}`}
         orientation="landscape"
+        exporterExcel={() => exporterListePersonnelExcel({ employees, entreprise, intitule, nomSite })}
         onClose={onClose}
       />
 
@@ -108,10 +111,12 @@ export default function ListePrint({
                 <thead>
                   <tr className="bg-slate-100">
                     {['N°', 'Nom & Prénom', 'Qualification', 'C.I.N.', 'N° CNSS',
-                      'Naissance', 'Embauche', 'Téléphone', 'Ville', 'Règlement'].map((c) => (
+                      'Naissance', 'Embauche', 'Téléphone', 'Ville', 'Règlement', 'Salaire'].map((c) => (
                       <th
                         key={c}
-                        className="border border-slate-400 px-1.5 py-1 text-left text-[7.5pt] font-bold uppercase tracking-wide"
+                        className={`border border-slate-400 px-1.5 py-1 text-[7.5pt] font-bold uppercase tracking-wide ${
+                          c === 'Salaire' ? 'text-right' : 'text-left'
+                        }`}
                       >
                         {c}
                       </th>
@@ -142,8 +147,19 @@ export default function ListePrint({
                       </td>
                       <td className="border border-slate-400 px-1.5 py-1">{e.ville ?? '—'}</td>
                       <td className="border border-slate-400 px-1.5 py-1">{e.mode_reglement ?? '—'}</td>
+                      <td className="border border-slate-400 px-1.5 py-1 text-right tabular-nums whitespace-nowrap">
+                        {e.salaire != null ? formatDH(e.salaire) : '—'}
+                      </td>
                     </tr>
                   ))}
+                  <tr className="font-bold">
+                    <td colSpan={10} className="border border-slate-400 px-1.5 py-1 text-right">
+                      Total {nomSite(siteId)}
+                    </td>
+                    <td className="border border-slate-400 px-1.5 py-1 text-right tabular-nums whitespace-nowrap">
+                      {formatDH(liste.reduce((t, e) => t + Number(e.salaire ?? 0), 0))}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </section>
@@ -151,7 +167,8 @@ export default function ListePrint({
         })}
 
         <p className="mt-6 border-t border-black pt-2 text-right text-[9pt] font-bold">
-          TOTAL GÉNÉRAL : {employees.length} employé(s)
+          TOTAL GÉNÉRAL : {employees.length} employé(s) —{' '}
+          {formatDH(employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0))}
         </p>
       </div>
 

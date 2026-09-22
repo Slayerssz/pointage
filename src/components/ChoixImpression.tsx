@@ -43,14 +43,14 @@ export default function ChoixImpression({
           <Choix
             titre="Liste complète"
             pour="Usage interne"
-            detail="Qualification, dates, contact, ville, règlement, salaire, gardes — regroupés par annexe."
+            detail="Qualification, dates, contact, ville, règlement, salaire — regroupés par annexe. Excel possible."
             avertissement="Contient les salaires."
             onClick={onComplete}
           />
           <Choix
             titre="Liste simplifiée"
-            pour="Bureau, ou client sans le salaire"
-            detail="N°, nom et prénom, C.I.N., n° C.N.S.S., salaire. Le salaire se décoche pour la version remise au client. Excel possible."
+            pour="À remettre au client"
+            detail="N°, nom et prénom, C.I.N., n° C.N.S.S. Rien d’autre ne sort."
             recommande
             onClick={onSimplifiee}
           />
