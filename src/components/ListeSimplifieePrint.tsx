@@ -1,5 +1,7 @@
 import { enteteDe } from '../lib/entetes'
 import { formatDateFr } from '../lib/dates'
+import { formatDH } from '../lib/paie'
+import { exporterListeSimplifieeExcel } from '../lib/exports'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
@@ -8,9 +10,9 @@ import type { Employee } from '../lib/types'
 /**
  * LISTE SIMPLIFIÉE — la version courte, celle qui sort de l'entreprise.
  *
- * Rien d'autre que le numéro, le nom, le C.I.N. et le numéro C.N.S.S. :
- * c'est ce que le client a le droit de voir. Ni salaire, ni adresse, ni
- * téléphone, contrairement à la liste complète qui, elle, reste interne.
+ * Le numéro, le nom, le C.I.N. et le numéro C.N.S.S. — c'est ce que le
+ * client a le droit de voir. Le salaire s'y ajoute sur demande (avecSalaire),
+ * pour la version qui reste au bureau ; ni adresse ni téléphone, jamais.
  *
  * La mise en page suit le modèle papier : marché en haut à gauche, titre
  * et établissement centrés et soulignés, bandeau de période, tableau à
@@ -25,6 +27,7 @@ export default function ListeSimplifieePrint({
   etablissement,
   du,
   au,
+  avecSalaire,
   onClose,
 }: {
   employees: Employee[]
@@ -39,10 +42,18 @@ export default function ListeSimplifieePrint({
   etablissement: string
   du: string
   au: string
+  /** Une colonne Salaire en plus : la liste ne sort alors plus du bureau. */
+  avecSalaire?: boolean
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
   useModeImpression()
+  const colonnes = avecSalaire
+    ? ['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS', 'SALAIRE']
+    : ['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS']
+  // Largeurs : le nom prend ce que les autres laissent.
+  const largeur = (i: number) =>
+    i === 0 ? '9%' : i === 1 ? (avecSalaire ? '37%' : '46%') : i === 4 ? '18%' : avecSalaire ? '18%' : '21%'
 
   const entete = enteteDe(entreprise, modeleDocument)
   const { pret, imprimer } = useImpression(entete.logo ? 1 : 0)
@@ -57,6 +68,12 @@ export default function ListeSimplifieePrint({
       <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
         <BarreImpression
           titre={`${intitule} — ${employees.length} agent(s)`}
+          exporterExcel={() =>
+            exporterListeSimplifieeExcel({
+              employees, entreprise, intitule, etablissement, du, au,
+              avecSalaire: Boolean(avecSalaire),
+            })
+          }
           pret={pret}
           imprimer={imprimer}
           nomFichier={`Liste_${marche.replace(/[^\w]+/g, '-') || 'marche'}_${entreprise.replace(/\s+/g, '_')}`}
@@ -121,14 +138,14 @@ export default function ListeSimplifieePrint({
                     WebkitPrintColorAdjust: 'exact',
                   }}
                 >
-                  {['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS'].map((c, i) => (
+                  {colonnes.map((c, i) => (
                     <th
                       key={c}
                       className="px-2 py-1.5 font-bold italic"
                       style={{
                         border: '1px solid #000',
                         fontSize: '10pt',
-                        width: i === 0 ? '12%' : i === 1 ? '46%' : '21%',
+                        width: largeur(i),
                       }}
                     >
                       {c}
@@ -160,8 +177,33 @@ export default function ListeSimplifieePrint({
                     >
                       {e.cnss || '—'}
                     </td>
+                    {avecSalaire && (
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        style={{ border: '1px solid #000' }}
+                      >
+                        {e.salaire != null ? formatDH(e.salaire) : '—'}
+                      </td>
+                    )}
                   </tr>
                 ))}
+                {avecSalaire && (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-2 py-2 text-right font-bold"
+                      style={{ border: '1px solid #000' }}
+                    >
+                      TOTAL
+                    </td>
+                    <td
+                      className="px-2 py-2 text-right font-bold tabular-nums"
+                      style={{ border: '1px solid #000' }}
+                    >
+                      {formatDH(employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0))}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

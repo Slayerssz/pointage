@@ -7,7 +7,7 @@ import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impr
 import { genererFichePdf } from '../lib/fichePdf'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
-import { HORAIRES, type ContratCourant, type Employee } from '../lib/types'
+import { HORAIRES, type Employee } from '../lib/types'
 
 /**
  * FICHE D'INFORMATIONS PERSONNELLES
@@ -20,7 +20,7 @@ import { HORAIRES, type ContratCourant, type Employee } from '../lib/types'
  *
  * « detaillee » porte tout ce que le registre sait de la personne —
  * téléphone, situation familiale, horaire, repos, salaire, banque,
- * R.I.B., dette, contrat en cours. Elle reste au bureau. Une fiche par
+ * R.I.B. Elle reste au bureau. Une fiche par
  * page dans les deux cas.
  */
 
@@ -42,7 +42,6 @@ export default function FichePrint({
   entreprise,
   sites,
   variante = 'simple',
-  contrats,
   sitePrincipalNom,
   onClose,
 }: {
@@ -50,8 +49,6 @@ export default function FichePrint({
   entreprise: string
   sites: { id: string; name: string }[]
   variante?: 'simple' | 'detaillee'
-  /** Le contrat en cours de chaque employé, pour la fiche détaillée. */
-  contrats?: Map<string, ContratCourant> | null
   /** Le site principal de l'annexe, quand la page le connaît. */
   sitePrincipalNom?: (e: Employee) => string | null
   onClose: () => void
@@ -224,7 +221,6 @@ export default function FichePrint({
                   accent={entete.accent}
                   siteNom={siteName(e.site_id)}
                   sitePrincipal={sitePrincipalNom?.(e) ?? null}
-                  contrat={contrats?.get(e.id) ?? null}
                 />
               ) : (
                 <>
@@ -284,13 +280,12 @@ export default function FichePrint({
  * blanc qu'on prendrait pour un oubli d'impression.
  */
 function FicheDetaillee({
-  e, accent, siteNom, sitePrincipal, contrat,
+  e, accent, siteNom, sitePrincipal,
 }: {
   e: Employee
   accent: string
   siteNom: string
   sitePrincipal: string | null
-  contrat: ContratCourant | null
 }) {
   const ou = (v: string | number | null | undefined) =>
     v == null || v === '' ? '—' : String(v)
@@ -339,20 +334,7 @@ function FicheDetaillee({
         ['Mode de règlement', ou(e.mode_reglement)],
         ['Banque', ou(e.banque)],
         ['R.I.B.', ou(e.rib)],
-        ['Dette en cours', e.dette > 0 ? formatDH(e.dette) : 'Aucune'],
       ],
-    },
-    {
-      titre: 'Contrat en cours',
-      champs: contrat
-        ? [
-            ['Type', contrat.type_contrat],
-            ['N°', ou(contrat.numero)],
-            ['Du', date(contrat.date_debut)],
-            ['Au', date(contrat.date_fin)],
-            ['Jours restants', contrat.jours_restants != null ? String(contrat.jours_restants) : '—'],
-          ]
-        : [['Contrat', 'Aucun contrat validé']],
     },
   ]
 

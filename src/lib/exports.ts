@@ -6,7 +6,8 @@
 
 import type { Row, SheetData } from 'write-excel-file/browser'
 import { MOIS_FR, estVirement, formatNombre } from './paie'
-import type { BulletinSite, LignePaie, TotauxPeriode } from './types'
+import { formatDateFr } from './dates'
+import type { BulletinSite, Employee, LignePaie, TotauxPeriode } from './types'
 import { gardeSymbole } from './gardes'
 
 /** Nom de fichier lisible : « Paie_Groupe-Triple-A_Janvier-2026.xlsx ». */
@@ -421,3 +422,56 @@ export async function exporterBulletinExcel(opts: {
 }
 
 export { estVirement }
+
+// ------------------------------------------- Liste simplifiée (Excel) -----
+
+/**
+ * La liste simplifiée en tableur : les mêmes colonnes que le papier —
+ * numéro, nom, C.I.N., C.N.S.S., et le salaire si on l'a demandé.
+ */
+export async function exporterListeSimplifieeExcel(opts: {
+  employees: Employee[]
+  entreprise: string
+  intitule: string
+  etablissement: string
+  du: string
+  au: string
+  avecSalaire: boolean
+}) {
+  const { default: writeXlsxFile } = await import('write-excel-file/browser')
+  const { employees, entreprise, intitule, etablissement, du, au, avecSalaire } = opts
+  const largeur = avecSalaire ? 5 : 4
+
+  const rows: SheetData = []
+  rows.push([{ value: intitule, fontWeight: 'bold', fontSize: 13, columnSpan: largeur }])
+  rows.push([{ value: `${entreprise}${etablissement ? ' — ' + etablissement : ''}`, columnSpan: largeur }])
+  rows.push([{ value: `Période du ${formatDateFr(du)} au ${formatDateFr(au)}`, columnSpan: largeur }])
+  rows.push([])
+  rows.push(
+    ['N°', 'Nom et prénom', 'N° C.I.N.', 'N° C.N.S.S.', ...(avecSalaire ? ['Salaire'] : [])]
+      .map((c) => ({ value: c, ...ENTETE })),
+  )
+  employees.forEach((e, i) => {
+    const ligne: Row = [
+      { type: Number, value: i + 1 },
+      { type: String, value: e.nom_prenom },
+      { type: String, value: e.cin ?? undefined },
+      { type: String, value: e.cnss ?? undefined },
+    ]
+    if (avecSalaire) ligne.push({ ...MONTANT, value: e.salaire == null ? undefined : Number(e.salaire) })
+    rows.push(ligne)
+  })
+  if (avecSalaire) {
+    rows.push([])
+    rows.push([
+      { value: 'TOTAL', fontWeight: 'bold', columnSpan: 4, backgroundColor: '#F1F5F9' },
+      null, null, null,
+      { ...MONTANT, value: employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0), fontWeight: 'bold' },
+    ])
+  }
+
+  await writeXlsxFile(rows, {
+    columns: [{ width: 6 }, { width: 34 }, { width: 16 }, { width: 16 }, ...(avecSalaire ? [{ width: 14 }] : [])],
+    sheet: 'Liste',
+  }).toFile(`${slug(intitule)}_${slug(entreprise)}.xlsx`)
+}

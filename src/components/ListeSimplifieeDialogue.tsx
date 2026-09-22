@@ -53,6 +53,9 @@ export default function ListeSimplifieeDialogue({
   const [du, setDu] = useState(mois.du)
   const [au, setAu] = useState(mois.au)
   const [imprime, setImprime] = useState(false)
+  // Le salaire est demandé par le bureau ; on le décoche pour la version
+  // qui part chez le client.
+  const [avecSalaire, setAvecSalaire] = useState(true)
 
   if (imprime) {
     return (
@@ -64,6 +67,7 @@ export default function ListeSimplifieeDialogue({
         etablissement={etablissement}
         du={du}
         au={au}
+        avecSalaire={avecSalaire}
         onClose={onClose}
       />
     )
@@ -137,6 +141,21 @@ export default function ListeSimplifieeDialogue({
           {au && du && au < du && (
             <p className="text-sm text-red-600">La fin de période précède son début.</p>
           )}
+
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <input
+              type="checkbox"
+              checked={avecSalaire}
+              onChange={(e) => setAvecSalaire(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-slate-800">Avec la colonne Salaire</span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Décochez pour la version qui part chez le client : nom, C.I.N. et C.N.S.S. seulement.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

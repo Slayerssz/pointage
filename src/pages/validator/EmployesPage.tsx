@@ -694,7 +694,6 @@ export default function EmployesPage() {
           entreprise={entrepriseDe(fiche.employe)}
           sites={sitesImpression}
           variante={fiche.variante}
-          contrats={contrats ?? null}
           sitePrincipalNom={(e) => {
             const sp = sitesImpression.find((s) => s.id === e.site_id)?.site_principal_id
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null

@@ -43,7 +43,7 @@ export default function ChoixFiche({
           <Choix
             titre="Fiche détaillée"
             pour="Usage interne, bureau"
-            detail="Tout ce que le registre sait : téléphone, situation familiale, horaire, repos, salaire, banque, R.I.B., dette, contrat en cours."
+            detail="Tout ce que le registre sait : téléphone, situation familiale, horaire, repos, salaire, banque, R.I.B."
             avertissement="Contient le salaire et le R.I.B."
             onClick={onDetaillee}
           />

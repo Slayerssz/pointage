@@ -49,8 +49,8 @@ export default function ChoixImpression({
           />
           <Choix
             titre="Liste simplifiée"
-            pour="À remettre au client"
-            detail="N°, nom et prénom, C.I.N., n° C.N.S.S. Rien d’autre ne sort."
+            pour="Bureau, ou client sans le salaire"
+            detail="N°, nom et prénom, C.I.N., n° C.N.S.S., salaire. Le salaire se décoche pour la version remise au client. Excel possible."
             recommande
             onClick={onSimplifiee}
           />

@@ -17,6 +17,7 @@ export default function BarreImpression({
   nomFichier,
   orientation = 'portrait',
   genererPdf,
+  exporterExcel,
   onClose,
 }: {
   titre: string
@@ -26,6 +27,8 @@ export default function BarreImpression({
   orientation?: 'portrait' | 'landscape'
   /** Générateur sur mesure ; à défaut, on photographie la page. */
   genererPdf?: () => Promise<void>
+  /** Le même document en tableur, quand cela a un sens. */
+  exporterExcel?: () => Promise<void>
   onClose: () => void
 }) {
   const [enCours, setEnCours] = useState(false)
@@ -59,6 +62,15 @@ export default function BarreImpression({
           >
             {enCours ? 'Création du PDF…' : 'Enregistrer en PDF'}
           </button>
+          {exporterExcel && (
+            <button
+              onClick={() => void exporterExcel()}
+              disabled={!pret}
+              className="rounded-lg border border-emerald-500 bg-slate-800 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-slate-700 disabled:opacity-50"
+            >
+              Excel
+            </button>
+          )}
           <button
             onClick={imprimer}
             disabled={!pret}
