@@ -31,11 +31,11 @@ export default function BarreImpression({
   exporterExcel?: () => Promise<void>
   onClose: () => void
 }) {
-  const [enCours, setEnCours] = useState(false)
+  const [enCours, setEnCours] = useState<'pdf' | 'excel' | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
 
   const pdf = async () => {
-    setEnCours(true)
+    setEnCours('pdf')
     setErreur(null)
     try {
       if (genererPdf) await genererPdf()
@@ -43,7 +43,20 @@ export default function BarreImpression({
     } catch (e) {
       setErreur(e instanceof Error ? e.message : String(e))
     } finally {
-      setEnCours(false)
+      setEnCours(null)
+    }
+  }
+
+  const excel = async () => {
+    if (!exporterExcel) return
+    setEnCours('excel')
+    setErreur(null)
+    try {
+      await exporterExcel()
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : String(e))
+    } finally {
+      setEnCours(null)
     }
   }
 
@@ -57,18 +70,18 @@ export default function BarreImpression({
         <div className="flex flex-wrap gap-2">
           <button
             onClick={pdf}
-            disabled={!pret || enCours}
+            disabled={!pret || enCours != null}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            {enCours ? 'Création du PDF…' : 'Enregistrer en PDF'}
+            {enCours === 'pdf' ? 'Création du PDF…' : 'Enregistrer en PDF'}
           </button>
           {exporterExcel && (
             <button
-              onClick={() => void exporterExcel()}
-              disabled={!pret}
+              onClick={excel}
+              disabled={!pret || enCours != null}
               className="rounded-lg border border-emerald-500 bg-slate-800 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-slate-700 disabled:opacity-50"
             >
-              Excel
+              {enCours === 'excel' ? 'Création du fichier…' : 'Excel'}
             </button>
           )}
           <button
