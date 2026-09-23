@@ -14,14 +14,11 @@ import type { VersementsDeBanque } from './ListeVersementsPrint'
  */
 export default function ChoixListeVersements({
   versements,
-  banqueInitiale,
   onImprimer,
   onClose,
 }: {
   /** Les lignes payées par versement, ce mois-ci. */
   versements: LignePaie[]
-  /** La banque déjà choisie dans le parcours de la paie, s'il y en a une. */
-  banqueInitiale?: string
   onImprimer: (groupes: VersementsDeBanque[]) => void
   onClose: () => void
 }) {
@@ -40,11 +37,7 @@ export default function ChoixListeVersements({
       total: lignes.reduce((s, l) => s + Number(l.net_a_payer), 0),
     }))
 
-  const [choisie, setChoisie] = useState<string>(
-    banqueInitiale && banques.some((b) => b.banque === banqueInitiale)
-      ? banqueInitiale
-      : banques.length === 1 ? banques[0].banque : '',
-  )
+  const [choisie, setChoisie] = useState<string>(banques.length === 1 ? banques[0].banque : '')
 
   const lancer = () => {
     if (choisie === '*') onImprimer(banques.map(({ banque, lignes }) => ({ banque, lignes })))

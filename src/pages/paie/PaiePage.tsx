@@ -20,6 +20,7 @@ import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import ChoixOrdreVirement from '../../components/ChoixOrdreVirement'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
 import ChoixListeVersements from '../../components/ChoixListeVersements'
+import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
 import ListeVersementsPrint, { type VersementsDeBanque } from '../../components/ListeVersementsPrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
@@ -284,10 +285,13 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     }
     return {
       modes: listeModes,
-      // Le versement se range par banque ; le reste par site.
-      secondes: filtreReglement === 'Versement'
+      // Le virement se range par banque — c'est la banque qui exécute ;
+      // le versement par site, c'est là qu'on porte l'argent.
+      secondes: filtreReglement === 'Virement'
         ? par(banqueDe)
         : par((l) => l.site_nom?.trim() || '(sans site)'),
+      totalDuMode: somme(duMode),
+      nDuMode: duMode.length,
     }
   }, [lignes, filtreReglement])
 
@@ -296,10 +300,19 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     setFiltreSite(''); setFiltreBanque('')
   }
   const choisirSeconde = (v: string) => {
-    if (filtreReglement === 'Versement') setFiltreBanque(v === filtreBanque ? '' : v)
-    else setFiltreSite(v === filtreSite ? '' : v)
+    if (filtreReglement === 'Virement') setFiltreBanque(v)
+    else setFiltreSite(v)
   }
-  const secondeActive = filtreReglement === 'Versement' ? filtreBanque : filtreSite
+  const secondeActive = filtreReglement === 'Virement' ? filtreBanque : filtreSite
+
+  // Cliquer sur Virement ou Versement ouvre la fenêtre du second choix :
+  // on y lit les montants avant de décider, ce qu'un menu ne montre pas.
+  const [choixOuvert, setChoixOuvert] = useState<string | null>(null)
+  const ouvrirMode = (m: string) => {
+    if (m === filtreReglement && m !== '') { setChoixOuvert(m); return }
+    choisirMode(m)
+    if (m === 'Virement' || m === 'Versement') setChoixOuvert(m)
+  }
 
   // Les valeurs proposées viennent des lignes du mois : on ne propose que
   // ce qui existe réellement dans cette paie.
@@ -612,7 +625,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             return (
               <button
                 key={c.mode || 'tout'}
-                onClick={() => choisirMode(c.mode)}
+                onClick={() => ouvrirMode(c.mode)}
                 disabled={!c.mode ? false : c.n === 0}
                 className={`rounded-xl border p-3 text-left transition disabled:opacity-40 ${
                   actif
@@ -636,26 +649,16 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {filtreReglement && filtreReglement !== 'Espèces' && (
-          <>
-            <span className="text-sm text-slate-600">
-              {filtreReglement === 'Versement' ? 'Quelle banque ?' : 'Quel site ?'}
+          <button
+            onClick={() => setChoixOuvert(filtreReglement)}
+            className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:border-slate-400"
+          >
+            {filtreReglement === 'Virement' ? 'Banque' : 'Site'} :{' '}
+            <span className="font-semibold">
+              {secondeActive || `Tout (${etapes.secondes.length})`}
             </span>
-            <select
-              value={secondeActive}
-              onChange={(e) => choisirSeconde(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium"
-            >
-              <option value="">
-                {filtreReglement === 'Versement' ? 'Toutes les banques' : 'Tous les sites'}
-                {' '}({etapes.secondes.length})
-              </option>
-              {etapes.secondes.map((x) => (
-                <option key={x.nom} value={x.nom}>
-                  {x.nom} — {x.n} · {formatDH(x.total)}
-                </option>
-              ))}
-            </select>
-          </>
+            <span className="ml-2 text-slate-400">changer</span>
+          </button>
         )}
 
         {!filtreReglement && valeurs.principaux.length > 0 && (
@@ -790,16 +793,31 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           virements={(lignes ?? []).filter((l) => estVirement(l.mode_reglement))}
           companyId={companyId!}
           ribSociete={company?.rib_ordinateur ?? null}
-          siteInitial={filtreSite || undefined}
           onImprimer={(o, rib) => { setOrdres({ ordres: o, rib }); setChoixVirement(false) }}
           onClose={() => setChoixVirement(false)}
+        />
+      )}
+
+      {choixOuvert && (
+        <ChoixDansLaPaie
+          titre={choixOuvert === 'Virement' ? 'Virements' : 'Versements'}
+          question={
+            choixOuvert === 'Virement'
+              ? 'Quelle banque voulez-vous voir ?'
+              : 'Quel site voulez-vous voir ?'
+          }
+          options={etapes.secondes}
+          choisi={secondeActive}
+          totalGeneral={etapes.totalDuMode}
+          nGeneral={etapes.nDuMode}
+          onChoisir={choisirSeconde}
+          onClose={() => setChoixOuvert(null)}
         />
       )}
 
       {choixVersement && (
         <ChoixListeVersements
           versements={(lignes ?? []).filter((l) => (l.mode_reglement ?? '').toLowerCase().startsWith('vers'))}
-          banqueInitiale={filtreBanque || undefined}
           onImprimer={(g) => { setVersements(g); setChoixVersement(false) }}
           onClose={() => setChoixVersement(false)}
         />

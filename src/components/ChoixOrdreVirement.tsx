@@ -18,7 +18,6 @@ export default function ChoixOrdreVirement({
   virements,
   companyId,
   ribSociete,
-  siteInitial,
   onImprimer,
   onClose,
 }: {
@@ -27,8 +26,6 @@ export default function ChoixOrdreVirement({
   companyId: string
   /** Le R.I.B. enregistré sur la société : quand il est là, rien à taper. */
   ribSociete: string | null
-  /** Le site déjà choisi dans le parcours de la paie, s'il y en a un. */
-  siteInitial?: string
   onImprimer: (ordres: OrdreDeSite[], ribOrdinateur: string) => void
   onClose: () => void
 }) {
@@ -55,11 +52,7 @@ export default function ChoixOrdreVirement({
       sansRib: lignes.filter((l) => !l.rib).length,
     }))
 
-  const [choisi, setChoisi] = useState<string>(
-    siteInitial && sites.some((s) => s.site === siteInitial)
-      ? siteInitial
-      : sites.length === 1 ? sites[0].site : '',
-  )
+  const [choisi, setChoisi] = useState<string>(sites.length === 1 ? sites[0].site : '')
 
   const lancer = () => {
     try { localStorage.setItem(cleRib(companyId), ribPropre) } catch { /* navigateur sans stockage */ }
