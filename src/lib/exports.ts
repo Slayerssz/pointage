@@ -4,11 +4,10 @@
  *  elles ne pèsent sur l'application que lorsqu'on clique sur « Exporter ».
  */
 
-import type { Row, SheetData } from 'write-excel-file/browser'
+import type { SheetData } from 'write-excel-file/browser'
 import { MOIS_FR, estVirement, formatNombre } from './paie'
 import { formatDateFr } from './dates'
-import type { BulletinSite, Employee, LignePaie, TotauxPeriode } from './types'
-import { gardeSymbole } from './gardes'
+import type { Employee, LignePaie, TotauxPeriode } from './types'
 
 /** Nom de fichier lisible : « Paie_Groupe-Triple-A_Janvier-2026.xlsx ». */
 function nomFichier(entreprise: string, annee: number, mois: number, ext: string): string {
@@ -326,100 +325,7 @@ export async function exporterPaiePdf(opts: {
   doc.save(nomFichier(entreprise, annee, mois, 'pdf'))
 }
 
-// ------------------------------------------- Bulletin journalier (PDF) -----
 
-export async function exporterBulletinPdf(opts: {
-  entreprise: string
-  date: string
-  sites: BulletinSite[]
-}) {
-  const [{ jsPDF }, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
-  const autoTable = autoTableMod.default
-  const { entreprise, date, sites } = opts
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const largeur = doc.internal.pageSize.getWidth()
-  const dateFr = date.split('-').reverse().join('/')
-
-  sites.forEach((site, i) => {
-    if (i > 0) doc.addPage()
-    doc.setFontSize(14).setFont('helvetica', 'bold')
-    doc.text(entreprise.toUpperCase(), largeur / 2, 16, { align: 'center' })
-    doc.setFontSize(12)
-    doc.text(`BULLETIN DE PRÉSENCE — ${site.site}`, largeur / 2, 23, { align: 'center' })
-    doc.setFontSize(10).setFont('helvetica', 'normal')
-    doc.text(dateFr, largeur / 2, 29, { align: 'center' })
-
-    autoTable(doc, {
-      startY: 34,
-      head: [['N°', 'Matricule', 'Nom & Prénom', 'Qualification', 'CIN', 'Garde', 'Heure']],
-      body: site.employes.map((e, n) => [
-        String(n + 1),
-        e.matricule ?? '',
-        e.nom_prenom,
-        e.qualification ?? '',
-        e.cin ?? '',
-        gardeSymbole(e.type_garde),
-        e.heure ?? '—',
-      ]),
-      styles: { fontSize: 9, cellPadding: 1.8 },
-      headStyles: { fillColor: [6, 95, 70], textColor: 255 },
-      columnStyles: {
-        0: { halign: 'right', cellWidth: 10 },
-        1: { halign: 'right', cellWidth: 20 },
-        5: { halign: 'center', cellWidth: 16 },
-        6: { halign: 'center', cellWidth: 18 },
-      },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-    })
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const y = (doc as any).lastAutoTable.finalY + 12
-    doc.setFontSize(9)
-    doc.text(`Total présents : ${site.employes.length}`, 14, y)
-    doc.text('Visa du responsable :', largeur - 14, y, { align: 'right' })
-    doc.line(largeur - 70, y + 14, largeur - 14, y + 14)
-  })
-
-  doc.save(`Bulletin_${slug(entreprise)}_${date}.pdf`)
-}
-
-/** Le bulletin journalier au format Excel (une feuille, tous les sites). */
-export async function exporterBulletinExcel(opts: {
-  entreprise: string
-  date: string
-  sites: BulletinSite[]
-}) {
-  const { default: writeXlsxFile } = await import('write-excel-file/browser')
-  const { entreprise, date, sites } = opts
-
-  const rows: SheetData = []
-  rows.push([{ value: `BULLETIN DE PRÉSENCE — ${entreprise}`, fontWeight: 'bold', fontSize: 14, columnSpan: 6 }])
-  rows.push([{ value: date.split('-').reverse().join('/'), fontSize: 11, columnSpan: 6 }])
-
-  for (const site of sites) {
-    rows.push([])
-    rows.push([{ value: site.site, fontWeight: 'bold', backgroundColor: '#F1F5F9', columnSpan: 6 }])
-    rows.push(['Matricule', 'Nom & Prénom', 'Qualification', 'CIN', 'Garde', 'Heure']
-      .map((c): Row[number] => ({ value: c, ...ENTETE })))
-    for (const e of site.employes) {
-      rows.push([
-        { type: Number, value: e.matricule ?? undefined },
-        { type: String, value: e.nom_prenom },
-        { type: String, value: e.qualification ?? undefined },
-        { type: String, value: e.cin ?? undefined },
-        { type: String, value: gardeSymbole(e.type_garde) },
-        { type: String, value: e.heure ?? undefined },
-      ])
-    }
-    rows.push([{ type: String, value: `Total : ${site.employes.length}`, fontWeight: 'bold' }])
-  }
-
-  await writeXlsxFile(rows, {
-    columns: [{ width: 12 }, { width: 32 }, { width: 22 }, { width: 14 }, { width: 10 }, { width: 10 }],
-    sheet: 'Présences',
-  }).toFile(`Bulletin_${slug(entreprise)}_${date}.xlsx`)
-}
 
 export { estVirement }
 

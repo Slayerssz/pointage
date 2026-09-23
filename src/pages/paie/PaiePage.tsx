@@ -19,7 +19,7 @@ import {
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
-import ListeVersementsPrint, { type VersementsDeBanque } from '../../components/ListeVersementsPrint'
+import ListeVersementsPrint from '../../components/ListeVersementsPrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useModeleSociete } from '../../lib/modeleSociete'
@@ -350,7 +350,8 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   // lit et s'imprime seul — l'espèce se compte en caisse, le virement
   // part à la banque, ce ne sont pas les mêmes gens qui les traitent.
   const [ordres, setOrdres] = useState<OrdreDeSite[] | null>(null)
-  const [versements, setVersements] = useState<VersementsDeBanque[] | null>(null)
+  // Ce qui part à l'impression : les lignes affichées, et le site choisi.
+  const [versements, setVersements] = useState<{ lignes: LignePaie[]; precision: string | null } | null>(null)
 
   /**
    * Ce qu'on imprime est ce qu'on a sous les yeux : la sélection courante.
@@ -736,12 +737,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                     <span className="flex items-center gap-1.5">
                       {g.mode === 'Versement' && (
                         <button
-                          onClick={() =>
-                            setVersements(aImprimer(
-                              g.liste, (l) => l.site_nom?.trim() || '(sans site)',
-                              filtreSite, 'TOUS LES VERSEMENTS',
-                            ))
-                          }
+                          onClick={() => setVersements({ lignes: g.liste, precision: filtreSite || null })}
                           className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
                           title="La liste de ce qui est affiché — un site par liste si aucun n’est choisi"
                         >
@@ -796,7 +792,8 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
       {versements && (
         <ListeVersementsPrint
-          groupes={versements}
+          lignes={versements.lignes}
+          precision={versements.precision}
           entreprise={company?.name ?? ''}
           modeleDocument={cleModele}
           annee={periode.annee}

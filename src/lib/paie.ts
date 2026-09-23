@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import type {
-  BulletinSite,
   Conge,
   Contrat,
   ContratCourant,
@@ -316,17 +315,3 @@ export function useDettesOuvertes(companyId: string | undefined) {
 
 // --- Bulletin journalier ------------------------------------------------------
 
-export function useBulletinJournalier(companyId: string | undefined, date: string) {
-  return useQuery({
-    queryKey: ['bulletin-journalier', companyId, date],
-    enabled: Boolean(companyId),
-    queryFn: async (): Promise<BulletinSite[]> => {
-      const { data, error } = await supabase.rpc('bulletin_journalier', {
-        p_company: companyId!,
-        p_date: date,
-      })
-      if (error) throw error
-      return (data ?? []) as BulletinSite[]
-    },
-  })
-}

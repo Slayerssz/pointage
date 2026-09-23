@@ -276,18 +276,3 @@ export interface TotauxPeriode {
   par_banque: { banque: string; n: number; montant: number }[]
 }
 
-/** Une entrée du bulletin journalier : un site et les employés qui y ont travaillé. */
-export interface BulletinSite {
-  site_id: string
-  site: string
-  employes: {
-    employee_id: string
-    matricule: number | null
-    nom_prenom: string
-    qualification: string | null
-    cin: string | null
-    type_garde: string | null
-    heure: string | null
-    photo: boolean
-  }[]
-}
