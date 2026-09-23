@@ -12,15 +12,17 @@ import type { LignePaie } from '../lib/types'
  * tête, « Liste des Versements », la période, puis MAT / Nom & Prénom /
  * Site / RIB / Salaire, avec un total par banque.
  *
- * Une banque par page : la liste d'Al Barid ne part pas au guichet de
- * la Banque Populaire. Chaque banque a ses propres pages et son propre
- * total ; au-delà d'une page, la suite reprend l'en-tête et numérote.
+ * Ce qui est imprimé est ce que la paie affiche : le site choisi, ou une
+ * liste par site quand on n'en a choisi aucun. Chaque liste a ses pages
+ * et son total ; au-delà d'une page, la suite reprend l'en-tête et
+ * numérote.
  */
 
 const LIGNES_PAR_PAGE = 34
 
 export interface VersementsDeBanque {
-  banque: string
+  /** Ce qui identifie la liste : le site, ou « TOUS LES VERSEMENTS ». */
+  intitule: string
   lignes: LignePaie[]
 }
 
@@ -50,8 +52,8 @@ export default function ListeVersementsPrint({
 
   const titre =
     groupes.length === 1
-      ? `Liste des versements — ${groupes[0].banque}`
-      : `Listes des versements — ${groupes.length} banques`
+      ? `Liste des versements — ${groupes[0].intitule}`
+      : `Listes des versements — ${groupes.length} sites`
 
   const B = '1px solid #000'
   const cell: React.CSSProperties = { border: B, padding: '1.2mm 1.8mm', fontSize: '9pt' }
@@ -65,7 +67,7 @@ export default function ListeVersementsPrint({
           imprimer={imprimer}
           nomFichier={
             groupes.length === 1
-              ? `Versements_${groupes[0].banque.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
+              ? `Versements_${groupes[0].intitule.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
               : `Versements_${MOIS_FR[mois - 1]}_${annee}`
           }
           onClose={onClose}
@@ -84,7 +86,7 @@ export default function ListeVersementsPrint({
               const derniere = p === pages.length - 1
               return (
                 <article
-                  key={`${g.banque}-${p}`}
+                  key={`${g.intitule}-${p}`}
                   className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
                   style={{
                     width: '210mm', minHeight: '297mm', padding: '12mm 14mm',
@@ -116,10 +118,10 @@ export default function ListeVersementsPrint({
                         <th style={{ ...cell, width: '26%', textAlign: 'center', fontWeight: 400 }}>RIB</th>
                         <th style={{ ...cell, textAlign: 'center', fontWeight: 400 }}>Salaire</th>
                       </tr>
-                      {/* La banque, en titre du groupe */}
+                      {/* Le site, en titre de la liste */}
                       <tr>
                         <td colSpan={5} style={{ padding: '2.5mm 1mm 1mm', fontWeight: 700, fontSize: '11pt', textTransform: 'uppercase' }}>
-                          {g.banque}
+                          {g.intitule}
                         </td>
                       </tr>
                     </thead>
@@ -143,7 +145,7 @@ export default function ListeVersementsPrint({
                         <tr>
                           <td style={{ padding: '2mm 1mm', fontWeight: 700, fontSize: '10pt' }}>Total</td>
                           <td colSpan={3} style={{ padding: '2mm 1mm', fontWeight: 700, fontSize: '10pt', textTransform: 'uppercase' }}>
-                            {g.banque}
+                            {g.intitule}
                           </td>
                           <td style={{ padding: '2mm 1.8mm', fontWeight: 700, fontSize: '10pt', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             {n2(total)}

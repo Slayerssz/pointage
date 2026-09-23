@@ -17,9 +17,7 @@ import {
   useTotauxPeriode,
 } from '../../lib/paie'
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
-import ChoixOrdreVirement from '../../components/ChoixOrdreVirement'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
-import ChoixListeVersements from '../../components/ChoixListeVersements'
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
 import ListeVersementsPrint, { type VersementsDeBanque } from '../../components/ListeVersementsPrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
@@ -356,10 +354,28 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   // ensemble, les versements ensemble, les espèces ensemble. Chacun se
   // lit et s'imprime seul — l'espèce se compte en caisse, le virement
   // part à la banque, ce ne sont pas les mêmes gens qui les traitent.
-  const [choixVirement, setChoixVirement] = useState(false)
-  const [ordres, setOrdres] = useState<{ ordres: OrdreDeSite[]; rib: string } | null>(null)
-  const [choixVersement, setChoixVersement] = useState(false)
+  const [ordres, setOrdres] = useState<OrdreDeSite[] | null>(null)
   const [versements, setVersements] = useState<VersementsDeBanque[] | null>(null)
+
+  /**
+   * Ce qu'on imprime est ce qu'on a sous les yeux : la sélection courante.
+   * Sans second choix, le tout se scinde par groupe — une feuille par
+   * banque pour les virements, une liste par site pour les versements.
+   */
+  const aImprimer = (
+    lignes: LignePaie[],
+    cle: (l: LignePaie) => string,
+    choix: string,
+    toutLabel: string,
+  ): { intitule: string; lignes: LignePaie[] }[] => {
+    if (choix) return [{ intitule: choix, lignes }]
+    const par = new Map<string, LignePaie[]>()
+    for (const l of lignes) par.set(cle(l), [...(par.get(cle(l)) ?? []), l])
+    if (par.size <= 1) return [{ intitule: [...par.keys()][0] ?? toutLabel, lignes }]
+    return [...par.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+      .map(([intitule, l]) => ({ intitule, lignes: l }))
+  }
   // La clé de modèle prime sur le nom : une société renommée garde son siège.
   const { data: cleModele } = useModeleSociete(companyId)
 
@@ -734,18 +750,23 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                     <span className="flex items-center gap-1.5">
                       {g.mode === 'Versement' && (
                         <button
-                          onClick={() => setChoixVersement(true)}
+                          onClick={() =>
+                            setVersements(aImprimer(
+                              g.liste, (l) => l.site_nom?.trim() || '(sans site)',
+                              filtreSite, 'TOUS LES VERSEMENTS',
+                            ))
+                          }
                           className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
-                          title="La liste pour chaque banque"
+                          title="La liste de ce qui est affiché — un site par liste si aucun n’est choisi"
                         >
                           Liste des versements
                         </button>
                       )}
                       {g.mode === 'Virement' && (
                         <button
-                          onClick={() => setChoixVirement(true)}
+                          onClick={() => setOrdres(aImprimer(g.liste, banqueDe, filtreBanque, 'TOUS LES VIREMENTS'))}
                           className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
-                          title="Le formulaire pour la banque, un par site"
+                          title="Le formulaire pour la banque — une feuille par banque si aucune n’est choisie"
                         >
                           Ordre de virement
                         </button>
@@ -788,13 +809,14 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         </table>
       </div>
 
-      {choixVirement && (
-        <ChoixOrdreVirement
-          virements={(lignes ?? []).filter((l) => estVirement(l.mode_reglement))}
-          companyId={companyId!}
-          ribSociete={company?.rib_ordinateur ?? null}
-          onImprimer={(o, rib) => { setOrdres({ ordres: o, rib }); setChoixVirement(false) }}
-          onClose={() => setChoixVirement(false)}
+      {versements && (
+        <ListeVersementsPrint
+          groupes={versements}
+          entreprise={company?.name ?? ''}
+          modeleDocument={cleModele}
+          annee={periode.annee}
+          mois={periode.mois}
+          onClose={() => setVersements(null)}
         />
       )}
 
@@ -815,30 +837,11 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         />
       )}
 
-      {choixVersement && (
-        <ChoixListeVersements
-          versements={(lignes ?? []).filter((l) => (l.mode_reglement ?? '').toLowerCase().startsWith('vers'))}
-          onImprimer={(g) => { setVersements(g); setChoixVersement(false) }}
-          onClose={() => setChoixVersement(false)}
-        />
-      )}
-
-      {versements && (
-        <ListeVersementsPrint
-          groupes={versements}
-          entreprise={company?.name ?? ''}
-          modeleDocument={cleModele}
-          annee={periode.annee}
-          mois={periode.mois}
-          onClose={() => setVersements(null)}
-        />
-      )}
-
       {ordres && (
         <OrdreVirementPrint
-          ordres={ordres.ordres}
+          ordres={ordres}
           entreprise={company?.name ?? ''}
-          ribOrdinateur={ordres.rib || null}
+          ribOrdinateur={company?.rib_ordinateur ?? null}
           annee={periode.annee}
           mois={periode.mois}
           onClose={() => setOrdres(null)}

@@ -12,21 +12,24 @@ import type { LignePaie } from '../lib/types'
  * libellé), le tableau des bénéficiaires, puis le cadre des signatures.
  * Pas de logo, pas d'en-tête : la banque veut le formulaire, rien d'autre.
  *
- * Un ordre par site : chaque site reçoit ses pages, avec son propre
- * total. Au-delà de dix-huit bénéficiaires, le tableau continue sur une
- * page suivante qui reprend le cartouche — les totaux, eux, restent ceux
- * de l'ordre entier, et les signatures ferment la dernière page.
+ * Ce qui est imprimé est ce que la paie affiche : la banque choisie, ou
+ * une feuille par banque quand on n'en a choisi aucune. Chaque feuille a
+ * son propre total. Au-delà de dix-huit bénéficiaires, le tableau
+ * continue sur une page qui reprend le cartouche, et les signatures
+ * ferment la dernière.
  */
 
 const LIGNES_PAR_PAGE = 18
 
 export interface OrdreDeSite {
-  site: string
+  /** Ce qui identifie la feuille : la banque, ou « TOUS LES VIREMENTS ». */
+  intitule: string
   lignes: LignePaie[]
 }
 
 export default function OrdreVirementPrint({
   ordres,
+  libelleIntitule = 'BANQUE',
   entreprise,
   ribOrdinateur,
   annee,
@@ -35,6 +38,8 @@ export default function OrdreVirementPrint({
   onClose,
 }: {
   ordres: OrdreDeSite[]
+  /** L'intitulé de la ligne du cartouche : BANQUE, SITE… */
+  libelleIntitule?: string
   entreprise: string
   ribOrdinateur: string | null
   annee: number
@@ -55,8 +60,8 @@ export default function OrdreVirementPrint({
 
   const titre =
     ordres.length === 1
-      ? `Ordre de virement — ${ordres[0].site}`
-      : `Ordres de virement — ${ordres.length} sites`
+      ? `Ordre de virement — ${ordres[0].intitule}`
+      : `Ordres de virement — ${ordres.length} banques`
 
   // Bordures épaisses du modèle : un trait franc, noir, partout.
   const B = '1.4px solid #000'
@@ -72,7 +77,7 @@ export default function OrdreVirementPrint({
           imprimer={imprimer}
           nomFichier={
             ordres.length === 1
-              ? `Ordre_virement_${ordres[0].site.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
+              ? `Ordre_virement_${ordres[0].intitule.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
               : `Ordres_virement_${MOIS_FR[mois - 1]}_${annee}`
           }
           onClose={onClose}
@@ -95,7 +100,7 @@ export default function OrdreVirementPrint({
 
               return (
                 <article
-                  key={`${o.site}-${p}`}
+                  key={`${o.intitule}-${p}`}
                   className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
                   style={{
                     width: '210mm', minHeight: '297mm', padding: '14mm 16mm',
@@ -120,8 +125,8 @@ export default function OrdreVirementPrint({
                         </td>
                       </tr>
                       <tr>
-                        <td style={gras}>SITE</td>
-                        <td style={{ ...cell, fontWeight: 700 }}>{o.site.toUpperCase()}</td>
+                        <td style={gras}>{libelleIntitule}</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>{o.intitule.toUpperCase()}</td>
                       </tr>
                       <tr>
                         <td style={gras}>NOMBRE TOTAL D'OPERATIONS</td>
@@ -169,7 +174,7 @@ export default function OrdreVirementPrint({
 
                   {pages.length > 1 && (
                     <p style={{ fontSize: '8pt', textAlign: 'right', marginTop: '1.5mm' }}>
-                      {o.site} — page {p + 1} / {pages.length}
+                      {o.intitule} — page {p + 1} / {pages.length}
                       {!derniere && ' — suite au verso ou page suivante'}
                     </p>
                   )}
