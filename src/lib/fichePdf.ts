@@ -181,7 +181,7 @@ export async function genererFichePdf(opts: {
 
     // ── Pièces administratives ────────────────────────────────────────
     y += 6
-    const sousTitre = 'PIÈCES ADMINISTRATIVES À FOURNIR'
+    const sousTitre = 'PIÈCES ADMINISTRATIVES'
     doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...accent)
     doc.text(sousTitre, P.l / 2, y, { align: 'center' })
     const lSous = doc.getTextWidth(sousTitre)

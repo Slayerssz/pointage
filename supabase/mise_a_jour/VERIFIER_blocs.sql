@@ -90,7 +90,13 @@ with attendu (numero, bloc, objet, present) as (
                 where table_name = 'lignes_paie' and column_name = 'frais_transport')),
   (31, 'R.I.B. de la société',       'colonne companies.rib_ordinateur',
        exists (select 1 from information_schema.columns
-                where table_name = 'companies' and column_name = 'rib_ordinateur'))
+                where table_name = 'companies' and column_name = 'rib_ordinateur')),
+  (32, 'État validation demandée',  'valeur validation_demandee',
+       exists (select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+                where t.typname = 'periode_statut' and e.enumlabel = 'validation_demandee')),
+  (33, 'Paie toujours ouverte',      'fonction periode_du_mois()',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'periode_du_mois'))
 )
 select numero,
        bloc,

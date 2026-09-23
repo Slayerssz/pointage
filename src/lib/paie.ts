@@ -33,10 +33,45 @@ export function formatNombre(n: number | null | undefined, max = 2): string {
 }
 
 export const STATUT_PERIODE: Record<PeriodeStatut, { label: string; tone: 'slate' | 'amber' | 'green' | 'blue' | 'red' }> = {
-  ouvert: { label: 'Ouvert — pointage en cours', tone: 'slate' },
+  ouvert: { label: 'Ouvert — se met à jour avec le pointage', tone: 'slate' },
   pointage_valide: { label: 'Pointage validé — paie à préparer', tone: 'blue' },
+  validation_demandee: { label: 'Validation demandée — attend l’administrateur', tone: 'amber' },
   paie_validee: { label: 'Paie validée — verrouillée', tone: 'green' },
   reouverture_demandee: { label: 'Réouverture demandée', tone: 'amber' },
+}
+
+/**
+ * La paie d'un mois : celle qui existe, ou une nouvelle, ouverte. Elle est
+ * recalculée d'après le pointage à chaque fois qu'on l'ouvre — tant qu'elle
+ * n'est pas verrouillée. Ce que la paie a saisi n'est jamais écrasé.
+ */
+export function usePeriodeDuMois(
+  companyId: string | undefined,
+  annee: number,
+  mois: number,
+) {
+  return useQuery({
+    queryKey: ['periode-du-mois', companyId, annee, mois],
+    enabled: Boolean(companyId),
+    // Toujours relue : c'est ce qui la garde à jour avec le pointage.
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    queryFn: async (): Promise<PeriodePaie | null> => {
+      const { data, error } = await supabase.rpc('periode_du_mois', {
+        p_company: companyId, p_annee: annee, p_mois: mois,
+      })
+      if (error) {
+        // « Ce mois n'a pas encore commencé » n'est pas une panne.
+        if (/pas encore commencé/i.test(error.message)) return null
+        throw error
+      }
+      const { data: p, error: e2 } = await supabase
+        .from('periodes_paie').select('*').eq('id', data as string).single()
+      if (e2) throw e2
+      return p as PeriodePaie
+    },
+  })
 }
 
 /** Le mode de règlement est-il un virement bancaire ? */

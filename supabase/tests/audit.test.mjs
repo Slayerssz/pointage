@@ -912,6 +912,90 @@ ok('les indemnités ne sont plus sur la fiche employé',
                  where table_name = 'employees'
                    and column_name in ('frais_transport','frais_panier')`)).length === 0)
 
+// ═══════════════════ LA PAIE DU MOIS EST-ELLE TOUJOURS LÀ ? ════════════════
+// Règle voulue : le mois en cours a sa paie, ouverte et recalculée ; la
+// clôture demande deux mains — le bureau demande, l'administrateur accepte.
+
+section('La paie toujours ouverte')
+
+const moisEnCours = (await q1(
+  `select date_part('year', (now() at time zone 'Africa/Casablanca'))::int a,
+          date_part('month', (now() at time zone 'Africa/Casablanca'))::int m`))
+const AN = Number(moisEnCours.a), MS = Number(moisEnCours.m)
+
+await connecte(bureau)
+const pOuverte = (await q1(`select public.periode_du_mois($1,$2,$3) as id`, [co, AN, MS])).id
+ok('le mois en cours a sa paie', Boolean(pOuverte))
+ok('… et elle est ouverte',
+   (await q1(`select statut from public.periodes_paie where id=$1`, [pOuverte])).statut === 'ouvert')
+
+// Rappeler la fonction ne crée pas un second mois.
+const encore = (await q1(`select public.periode_du_mois($1,$2,$3) as id`, [co, AN, MS])).id
+ok('rappeler la fonction rend la même paie', encore === pOuverte)
+
+// Un mois qui n'a pas commencé n'a pas de paie.
+await refuse('un mois à venir n’a pas de paie',
+  `select public.periode_du_mois($1, 2030, 1)`, [co], /pas encore commencé/i)
+
+// Le pointage reste possible tant que le mois est ouvert.
+const ePaie = await employe('PAIE OUVERTE', { cin: 'PO1', cnss: '930000001' })
+const hier = (await q1(
+  `select ((now() at time zone 'Africa/Casablanca')::date - 1)::text d`)).d
+ok('on pointe encore sur un mois ouvert',
+   await reussit(`select public.marquer_present($1,$2::date,'X')`, [ePaie, hier]))
+
+// Et la paie s'en aperçoit sans qu'on lui demande rien d'autre.
+await q1(`select public.periode_du_mois($1,$2,$3)`, [co, AN, MS])
+const gardes = async () => num((await q1(
+  `select coalesce(gardes_travaillees,0) g from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [pOuverte, ePaie]))?.g ?? -1)
+ok('la journée pointée apparaît dans la paie', (await gardes()) === 1, String(await gardes()))
+
+// Tant que le mois n'est pas fini, on ne demande pas la validation.
+await refuse('pas de validation avant la fin du mois',
+  `select public.demander_validation_paie($1)`, [pOuverte], /pas terminé/i)
+
+// Un mois révolu, lui, peut être proposé. Août 2026 fera l'affaire.
+const pAout = (await q1(`select public.periode_du_mois($1, 2026, 8) as id`, [co])).id
+await q1(`select public.demander_validation_paie($1)`, [pAout])
+const statutDe = async (id) => (await q1(`select statut from public.periodes_paie where id=$1`, [id])).statut
+ok('le bureau demande la validation', (await statutDe(pAout)) === 'validation_demandee')
+
+// Demandé, le mois se fige : plus de pointage dessus.
+await refuse('le pointage se ferme pendant la demande',
+  `select public.marquer_present($1,'2026-08-12'::date,'X')`, [ePaie], /clôturé/i)
+
+// Le bureau n'accepte pas sa propre demande.
+await refuse('le bureau n’accepte pas sa propre demande',
+  `select public.repondre_validation_paie($1, true)`, [pAout], /réservé|autoris|administrateur|Seul l/i)
+
+// L'administrateur refuse : le mois se rouvre.
+await connecte(admin)
+await q1(`select public.repondre_validation_paie($1, false)`, [pAout])
+ok('l’administrateur refuse et le mois se rouvre', (await statutDe(pAout)) === 'ouvert')
+await connecte(bureau)
+ok('… et le pointage y redevient possible',
+   await reussit(`select public.marquer_present($1,'2026-08-12'::date,'X')`, [ePaie]))
+
+// Puis il accepte : le mois est validé, et verrouillé.
+await q1(`select public.demander_validation_paie($1)`, [pAout])
+await connecte(admin)
+await q1(`select public.repondre_validation_paie($1, true)`, [pAout])
+ok('l’administrateur accepte et la paie est validée', (await statutDe(pAout)) === 'paie_validee')
+
+await connecte(bureau)
+await refuse('un mois validé ne se pointe plus',
+  `select public.marquer_present($1,'2026-08-13'::date,'X')`, [ePaie], /clôturé/i)
+// Et il ne se recalcule plus : ce qu'on imprime est ce qui a été validé.
+const avantRelecture = num((await q1(
+  `select count(*) n from public.lignes_paie where periode_id=$1`, [pAout])).n)
+await q1(`select public.periode_du_mois($1, 2026, 8)`, [co])
+ok('un mois validé ne se recalcule pas à la relecture',
+   num((await q1(`select count(*) n from public.lignes_paie where periode_id=$1`, [pAout])).n)
+     === avantRelecture)
+await refuse('et on ne le redemande pas',
+  `select public.demander_validation_paie($1)`, [pAout], /déjà validée/i)
+
 section('La photo suit-elle la fiche ?')
 
 const listeUnique = (await db.query(

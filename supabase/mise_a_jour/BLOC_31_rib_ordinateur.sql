@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 31 sur 31 — Le R.I.B. de la société
+--  BLOC 31 sur 33 — Le R.I.B. de la société
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 30.
 --  (Déjà lancé le 15 septembre 2026 ; relancer ne change rien.)

@@ -203,6 +203,8 @@ export interface Conge {
 export type PeriodeStatut =
   | 'ouvert'
   | 'pointage_valide'
+  /** Le bureau a demandé la clôture ; elle attend l'administrateur. */
+  | 'validation_demandee'
   | 'paie_validee'
   | 'reouverture_demandee'
 

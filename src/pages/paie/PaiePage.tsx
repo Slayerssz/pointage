@@ -13,6 +13,7 @@ import {
   useDettesOuvertes,
   useLignesPaie,
   usePeriodes,
+  usePeriodeDuMois,
   useTotauxPeriode,
 } from '../../lib/paie'
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
@@ -29,59 +30,80 @@ import { useModeleSociete } from '../../lib/modeleSociete'
 
 export default function PaiePage() {
   const { companyId } = useParams()
-  const { data: periodes, isLoading, error } = usePeriodes(companyId)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Le mois en cours par défaut : sa paie existe toujours et se met à jour
+  // avec le pointage. On circule d'un mois à l'autre, jamais vers l'avenir.
+  const maintenant = new Date()
+  const [annee, setAnnee] = useState(maintenant.getFullYear())
+  const [mois, setMois] = useState(maintenant.getMonth() + 1)
+  const { data: periode, isLoading, error, isFetching } = usePeriodeDuMois(companyId, annee, mois)
+  const { data: periodes } = usePeriodes(companyId)
 
-  // Sélectionner automatiquement la période la plus récente
-  useEffect(() => {
-    if (!selectedId && periodes?.length) setSelectedId(periodes[0].id)
-  }, [periodes, selectedId])
-
-  const periode = periodes?.find((p) => p.id === selectedId) ?? null
+  const decaler = (pas: number) => {
+    const d = new Date(annee, mois - 1 + pas, 1)
+    setAnnee(d.getFullYear())
+    setMois(d.getMonth() + 1)
+  }
+  const estMoisCourant =
+    annee === maintenant.getFullYear() && mois === maintenant.getMonth() + 1
+  const statutDuMois = (a: number, m: number) =>
+    periodes?.find((p) => p.annee === a && p.mois === m) ?? null
 
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-5">
         <h1 className="mb-1 text-xl font-semibold text-slate-900">La Paie</h1>
         <p className="text-sm text-slate-500">
-          Chaque mois validé par le bureau arrive ici : salaires calculés automatiquement à partir
-          du pointage, retenues, puis validation et export.
+          La paie du mois est toujours là et suit le pointage au jour le jour. À la fin du mois,
+          le bureau demande la validation ; l’administrateur l’accepte et le mois se verrouille.
         </p>
       </div>
 
-      {isLoading && <Spinner label="Chargement des périodes…" />}
+      {/* Le mois, au-dessus de tout le reste */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => decaler(-1)}
+          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          title="Mois précédent"
+        >
+          ←
+        </button>
+        <span className="min-w-44 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-center text-sm font-semibold text-slate-900">
+          {moisLabel(annee, mois)}
+          {(() => {
+            const p = statutDuMois(annee, mois)
+            return p ? (
+              <span className="ml-2 inline-block h-2 w-2 rounded-full align-middle"
+                    style={{ backgroundColor: couleurStatut(p) }} />
+            ) : null
+          })()}
+        </span>
+        <button
+          onClick={() => decaler(1)}
+          disabled={estMoisCourant}
+          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          title={estMoisCourant ? 'Le mois en cours est le dernier' : 'Mois suivant'}
+        >
+          →
+        </button>
+        {!estMoisCourant && (
+          <button
+            onClick={() => { setAnnee(maintenant.getFullYear()); setMois(maintenant.getMonth() + 1) }}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Mois en cours
+          </button>
+        )}
+        {isFetching && <span className="text-xs text-slate-400">mise à jour…</span>}
+      </div>
+
+      {isLoading && <Spinner label="Ouverture de la paie du mois…" />}
       {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
 
-      {periodes && periodes.length === 0 && (
-        <EmptyState>
-          Aucun mois n’a encore été clôturé. Le bureau doit d’abord valider le pointage d’un mois
-          depuis l’onglet Pointage.
-        </EmptyState>
+      {!isLoading && !error && !periode && (
+        <EmptyState>Ce mois n’a pas encore commencé.</EmptyState>
       )}
 
-      {periodes && periodes.length > 0 && (
-        <>
-          <div className="mb-5 flex flex-wrap gap-2">
-            {periodes.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
-                className={`rounded-xl border px-3.5 py-2 text-sm font-medium transition ${
-                  p.id === selectedId
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                }`}
-              >
-                {moisLabel(p.annee, p.mois)}
-                <span className="ml-2 inline-block h-2 w-2 rounded-full align-middle"
-                      style={{ backgroundColor: couleurStatut(p) }} />
-              </button>
-            ))}
-          </div>
-
-          {periode && <PeriodeDetail key={periode.id} periode={periode} companyId={companyId} />}
-        </>
-      )}
+      {periode && <PeriodeDetail key={periode.id} periode={periode} companyId={companyId} />}
     </div>
   )
 }
@@ -144,6 +166,14 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   const estAdmin = profile?.role === 'admin'
   const verrouille = periode.statut === 'paie_validee'
   const enDemande = periode.statut === 'reouverture_demandee'
+  const attendAdmin = periode.statut === 'validation_demandee'
+  // Rien ne se saisit tant que l'administrateur n'a pas répondu.
+  const modifiable = estPaie && !verrouille && !enDemande && !attendAdmin
+  // La validation ne s'ouvre qu'une fois le mois terminé.
+  const dernierJour = new Date(periode.annee, periode.mois, 0)
+  const moisTermine = new Date() >= new Date(
+    dernierJour.getFullYear(), dernierJour.getMonth(), dernierJour.getDate(), 0, 0, 0,
+  )
 
   const recalculer = useMutation({
     mutationFn: async () => {
@@ -153,14 +183,32 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     onSuccess: invalider,
   })
 
-  const validerPaie = useMutation({
+  const demanderValidation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('valider_paie', { p_periode: periode.id })
+      const { error } = await supabase.rpc('demander_validation_paie', { p_periode: periode.id })
       if (error) throw error
     },
-    onSuccess: () => {
+    onSuccess: invalider,
+  })
+
+  const annulerDemande = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('annuler_demande_validation', { p_periode: periode.id })
+      if (error) throw error
+    },
+    onSuccess: invalider,
+  })
+
+  const repondreValidation = useMutation({
+    mutationFn: async (accepter: boolean) => {
+      const { error } = await supabase.rpc('repondre_validation_paie', {
+        p_periode: periode.id, p_accepter: accepter,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_d, accepter) => {
       invalider()
-      setVientDeValider(true)
+      if (accepter) setVientDeValider(true)
     },
   })
 
@@ -357,7 +405,8 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
   const statut = STATUT_PERIODE[periode.statut]
   const erreur =
-    recalculer.error ?? validerPaie.error ?? demanderReouverture.error ?? repondre.error
+    recalculer.error ?? demanderValidation.error ?? annulerDemande.error ??
+    repondreValidation.error ?? demanderReouverture.error ?? repondre.error
 
   if (isLoading) return <Spinner label="Chargement de la paie…" />
 
@@ -400,7 +449,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             >
               Bulletins de paie
             </button>
-            {estPaie && !verrouille && !enDemande && (
+            {modifiable && (
               <button
                 onClick={() => recalculer.mutate()}
                 disabled={recalculer.isPending}
@@ -725,7 +774,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                 <LigneRow
                   key={l.id}
                   ligne={l}
-                  modifiable={estPaie && !verrouille && !enDemande}
+                  modifiable={modifiable}
                   resteDette={dettes?.get(l.employee_id) ?? 0}
                   onSaved={invalider}
                   onBulletin={() => setBulletinPour(l.employee_id)}
@@ -778,24 +827,76 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         />
       )}
 
-      {/* Valider la paie */}
-      {estPaie && !verrouille && !enDemande && lignes && lignes.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-900">
-            Valider la paie de {moisLabel(periode.annee, periode.mois)}
+      {/* La clôture, à deux mains : le bureau demande, l'administrateur
+          accepte. Tant que le mois court, rien à valider — la paie se
+          contente de suivre le pointage. */}
+      {estPaie && !verrouille && !enDemande && !attendAdmin && lignes && lignes.length > 0 && (
+        moisTermine ? (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">
+              Clôturer {moisLabel(periode.annee, periode.mois)}
+            </p>
+            <p className="mt-1 text-sm text-emerald-800">
+              Le mois est terminé. En demandant la validation, vous figez la paie : plus de
+              pointage ni de saisie dessus, le temps que l’administrateur l’examine. C’est lui
+              qui la valide pour de bon.
+            </p>
+            <button
+              onClick={() => demanderValidation.mutate()}
+              disabled={demanderValidation.isPending}
+              className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {demanderValidation.isPending ? 'Envoi…' : 'Demander la validation'}
+            </button>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Le mois est en cours : cette paie se met à jour à chaque pointage. La validation
+            s’ouvrira le {new Intl.DateTimeFormat('fr-FR').format(dernierJour)}.
           </p>
-          <p className="mt-1 text-sm text-emerald-800">
-            Les retenues de dette seront imputées sur les dettes des employés, et la paie sera
-            verrouillée. Toute correction devra passer par une demande de réouverture approuvée par
-            l’administrateur.
+        )
+      )}
+
+      {/* Demandé : le bureau attend, l'administrateur tranche. */}
+      {attendAdmin && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Validation demandée pour {moisLabel(periode.annee, periode.mois)}
           </p>
-          <button
-            onClick={() => validerPaie.mutate()}
-            disabled={validerPaie.isPending}
-            className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {validerPaie.isPending ? 'Validation…' : 'Valider la paie'}
-          </button>
+          <p className="mt-1 text-sm text-amber-800">
+            {estAdmin
+              ? 'Accepter impute les retenues de dette et verrouille le mois. Refuser le rouvre : le bureau pourra le corriger.'
+              : 'La paie est figée en attendant la réponse de l’administrateur. Vous pouvez encore retirer la demande.'}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {estAdmin && (
+              <>
+                <button
+                  onClick={() => repondreValidation.mutate(true)}
+                  disabled={repondreValidation.isPending}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {repondreValidation.isPending ? '…' : 'Accepter et verrouiller le mois'}
+                </button>
+                <button
+                  onClick={() => repondreValidation.mutate(false)}
+                  disabled={repondreValidation.isPending}
+                  className="rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Refuser et rouvrir
+                </button>
+              </>
+            )}
+            {!estAdmin && (
+              <button
+                onClick={() => annulerDemande.mutate()}
+                disabled={annulerDemande.isPending}
+                className="rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+              >
+                {annulerDemande.isPending ? '…' : 'Retirer la demande'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

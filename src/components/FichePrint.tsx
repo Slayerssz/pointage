@@ -16,7 +16,7 @@ import { HORAIRES, type Employee } from '../lib/types'
  *
  * « simple » reprend le modèle officiel : couleur de l'entreprise,
  * emplacement photo, matricule, les dix champs (le téléphone en plus du modèle), puis la liste des
- * pièces administratives à fournir. C'est celle qu'on classe ou remet.
+ * pièces administratives. C’est celle qu’on classe ou remet.
  *
  * « detaillee » porte tout ce que le registre sait de la personne —
  * téléphone, situation familiale, horaire, repos, salaire, banque,
@@ -239,7 +239,7 @@ export default function FichePrint({
                     ))}
                   </dl>
 
-                  {/* Pièces à fournir */}
+                  {/* Pièces administratives */}
                   <p
                     className="text-center uppercase"
                     style={{
@@ -248,7 +248,7 @@ export default function FichePrint({
                       textUnderlineOffset: '2mm', margin: '10mm 0 6mm',
                     }}
                   >
-                    Pièces administratives à fournir
+                    Pièces administratives
                   </p>
                   {/* La liste des pièces reste en noir chez toutes les sociétés */}
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
