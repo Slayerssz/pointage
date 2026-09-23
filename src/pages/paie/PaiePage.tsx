@@ -22,9 +22,6 @@ import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
 import ListeVersementsPrint, { type VersementsDeBanque } from '../../components/ListeVersementsPrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
-import BulletinPaiePrint from '../../components/BulletinPaiePrint'
-import RecapPaiePrint from '../../components/RecapPaiePrint'
-import { useBulletins } from '../../lib/bulletin'
 import { useModeleSociete } from '../../lib/modeleSociete'
 
 export default function PaiePage() {
@@ -145,8 +142,6 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   const [erreurExport, setErreurExport] = useState<string | null>(null)
   // Vient d'être validée → on met les exports en avant
   const [vientDeValider, setVientDeValider] = useState(false)
-  // Bulletins : null = fermé, '' = tous les virements, un id = un seul employé
-  const [bulletinPour, setBulletinPour] = useState<string | null>(null)
 
   const { data: company } = useQuery({
     queryKey: ['company', companyId],
@@ -470,14 +465,6 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             >
               {exportEnCours === 'pdf' ? 'Export…' : 'PDF'}
             </button>
-            <button
-              onClick={() => setBulletinPour('')}
-              disabled={!lignes?.some((l) => (l.mode_reglement ?? '').toLowerCase().startsWith('vir'))}
-              title="Un bulletin par employé payé par virement"
-              className="rounded-lg border border-blue-300 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40"
-            >
-              Bulletins de paie
-            </button>
             {modifiable && (
               <button
                 onClick={() => recalculer.mutate()}
@@ -732,7 +719,6 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
               <th className="px-3 py-3 text-right font-medium">Autres</th>
               <th className="px-3 py-3 text-right font-medium">Net à payer</th>
               <th className="px-3 py-3 font-medium">Règlement</th>
-              <th className="fige-droite px-3 py-3 text-right font-medium">Bulletin</th>
             </tr>
           </thead>
           {groupes.map((g) => (
@@ -801,8 +787,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                   modifiable={modifiable}
                   resteDette={dettes?.get(l.employee_id) ?? 0}
                   onSaved={invalider}
-                  onBulletin={() => setBulletinPour(l.employee_id)}
-                />
+                  />
               ))}
             </tbody>
           ))}
@@ -921,142 +906,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         </div>
       )}
 
-      {bulletinPour !== null && (
-        <BulletinsModale
-          periodeId={periode.id}
-          employeeId={bulletinPour || null}
-          entreprise={company?.name ?? 'Entreprise'}
-          companyId={companyId}
-          onClose={() => setBulletinPour(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-/**
- * Charge les bulletins avant de les afficher : l'impression ne doit
- * jamais partir sur une page à moitié remplie.
- */
-function BulletinsModale({
-  periodeId, employeeId, entreprise, companyId, onClose,
-}: {
-  periodeId: string; employeeId: string | null; entreprise: string
-  companyId: string | undefined; onClose: () => void
-}) {
-  const { data: cleModele } = useModeleSociete(companyId)
-  const { data, isLoading, error } = useBulletins(periodeId, employeeId)
-  // Un seul employé : on va droit à son bulletin. Toute la période : on
-  // demande d'abord si c'est un bulletin par personne ou l'état d'ensemble.
-  const [forme, setForme] = useState<'individuel' | 'recap' | null>(
-    employeeId ? 'individuel' : null,
-  )
-
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-800/60">
-        <div className="rounded-xl bg-white px-6 py-5 shadow-xl">
-          <Spinner label="Préparation des bulletins…" />
-        </div>
-      </div>
-    )
-  }
-  if (error || !data) {
-    return (
-      <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-800/60 p-4">
-        <div className="max-w-md rounded-xl bg-white p-5 shadow-xl">
-          <ErrorNote>
-            {error?.message ?? 'Bulletins indisponibles.'}
-            {String(error?.message ?? '').includes('bulletin_paie') && (
-              <> Le BLOC 15 n’a peut-être pas encore été exécuté dans Supabase.</>
-            )}
-          </ErrorNote>
-          <button onClick={onClose} className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
-            Fermer
-          </button>
-        </div>
-      </div>
-    )
-  }
-  if (data.length === 0) {
-    return (
-      <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-800/60 p-4">
-        <div className="max-w-md rounded-xl bg-white p-5 text-sm shadow-xl">
-          <p className="font-semibold text-slate-900">Aucun bulletin à éditer</p>
-          <p className="mt-1 text-slate-600">
-            Le bulletin de paie ne concerne que les employés payés par virement,
-            les seuls déclarés à la C.N.S.S. Aucun n’apparaît dans cette sélection.
-          </p>
-          <button onClick={onClose} className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm">
-            Fermer
-          </button>
-        </div>
-      </div>
-    )
-  }
-  if (forme === null) {
-    return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-        <div
-          className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h2 className="text-lg font-semibold text-slate-900">Bulletins de paie</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {data.length} employé(s) payé(s) par virement. Sous quelle forme ?
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <FormeBulletin
-              titre="Un bulletin par employé"
-              pour="À remettre à chacun"
-              detail={`${data.length} page${data.length > 1 ? 's' : ''} A4, une par personne, avec le détail de ses cotisations et son net.`}
-              onClick={() => setForme('individuel')}
-            />
-            <FormeBulletin
-              titre="Un état pour tout le monde"
-              pour="Pour la banque et le comptable"
-              detail="Une ligne par employé, regroupée par site, avec sous-totaux et total général. A4 paysage."
-              onClick={() => setForme('recap')}
-            />
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return forme === 'recap' ? (
-    <RecapPaiePrint bulletins={data} entreprise={entreprise}
-                    modeleDocument={cleModele} onClose={onClose} />
-  ) : (
-    <BulletinPaiePrint bulletins={data} entreprise={entreprise}
-                       modeleDocument={cleModele} onClose={onClose} />
-  )
-}
-
-function FormeBulletin({
-  titre, pour, detail, onClick,
-}: { titre: string; pour: string; detail: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col rounded-xl border border-slate-300 p-4 text-left transition hover:border-slate-900 hover:bg-slate-50"
-    >
-      <span className="block text-sm font-semibold text-slate-900">{titre}</span>
-      <span className="mt-0.5 block text-xs font-medium tracking-wide text-slate-500 uppercase">
-        {pour}
-      </span>
-      <span className="mt-2 block text-sm text-slate-600">{detail}</span>
-    </button>
+   </div>
   )
 }
 
@@ -1077,17 +927,12 @@ function LigneRow({
   modifiable,
   resteDette,
   onSaved,
-  onBulletin,
 }: {
   ligne: LignePaie
   modifiable: boolean
   resteDette: number
   onSaved: () => void
-  onBulletin: () => void
 }) {
-  // Le bulletin de paie ne concerne que les virements : ce sont les
-  // seuls employés déclarés à la C.N.S.S.
-  const bulletinDisponible = estVirement(ligne.mode_reglement)
   const [prime, setPrime] = useState(String(ligne.prime ?? 0))
   const [dette, setDette] = useState(String(ligne.retenue_dette ?? 0))
   const [autres, setAutres] = useState(String(ligne.autres_retenues ?? 0))
@@ -1207,20 +1052,6 @@ function LigneRow({
           <p className="truncate text-[10px] text-slate-500" title={ligne.rib ?? undefined}>
             {ligne.banque ?? 'banque ?'} · {ligne.rib ?? 'RIB manquant'}
           </p>
-        )}
-      </td>
-      <td className="fige-droite px-3 py-2 text-right">
-        {bulletinDisponible ? (
-          <button
-            onClick={onBulletin}
-            className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-          >
-            Bulletin
-          </button>
-        ) : (
-          <span className="text-xs text-slate-300" title="Bulletin réservé aux virements (C.N.S.S.)">
-            —
-          </span>
         )}
       </td>
     </tr>
