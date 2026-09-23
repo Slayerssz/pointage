@@ -2,6 +2,7 @@ import { MOIS_FR } from '../lib/paie'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
+import { enregistrerOrdreVirementPdf, LIGNES_PAR_PAGE } from '../lib/ordreVirementPdf'
 import type { LignePaie } from '../lib/types'
 
 /**
@@ -19,7 +20,6 @@ import type { LignePaie } from '../lib/types'
  * ferment la dernière.
  */
 
-const LIGNES_PAR_PAGE = 18
 
 export interface OrdreDeSite {
   /** Ce qui identifie la feuille : la banque, ou « TOUS LES VIREMENTS ». */
@@ -75,6 +75,15 @@ export default function OrdreVirementPrint({
           titre={titre}
           pret={pret}
           imprimer={imprimer}
+          genererPdf={() =>
+            enregistrerOrdreVirementPdf({
+              ordres, entreprise, ribOrdinateur, libelleIntitule, annee, mois,
+              nomFichier:
+                ordres.length === 1
+                  ? `Ordre_virement_${ordres[0].intitule.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
+                  : `Ordres_virement_${MOIS_FR[mois - 1]}_${annee}`,
+            })
+          }
           nomFichier={
             ordres.length === 1
               ? `Ordre_virement_${ordres[0].intitule.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
