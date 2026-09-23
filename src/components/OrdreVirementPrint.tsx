@@ -13,8 +13,8 @@ import type { LignePaie } from '../lib/types'
  * libellé), le tableau des bénéficiaires, puis le cadre des signatures.
  * Pas de logo, pas d'en-tête : la banque veut le formulaire, rien d'autre.
  *
- * Ce qui est imprimé est ce que la paie affiche : la banque choisie, ou
- * une feuille par banque quand on n'en a choisi aucune. Chaque feuille a
+ * Ce qui est imprimé est ce que la paie affiche : le site choisi, ou une
+ * feuille par site quand on n'en a choisi aucun. Chaque feuille a
  * son propre total. Au-delà de dix-huit bénéficiaires, le tableau
  * continue sur une page qui reprend le cartouche, et les signatures
  * ferment la dernière.
@@ -22,14 +22,14 @@ import type { LignePaie } from '../lib/types'
 
 
 export interface OrdreDeSite {
-  /** Ce qui identifie la feuille : la banque, ou « TOUS LES VIREMENTS ». */
+  /** Ce qui identifie la feuille : le site, ou « TOUS LES VIREMENTS ». */
   intitule: string
   lignes: LignePaie[]
 }
 
 export default function OrdreVirementPrint({
   ordres,
-  libelleIntitule = 'BANQUE',
+  libelleIntitule = 'SITE',
   entreprise,
   ribOrdinateur,
   annee,

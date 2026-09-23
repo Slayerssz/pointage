@@ -27,7 +27,7 @@ export const LIGNES_PAR_PAGE = 18
 const GRIS: [number, number, number] = [217, 217, 217]
 
 export interface OrdreDeVirement {
-  /** Ce qui identifie la feuille : la banque, le site… */
+  /** Ce qui identifie la feuille : le site, la banque… */
   intitule: string
   lignes: LignePaie[]
 }
@@ -63,7 +63,7 @@ export async function dessinerOrdreVirement(opts: {
 }) {
   const { jsPDF } = opts.jsPDFModule ?? (await import('jspdf'))
   const { ordres, entreprise, ribOrdinateur, annee, mois } = opts
-  const libelleIntitule = opts.libelleIntitule ?? 'BANQUE'
+  const libelleIntitule = opts.libelleIntitule ?? 'SITE'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc: any = new (jsPDF as any)({ orientation: 'portrait', unit: 'mm', format: 'a4' })

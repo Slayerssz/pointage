@@ -20,6 +20,7 @@ import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
 import ListeVersementsPrint from '../../components/ListeVersementsPrint'
+import RecusEspecePrint from '../../components/RecusEspecePrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useModeleSociete } from '../../lib/modeleSociete'
@@ -278,9 +279,9 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     }
     return {
       modes: listeModes,
-      // Le virement se range par banque — c'est la banque qui exécute ;
-      // le versement par site, c'est là qu'on porte l'argent.
-      secondes: filtreReglement === 'Virement'
+      // Le versement se range par banque — c'est au guichet qu'on porte
+      // l'argent ; le virement par site, comme l'ordre qui part à la banque.
+      secondes: filtreReglement === 'Versement'
         ? par(banqueDe)
         : par((l) => l.site_nom?.trim() || '(sans site)'),
       totalDuMode: somme(duMode),
@@ -293,10 +294,10 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     setFiltreSite(''); setFiltreBanque('')
   }
   const choisirSeconde = (v: string) => {
-    if (filtreReglement === 'Virement') setFiltreBanque(v)
+    if (filtreReglement === 'Versement') setFiltreBanque(v)
     else setFiltreSite(v)
   }
-  const secondeActive = filtreReglement === 'Virement' ? filtreBanque : filtreSite
+  const secondeActive = filtreReglement === 'Versement' ? filtreBanque : filtreSite
 
   // Cliquer sur Virement ou Versement ouvre la fenêtre du second choix :
   // on y lit les montants avant de décider, ce qu'un menu ne montre pas.
@@ -352,12 +353,27 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   const [ordres, setOrdres] = useState<OrdreDeSite[] | null>(null)
   // Ce qui part à l'impression : les lignes affichées, et le site choisi.
   const [versements, setVersements] = useState<{ lignes: LignePaie[]; precision: string | null } | null>(null)
+  const [recus, setRecus] = useState<LignePaie[] | null>(null)
 
   /**
    * Ce qu'on imprime est ce qu'on a sous les yeux : la sélection courante.
    * Sans second choix, le tout se scinde par groupe — une feuille par
    * banque pour les virements, une liste par site pour les versements.
    */
+  /** Le document du mode affiché, dans son modèle. */
+  const imprimerPour = (mode: string, liste: LignePaie[]) => {
+    if (mode === 'Virement') {
+      setOrdres(aImprimer(
+        liste, (l) => l.site_nom?.trim() || '(sans site)', filtreSite, 'TOUS LES VIREMENTS',
+      ))
+    } else if (mode === 'Versement') {
+      setVersements({ lignes: liste, precision: filtreBanque || null })
+    } else if (mode === 'Espèces') {
+      setRecus(liste)
+    }
+  }
+  const imprimerLaSelection = () => imprimerPour(filtreReglement, filtrees)
+
   const aImprimer = (
     lignes: LignePaie[],
     cle: (l: LignePaie) => string,
@@ -466,6 +482,21 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             >
               {exportEnCours === 'pdf' ? 'Export…' : 'PDF'}
             </button>
+            {/* Imprimer ouvre le document du mode choisi — l'ordre de
+                virement, la liste des versements, les reçus d'espèces —
+                dans le modèle papier qui lui revient. */}
+            <button
+              onClick={imprimerLaSelection}
+              disabled={!filtreReglement || filtrees.length === 0}
+              title={
+                filtreReglement
+                  ? `Imprimer : ${filtreReglement.toLowerCase()}`
+                  : 'Choisissez d’abord Espèces, Virement ou Versement'
+              }
+              className="rounded-lg border border-slate-800 bg-slate-800 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
+            >
+              Imprimer
+            </button>
             {modifiable && (
               <button
                 onClick={() => recalculer.mutate()}
@@ -478,40 +509,6 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           </div>
         </div>
 
-        {totaux && (
-          <>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-              <Total label="Employés" value={String(totauxFiltres.employes)} />
-              <Total label="Total brut" value={formatDH(totauxFiltres.total_brut)} />
-              <Total label="Retenues" value={formatDH(totauxFiltres.total_dettes + totauxFiltres.total_autres_retenues)} />
-              <Total label="Virements" value={formatDH(totauxFiltres.total_virement)} />
-              <Total label="NET À PAYER" value={formatDH(totauxFiltres.total_net)} fort />
-            </div>
-            {filtreActif && (
-              <p className="mt-2 text-xs text-slate-500">
-                Ces totaux ne portent que sur la sélection.
-                {' '}Paie complète du mois : <strong>{formatDH(totaux.total_net)}</strong> pour{' '}
-                {totaux.employes} employé(s).
-              </p>
-            )}
-            {/* Espèces / virement : la question la plus fréquente */}
-            <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-              <span>
-                À payer en <strong className="text-slate-900">espèces</strong> :{' '}
-                <span className="tabular-nums">{formatDH(totauxFiltres.total_especes)}</span>
-              </span>
-              <span>
-                Par <strong className="text-slate-900">virement</strong> :{' '}
-                <span className="tabular-nums">{formatDH(totauxFiltres.total_virement)}</span>
-              </span>
-              {totauxFiltres.par_banque.map((b) => (
-                <span key={b.banque} className="text-slate-500">
-                  {b.banque} : <span className="tabular-nums">{formatDH(b.montant)}</span>
-                </span>
-              ))}
-            </div>
-          </>
-        )}
       </div>
 
       {erreurExport && (
@@ -657,7 +654,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             onClick={() => setChoixOuvert(filtreReglement)}
             className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:border-slate-400"
           >
-            {filtreReglement === 'Virement' ? 'Banque' : 'Site'} :{' '}
+            {filtreReglement === 'Versement' ? 'Banque' : 'Site'} :{' '}
             <span className="font-semibold">
               {secondeActive || `Tout (${etapes.secondes.length})`}
             </span>
@@ -735,9 +732,18 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                       </span>
                     </span>
                     <span className="flex items-center gap-1.5">
+                      {g.mode === 'Espèces' && (
+                        <button
+                          onClick={() => imprimerPour('Espèces', g.liste)}
+                          className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
+                          title="Les talons à faire signer, trois par feuille"
+                        >
+                          Reçus
+                        </button>
+                      )}
                       {g.mode === 'Versement' && (
                         <button
-                          onClick={() => setVersements({ lignes: g.liste, precision: filtreSite || null })}
+                          onClick={() => imprimerPour('Versement', g.liste)}
                           className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
                           title="La liste de ce qui est affiché — un site par liste si aucun n’est choisi"
                         >
@@ -746,7 +752,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                       )}
                       {g.mode === 'Virement' && (
                         <button
-                          onClick={() => setOrdres(aImprimer(g.liste, banqueDe, filtreBanque, 'TOUS LES VIREMENTS'))}
+                          onClick={() => imprimerPour('Virement', g.liste)}
                           className="rounded-md border border-slate-900 bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-slate-800"
                           title="Le formulaire pour la banque — une feuille par banque si aucune n’est choisie"
                         >
@@ -806,7 +812,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         <ChoixDansLaPaie
           titre={choixOuvert === 'Virement' ? 'Virements' : 'Versements'}
           question={
-            choixOuvert === 'Virement'
+            choixOuvert === 'Versement'
               ? 'Quelle banque voulez-vous voir ?'
               : 'Quel site voulez-vous voir ?'
           }
@@ -816,6 +822,17 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           nGeneral={etapes.nDuMode}
           onChoisir={choisirSeconde}
           onClose={() => setChoixOuvert(null)}
+        />
+      )}
+
+      {recus && (
+        <RecusEspecePrint
+          lignes={recus}
+          entreprise={company?.name ?? ''}
+          modeleDocument={cleModele}
+          annee={periode.annee}
+          mois={periode.mois}
+          onClose={() => setRecus(null)}
         />
       )}
 
@@ -907,16 +924,6 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   )
 }
 
-function Total({ label, value, fort }: { label: string; value: string; fort?: boolean }) {
-  return (
-    <div className={`rounded-xl border px-3 py-2 ${fort ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-      <p className={`truncate text-base font-semibold tabular-nums ${fort ? 'text-emerald-800' : 'text-slate-900'}`}>
-        {value}
-      </p>
-      <p className="text-xs text-slate-500">{label}</p>
-    </div>
-  )
-}
 
 /** Une ligne de paie : les montants ajustables sont éditables sur place. */
 function LigneRow({
