@@ -22,6 +22,10 @@
 --  la grille l'affiche R.
 --
 --  Ne touche pas : congés, maladies, fériés, ni rien de saisi à la main.
+--
+--  Une fiche sans jour de repos est remplie comme les autres, tous les
+--  jours du mois : faute de repos déclaré, rien ne dit quel jour retirer.
+--  Le bureau corrige ces cas-là à la main.
 -- ============================================================================
 
 
