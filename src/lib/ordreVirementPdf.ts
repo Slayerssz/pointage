@@ -55,7 +55,6 @@ export async function dessinerOrdreVirement(opts: {
   ordres: OrdreDeVirement[]
   entreprise: string
   ribOrdinateur: string | null
-  libelleIntitule?: string
   annee: number
   mois: number
   /** Injectable pour les essais hors navigateur. */
@@ -63,7 +62,6 @@ export async function dessinerOrdreVirement(opts: {
 }) {
   const { jsPDF } = opts.jsPDFModule ?? (await import('jspdf'))
   const { ordres, entreprise, ribOrdinateur, annee, mois } = opts
-  const libelleIntitule = opts.libelleIntitule ?? 'SITE'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc: any = new (jsPDF as any)({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -126,7 +124,6 @@ export async function dessinerOrdreVirement(opts: {
       ligneCartouche(`Date        :   ${aujourdhui}`, '', { valeurCadre: false })
       ligneCartouche('RAISON SOCIAL', entreprise.toUpperCase())
       ligneCartouche('RIB ORDINATEUR', formaterRib(ribOrdinateur), { mono: true })
-      ligneCartouche(libelleIntitule, ordre.intitule.toUpperCase(), { valeurGrasse: true })
       ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(ordre.lignes.length))
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
@@ -142,18 +139,20 @@ export async function dessinerOrdreVirement(opts: {
       })
       y += hEntete
 
-      for (let i = 0; i < LIGNES_PAR_PAGE; i++) {
+      // Le tableau s'arrête aux bénéficiaires : trois virements font trois
+      // lignes, pas dix-huit cases vides à barrer.
+      for (let i = 0; i < page.length; i++) {
         const l = page[i]
-        case_(x, y, COL.nom, LIGNE, l ? l.nom_prenom.toUpperCase() : '', { taille: 9 })
-        const rib = l ? formaterRib(l.rib) : ''
-        if (l && !rib) {
+        case_(x, y, COL.nom, LIGNE, l.nom_prenom.toUpperCase(), { taille: 9 })
+        const rib = formaterRib(l.rib)
+        if (!rib) {
           doc.setTextColor(180, 0, 0)
           case_(x + COL.nom, y, COL.rib, LIGNE, 'R.I.B. MANQUANT', { taille: 8, gras: true })
           doc.setTextColor(0, 0, 0)
         } else {
           case_(x + COL.nom, y, COL.rib, LIGNE, rib, { mono: true, taille: 8 })
         }
-        case_(x + COL.nom + COL.rib, y, COL.montant, LIGNE, l ? n2(l.net_a_payer) : '', {
+        case_(x + COL.nom + COL.rib, y, COL.montant, LIGNE, n2(l.net_a_payer), {
           aligne: 'right', taille: 9,
         })
         y += LIGNE
@@ -188,7 +187,6 @@ export async function enregistrerOrdreVirementPdf(opts: {
   ordres: OrdreDeVirement[]
   entreprise: string
   ribOrdinateur: string | null
-  libelleIntitule?: string
   annee: number
   mois: number
   nomFichier: string

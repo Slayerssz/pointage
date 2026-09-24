@@ -81,10 +81,22 @@ export default function RecusEspecePrint({
                 borderTop: i % 3 === 0 ? 'none' : '1px dashed #999',
               }}
             >
-              <p style={{ fontSize: '14pt', fontWeight: 700 }}>{nomSociete}</p>
+              <div className="flex items-start justify-between">
+                <p style={{ fontSize: '14pt', fontWeight: 700 }}>{nomSociete}</p>
+                <p style={{ fontSize: '10pt' }}>{dateTexte}</p>
+              </div>
               <p style={{ fontSize: '12pt', fontWeight: 700, marginTop: '2mm' }}>
                 Reçue {numeroRecu(annee, mois, i + 1)}
               </p>
+
+              {/* Le cadre de signature démarre à la hauteur du premier
+                  renseignement : sur la même ligne, pas en dessous. */}
+              <div style={{ position: 'absolute', right: '14mm', top: '35mm', width: '52mm' }}>
+                <p style={{ fontSize: '9pt', textAlign: 'center', marginBottom: '1.5mm' }}>
+                  SIGNATURE
+                </p>
+                <div style={{ height: '26mm', border: '1px solid #000', borderRadius: '2mm' }} />
+              </div>
 
               <dl style={{ marginTop: '7mm', fontSize: '10pt' }}>
                 {[
@@ -100,14 +112,6 @@ export default function RecusEspecePrint({
                 ))}
               </dl>
 
-              {/* La date et le cadre de signature, en bas à droite */}
-              <div style={{ position: 'absolute', right: '14mm', bottom: '10mm', width: '52mm' }}>
-                <div className="flex items-end justify-between" style={{ fontSize: '9pt', marginBottom: '1.5mm' }}>
-                  <span>SIGNATURE</span>
-                  <span style={{ fontSize: '10pt' }}>{dateTexte}</span>
-                </div>
-                <div style={{ height: '26mm', border: '1px solid #000', borderRadius: '2mm' }} />
-              </div>
             </article>
           ))}
         </div>

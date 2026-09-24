@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 33 sur 33 — La paie du mois est toujours ouverte
+--  BLOC 33 sur 34 — La paie du mois est toujours ouverte
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 32.
 --

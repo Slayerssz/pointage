@@ -29,7 +29,6 @@ export interface OrdreDeSite {
 
 export default function OrdreVirementPrint({
   ordres,
-  libelleIntitule = 'SITE',
   entreprise,
   ribOrdinateur,
   annee,
@@ -38,8 +37,6 @@ export default function OrdreVirementPrint({
   onClose,
 }: {
   ordres: OrdreDeSite[]
-  /** L'intitulé de la ligne du cartouche : BANQUE, SITE… */
-  libelleIntitule?: string
   entreprise: string
   ribOrdinateur: string | null
   annee: number
@@ -77,7 +74,7 @@ export default function OrdreVirementPrint({
           imprimer={imprimer}
           genererPdf={() =>
             enregistrerOrdreVirementPdf({
-              ordres, entreprise, ribOrdinateur, libelleIntitule, annee, mois,
+              ordres, entreprise, ribOrdinateur, annee, mois,
               nomFichier:
                 ordres.length === 1
                   ? `Ordre_virement_${ordres[0].intitule.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
@@ -103,9 +100,6 @@ export default function OrdreVirementPrint({
 
             return pages.map((page, p) => {
               const derniere = p === pages.length - 1
-              // Le tableau garde ses dix-huit lignes, même vides, pour que
-              // chaque page ait la hauteur du modèle.
-              const vides = Math.max(0, LIGNES_PAR_PAGE - page.length)
 
               return (
                 <article
@@ -132,10 +126,6 @@ export default function OrdreVirementPrint({
                         <td style={{ ...cell, fontFamily: 'monospace', letterSpacing: '.04em' }}>
                           {rib(ribOrdinateur)}
                         </td>
-                      </tr>
-                      <tr>
-                        <td style={gras}>{libelleIntitule}</td>
-                        <td style={{ ...cell, fontWeight: 700 }}>{o.intitule.toUpperCase()}</td>
                       </tr>
                       <tr>
                         <td style={gras}>NOMBRE TOTAL D'OPERATIONS</td>
@@ -171,11 +161,6 @@ export default function OrdreVirementPrint({
                           <td style={{ ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                             {n2(l.net_a_payer)}
                           </td>
-                        </tr>
-                      ))}
-                      {Array.from({ length: vides }).map((_, i) => (
-                        <tr key={`v${i}`} style={{ height: '7.6mm' }}>
-                          <td style={cell} /><td style={cell} /><td style={cell} />
                         </tr>
                       ))}
                     </tbody>

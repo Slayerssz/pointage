@@ -996,6 +996,49 @@ ok('un mois validé ne se recalcule pas à la relecture',
 await refuse('et on ne le redemande pas',
   `select public.demander_validation_paie($1)`, [pAout], /déjà validée/i)
 
+// ══════════════ PEUT-ON ENCORE SUPPRIMER UN EMPLOYÉ AJOUTÉ PAR ERREUR ? ════
+// Depuis que la paie du mois est toujours ouverte, chacun y a une ligne dès
+// le premier jour. Elle ne doit pas empêcher la suppression — seul un mois
+// VALIDÉ est de l'histoire.
+
+section('Supprimer un employé')
+
+await connecte(bureau)
+const eErreur = await employe('AJOUTE PAR ERREUR', { cin: 'SUP1', cnss: '940000001' })
+// La paie du mois lui donne aussitôt une ligne.
+await q1(`select public.periode_du_mois($1,$2,$3)`, [co, AN, MS])
+ok('il a bien une ligne dans le mois ouvert',
+   num((await q1(`select count(*) n from public.lignes_paie lp
+                    join public.periodes_paie pp on pp.id = lp.periode_id
+                   where lp.employee_id=$1 and pp.statut = 'ouvert'`, [eErreur])).n) === 1)
+
+ok('l’aperçu le dit supprimable',
+   (await q1(`select public.apercu_suppression_employe($1) as a`, [eErreur])).a.supprimable === true)
+ok('et il se supprime',
+   await reussit(`select public.supprimer_employe($1)`, [eErreur]))
+ok('… il n’est plus au registre',
+   num((await q1(`select count(*) n from public.employees where id=$1`, [eErreur])).n) === 0)
+ok('… ni dans la paie du mois',
+   num((await q1(`select count(*) n from public.lignes_paie where employee_id=$1`, [eErreur])).n) === 0)
+
+// Celui qui a déjà été payé, lui, reste intouchable.
+const dejaPaye = (await q1(
+  `select lp.employee_id e from public.lignes_paie lp
+     join public.periodes_paie pp on pp.id = lp.periode_id
+    where pp.statut = 'paie_validee' limit 1`))?.e
+if (dejaPaye) {
+  ok('un employé déjà payé n’est pas supprimable',
+     (await q1(`select public.apercu_suppression_employe($1) as a`, [dejaPaye])).a.supprimable === false)
+  await refuse('… et la suppression le refuse',
+    `select public.supprimer_employe($1)`, [dejaPaye], /validés|historique|clôturé|validé/i)
+}
+
+// L'administrateur en a le droit, lui aussi.
+await connecte(admin)
+const eAdmin = await employe('SUPPRIME PAR ADMIN', { cin: 'SUP2', cnss: '940000002' })
+ok('l’administrateur supprime aussi',
+   await reussit(`select public.supprimer_employe($1)`, [eAdmin]))
+
 section('La photo suit-elle la fiche ?')
 
 const listeUnique = (await db.query(

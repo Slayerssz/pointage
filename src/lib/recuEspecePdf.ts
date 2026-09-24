@@ -87,10 +87,21 @@ export async function dessinerRecusEspece(opts: {
       doc.setDrawColor(0)
     }
 
+    // La date en tête, sur la même ligne que la société.
     texte(nomSociete, x, y, { gras: true, taille: 14 })
+    texte(dateTexte, P.l - MARGE, y, { taille: 10, aligne: 'right' })
     y += 7
     texte(`Reçue ${numeroRecu(annee, mois, i + 1)}`, x, y, { gras: true, taille: 12 })
     y += 10
+
+    // Le cadre de signature commence à la hauteur du premier renseignement :
+    // sur la même ligne, pas en dessous.
+    const cadreL = 52
+    const cadreH = 26
+    const cadreX = P.l - MARGE - cadreL
+    const cadreY = y - 4
+    texte('SIGNATURE', cadreX + cadreL / 2, cadreY - 2, { taille: 9, aligne: 'center' })
+    doc.roundedRect(cadreX, cadreY, cadreL, cadreH, 2, 2)
 
     const champs: [string, string][] = [
       ['Nom Prenom :', l.nom_prenom.toUpperCase()],
@@ -104,14 +115,6 @@ export async function dessinerRecusEspece(opts: {
       y += 6.5
     }
 
-    // La date, puis le cadre de signature, à droite.
-    const cadreL = 52
-    const cadreH = 26
-    const cadreX = P.l - MARGE - cadreL
-    const cadreY = haut + HAUTEUR - cadreH - 12
-    texte(dateTexte, P.l - MARGE, cadreY - 4, { taille: 10, aligne: 'right' })
-    texte('SIGNATURE', cadreX, cadreY - 4, { taille: 9 })
-    doc.roundedRect(cadreX, cadreY, cadreL, cadreH, 2, 2)
   })
 
   return doc
