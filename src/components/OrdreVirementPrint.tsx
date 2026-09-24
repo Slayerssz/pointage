@@ -106,7 +106,8 @@ export default function OrdreVirementPrint({
                   key={`${o.intitule}-${p}`}
                   className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
                   style={{
-                    width: '210mm', minHeight: '297mm', padding: '14mm 16mm',
+                    // Le haut reste libre pour un futur en-tête de société.
+                    width: '210mm', minHeight: '297mm', padding: '39mm 16mm 14mm',
                     color: '#000', breakAfter: 'page', fontFamily: 'Georgia, "Times New Roman", serif',
                   }}
                 >

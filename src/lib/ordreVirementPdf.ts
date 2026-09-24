@@ -12,7 +12,8 @@ import { MOIS_FR } from './paie'
 import type { LignePaie } from './types'
 
 /** Page A4 et marges, en millimètres. */
-const P = { l: 210, h: 297, marge: 14, haut: 15 }
+// Le haut est laissé libre : un en-tête de société viendra s'y poser.
+const P = { l: 210, h: 297, marge: 14, haut: 40 }
 
 /** Les trois colonnes du tableau des bénéficiaires. */
 const COL = { nom: 76, rib: 64, montant: 42 }
