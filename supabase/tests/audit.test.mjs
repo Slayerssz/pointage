@@ -354,13 +354,13 @@ await q1(`select public.maj_ligne_paie($1,350,0,120,'Prime et retenue')`, [lPart
 section('Bulletin : C.N.S.S. 4,48 %, A.M.O. 2,26 %, I.G.R.')
 
 const bulletins = (await q1(`select public.bulletin_paie($1) as b`, [periode])).b
-ok('le bulletin ne concerne que les virements',
+// Le bulletin ne se limite plus aux virements : tout le monde en a un.
+ok('chaque ligne de paie a son bulletin',
    bulletins.length === num((await q1(
-     `select count(*) as c from public.lignes_paie
-       where periode_id=$1 and lower(coalesce(mode_reglement,'')) like 'vir%'`, [periode])).c),
+     `select count(*) as c from public.lignes_paie where periode_id=$1`, [periode])).c),
    `${bulletins.length} bulletin(s)`)
-ok('l’employé payé en espèces n’a pas de bulletin',
-   !bulletins.some((b) => b.employe.nom_prenom === 'VINGT JOURS'))
+ok('celui payé en espèces en a un aussi',
+   bulletins.some((b) => b.employe.nom_prenom === 'VINGT JOURS'))
 
 const bPlein = bulletins.find((b) => b.employe.nom_prenom === 'MOIS COMPLET')
 const val = (b, code) => b.lignes.find((l) => l.code === code)
@@ -1048,6 +1048,20 @@ section('Le bulletin saisi à la main')
 await connecte(paie)
 const bulDe = async (args) => (await q1(
   `select public.bulletin_paie($1,$2,$3,$4,$5) as b`, args))?.b?.[0]
+
+// Le bulletin n'est plus réservé aux virements : tSans est payé par
+// virement, mais un employé en espèces doit en avoir un aussi.
+await connecte(bureau)
+// Pas besoin de le pointer : la paie prend tout employé en poste.
+const eEspeces = await employe('PAYE EN ESPECES', { mode: 'Espece', cin: 'BP1', cnss: '950000001' })
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [perTP])
+await connecte(paie)
+const bulEspeces = await bulDe([perTP, eEspeces, null, null, null])
+ok('un employé payé en espèces a son bulletin', Boolean(bulEspeces))
+ok('… et son mode de règlement s’y lit',
+   (bulEspeces?.employe?.mode_reglement ?? '').toLowerCase().startsWith('esp'),
+   String(bulEspeces?.employe?.mode_reglement))
 
 const auto = await bulDe([perTP, tAvec, null, null, null])
 ok('sans saisie, le bulletin reste celui de la paie', Boolean(auto))

@@ -1,40 +1,25 @@
 -- ============================================================================
---  BLOC 35 sur 36 — Le bulletin de paie se remplit à la main
+--  BLOC 36 sur 36 — Le bulletin de paie pour tout le monde
 --  ============================================================
---  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 34.
+--  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 35.
 --
---  Quand on demande le bulletin d'une personne, l'application pose trois
---  questions : le salaire brut, le nombre de jours travaillés, et
---  l'avance éventuelle. Le bulletin se calcule à partir de ces
---  chiffres-là — C.N.S.S., A.M.O. et I.G.R. compris, avec les taux de la
---  société.
+--  Le bulletin ne se limite plus aux employés payés par virement :
+--  espèces et versements en ont un aussi.
 --
---  Les trois champs arrivent préremplis avec ce que la paie a calculé :
---  on accepte, ou on corrige. Laissés tels quels, le bulletin sort
---  exactement comme avant.
---
---  L'avance s'inscrit en retenue et se déduit du net. Elle reste une
---  mention du bulletin : elle n'est pas enregistrée dans la paie.
+--  Le mode de règlement réel s'imprime — jusqu'ici le bulletin affichait
+--  « Virement » en dur, ce qui serait devenu faux.
 -- ============================================================================
 
 -- ============================================================
--- 052 — Le bulletin se remplit à la main
--- À exécuter après 051_supprimer_malgre_mois_ouvert.sql
+-- 053 — Le bulletin de paie pour tout le monde
+-- À exécuter après 052_bulletin_saisi.sql
 --
--- Le service paie veut établir un bulletin à partir de trois
--- chiffres qu'il saisit : le salaire brut, le nombre de jours
--- travaillés, et l'avance éventuelle. Le reste — C.N.S.S., A.M.O.,
--- I.G.R. — se calcule à partir de ce brut-là, avec les taux de la
--- société.
+-- Le bulletin était réservé aux employés payés par virement, au
+-- motif qu'eux seuls sont déclarés à la C.N.S.S. Le bureau en veut
+-- pour tous : espèces et versements y ont droit aussi.
 --
--- Laissés vides, ces trois champs cèdent la place aux chiffres de
--- la paie : le bulletin sort comme avant. La saisie ne vaut que
--- pour un employé à la fois — un état d'ensemble ne se réécrit pas
--- à la main.
---
--- L'avance s'inscrit en retenue sur le bulletin et se déduit du net.
--- Elle n'est pas enregistrée dans la paie : c'est une mention portée
--- sur le bulletin, pas un mouvement de compte.
+-- Le mode de règlement réel remonte désormais avec le bulletin —
+-- il y était écrit « Virement » en dur, ce qui serait devenu faux.
 -- ============================================================
 
 create or replace function public.bulletin_paie(
@@ -108,8 +93,6 @@ begin
     join public.companies c on c.id = pp.company_id
     left join public.employees e on e.id = lp.employee_id
     where lp.periode_id = p_periode
-      -- LE BULLETIN N'EST QUE POUR LES VIREMENTS
-      and lower(coalesce(lp.mode_reglement, '')) like 'vir%'
       and (p_employee is null or lp.employee_id = p_employee)
   ),
   calc as (
@@ -147,7 +130,6 @@ begin
        and (pp.id = p_periode
             or (pp.mois < (select mois from public.periodes_paie where id = p_periode)
                 and pp.statut = 'paie_validee'))
-       and lower(coalesce(lp.mode_reglement, '')) like 'vir%'
      group by lp.employee_id
   )
   select coalesce(jsonb_agg(x order by x->'employe'->>'nom_prenom'), '[]'::jsonb)
@@ -166,6 +148,7 @@ begin
         'date_embauche', c.date_embauche,
         'situation_familiale', c.situation_familiale,
         'nombre_enfants', c.nombre_enfants,
+        'mode_reglement', c.mode_reglement,
         'banque', c.banque,
         'rib', c.rib,
         'site_nom', c.site_nom,

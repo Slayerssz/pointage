@@ -104,7 +104,11 @@ with attendu (numero, bloc, objet, present) as (
   (35, 'Bulletin saisi à la main', 'bulletin_paie à cinq arguments',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'bulletin_paie'
-                  and p.pronargs = 5))
+                  and p.pronargs = 5)),
+  (36, 'Bulletin pour tous',       'bulletin_paie ne filtre plus les virements',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'bulletin_paie'
+                  and pg_get_functiondef(p.oid) not like '%like ''vir%%'))
 )
 select numero,
        bloc,

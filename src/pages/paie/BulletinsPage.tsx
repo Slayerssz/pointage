@@ -14,10 +14,8 @@ import { useSociete } from '../../lib/queries'
  *
  * Un mois, et ce qu'on en tire : un bulletin par personne, l'état
  * d'ensemble pour la banque et le comptable, ou le bulletin d'un seul
- * employé qu'on cherche par son nom.
- *
- * Le bulletin ne concerne que les employés payés par virement : ce sont
- * les seuls déclarés à la C.N.S.S.
+ * employé qu'on cherche par son nom. Tout le monde y a droit, quel que
+ * soit le mode de règlement.
  */
 export default function BulletinsPage() {
   const { companyId } = useParams()
@@ -40,8 +38,7 @@ export default function BulletinsPage() {
       <div className="mb-5">
         <h1 className="mb-1 text-xl font-semibold text-slate-900">Bulletins de paie</h1>
         <p className="text-sm text-slate-500">
-          Le bulletin ne concerne que les employés payés par <strong>virement</strong> : ce sont
-          les seuls déclarés à la C.N.S.S. Un par personne, ou l’état d’ensemble du mois.
+          Un bulletin par personne, ou l’état d’ensemble du mois.
         </p>
       </div>
 
@@ -117,10 +114,7 @@ function BulletinsDuMois({
   }
   if (!data || data.length === 0) {
     return (
-      <EmptyState>
-        Aucun bulletin pour ce mois. Le bulletin ne concerne que les employés payés par
-        virement, les seuls déclarés à la C.N.S.S.
-      </EmptyState>
+      <EmptyState>Aucun bulletin pour ce mois : la paie n’a encore personne.</EmptyState>
     )
   }
 
@@ -177,7 +171,7 @@ function BulletinsDuMois({
             Le bulletin d’une seule personne
           </h2>
           <span className="text-sm text-slate-500">
-            {data.length} employé(s) par virement · {formatDH(total)}
+            {data.length} employé(s) · {formatDH(total)}
           </span>
         </div>
         <input

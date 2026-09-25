@@ -24,6 +24,7 @@ export interface Bulletin {
     date_embauche: string | null
     situation_familiale: string | null
     nombre_enfants: number | null
+    mode_reglement: string | null
     banque: string | null
     rib: string | null
     site_nom: string | null

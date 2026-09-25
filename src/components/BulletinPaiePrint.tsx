@@ -137,7 +137,7 @@ export default function BulletinPaiePrint({
                     />
                     <Paire
                       cases={[
-                        ['Mode de règlement', 'Virement'],
+                        ['Mode de règlement', b.employe.mode_reglement || '—'],
                         ['Banque', b.employe.banque || '—'],
                       ]}
                       accent={entete.accent}
