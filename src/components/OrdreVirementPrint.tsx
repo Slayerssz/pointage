@@ -154,19 +154,6 @@ export default function OrdreVirementPrint({
                     </tbody>
                   </table>
 
-                  {/* La formule adressée à la banque */}
-                  <div style={{ fontSize: '9.5pt', fontWeight: 700, margin: '1mm 0 2mm' }}>
-                    <p>Nous Vous Prions De Bien Vouloir De Virer Par</p>
-                    <p>
-                      Le Debit De Nous Compte N° {rib(ribOrdinateur)} De La Societe{' '}
-                      {entreprise.toUpperCase()}
-                    </p>
-                    <p>
-                      Les Virements Suivants: La Somme de
-                      <span style={{ marginLeft: '18mm' }}>{n2(total)} Dirhams</span>
-                    </p>
-                  </div>
-
                   {/* Bénéficiaires */}
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
