@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDH, moisLabel, usePeriodeDuMois } from '../../lib/paie'
-import { useBulletins, type SaisieBulletin as Saisie } from '../../lib/bulletin'
+import { useBulletins, type Bulletin } from '../../lib/bulletin'
+import { useEtablirBulletin } from '../../lib/archiveBulletins'
+import ArchiveBulletins from '../../components/ArchiveBulletins'
 import SaisieBulletin from '../../components/SaisieBulletin'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import BulletinPaiePrint from '../../components/BulletinPaiePrint'
@@ -98,7 +100,10 @@ function BulletinsDuMois({
   // Demander le bulletin de quelqu'un passe par trois questions : le
   // brut, les jours, l'avance. Tant qu'on n'y a pas répondu, rien ne sort.
   const [aSaisir, setASaisir] = useState<string | null>(null)
-  const [unSeul, setUnSeul] = useState<{ id: string; saisie: Saisie } | null>(null)
+  // Ce qui s'imprime est la copie conservée par l'archive, jamais un
+  // recalcul : le papier et l'archive ne peuvent donc pas diverger.
+  const [unSeul, setUnSeul] = useState<Bulletin | null>(null)
+  const etablir = useEtablirBulletin(companyId)
   const [recherche, setRecherche] = useState('')
 
   if (isLoading) return <Spinner label="Préparation des bulletins…" />
@@ -129,14 +134,8 @@ function BulletinsDuMois({
   }
   if (unSeul) {
     return (
-      <BulletinUnSeul
-        periodeId={periodeId}
-        employeeId={unSeul.id}
-        saisie={unSeul.saisie}
-        entreprise={entreprise}
-        modeleDocument={cleModele}
-        onClose={() => setUnSeul(null)}
-      />
+      <BulletinPaiePrint bulletins={[unSeul]} entreprise={entreprise}
+                         modeleDocument={cleModele} onClose={() => setUnSeul(null)} />
     )
   }
 
@@ -217,41 +216,31 @@ function BulletinsDuMois({
         </ul>
       </div>
 
+      <ArchiveBulletins companyId={companyId} entreprise={entreprise} />
+
+      {etablir.isPending && <Spinner label="Établissement du bulletin…" />}
+      {etablir.error && (
+        <ErrorNote>
+          {etablir.error.message}
+          {etablir.error.message.includes('déjà été établi') && (
+            <> Rouvrez-le plus bas, ou demandez-en la modification.</>
+          )}
+        </ErrorNote>
+      )}
+
       {aSaisir && (
         <SaisieBulletin
           nom={data.find((b) => b.employe.id === aSaisir)?.employe.nom_prenom ?? ''}
-          onValider={(v) => { setUnSeul({ id: aSaisir, saisie: v }); setASaisir(null) }}
+          onValider={(saisie) => {
+            const employeeId = aSaisir
+            setASaisir(null)
+            etablir.mutate({ periodeId, employeeId, saisie },
+                           { onSuccess: (bulletin) => setUnSeul(bulletin) })
+          }}
           onClose={() => setASaisir(null)}
         />
       )}
     </>
-  )
-}
-
-/**
- * Le bulletin d'une seule personne, recalculé d'après ce qui vient
- * d'être saisi. C'est la base qui refait le calcul : les taux et le
- * barème de l'I.G.R. sont chez elle, pas ici.
- */
-function BulletinUnSeul({
-  periodeId, employeeId, saisie, entreprise, modeleDocument, onClose,
-}: {
-  periodeId: string
-  employeeId: string
-  saisie: Saisie
-  entreprise: string
-  modeleDocument?: string | null
-  onClose: () => void
-}) {
-  const { data, isLoading, error } = useBulletins(periodeId, employeeId, saisie)
-  if (isLoading) return <Spinner label="Établissement du bulletin…" />
-  if (error) return <ErrorNote>{error.message}</ErrorNote>
-  if (!data || data.length === 0) {
-    return <EmptyState>Ce bulletin n’a pas pu être établi.</EmptyState>
-  }
-  return (
-    <BulletinPaiePrint bulletins={data} entreprise={entreprise}
-                       modeleDocument={modeleDocument} onClose={onClose} />
   )
 }
 

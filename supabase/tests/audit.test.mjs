@@ -1104,6 +1104,92 @@ ok('la ligne de paie est inchangée',
                    where periode_id=$1 and employee_id=$2`, [perTP, tAvec])).n)
      === num((await lig(tAvec)).net))
 
+// ═════════════ LE BULLETIN ÉTABLI RESTE-T-IL CONSULTABLE ? ════════════
+// Un bulletin remis est une pièce : il se garde tel qu'il a été édité.
+// La paie l'établit, mais ne le refait pas sans l'accord de
+// l'administrateur, et ne le supprime jamais.
+
+section('L’archive des bulletins')
+
+await connecte(paie)
+const archiveId = (await q1(
+  `select public.etablir_bulletin($1,$2,$3,$4,$5) as id`,
+  [perTP, tAvec, brutAuto * 2, 30, 500])).id
+ok('la paie établit un bulletin', Boolean(archiveId))
+
+const arch = await q1(`select * from public.bulletins_emis where id=$1`, [archiveId])
+ok('… le nom et le matricule s’y lisent sans ouvrir le document',
+   arch.nom_prenom === saisi.employe.nom_prenom)
+ok('… le net conservé est celui du bulletin édité',
+   Math.abs(num(arch.net_a_payer) - num(saisi.pied.net_a_payer)) < 0.01,
+   `${arch.net_a_payer} vs ${saisi.pied.net_a_payer}`)
+ok('… le mois vient de la période', arch.annee === 2026 || arch.mois >= 1)
+ok('… et le document entier est conservé',
+   Array.isArray(arch.document?.lignes) && arch.document.lignes.length > 0)
+
+// Le refaire ne va pas de soi.
+await refuse('on ne refait pas un bulletin déjà établi',
+  `select public.etablir_bulletin($1,$2,$3,$4,$5)`,
+  [perTP, tAvec, 9999, 26, 0], /déjà été établi/i)
+
+await refuse('la paie ne supprime pas un bulletin',
+  `select public.supprimer_bulletin_emis($1)`, [archiveId], /Action réservée/i)
+// Le bureau couvre la paie (BLOC 20) : il établit donc les bulletins
+// comme elle. La réciproque reste fausse.
+await connecte(bureau)
+ok('le bureau aussi établit un bulletin',
+   await reussit(`select public.etablir_bulletin($1,$2,null,null,null)`, [perTP, eEspeces]))
+await connecte(paie)
+
+// La demande de modification.
+await refuse('une demande sans motif est refusée',
+  `select public.demander_modification_bulletin($1,'   ')`, [archiveId], /pourquoi/i)
+ok('la paie demande la modification',
+   await reussit(`select public.demander_modification_bulletin($1,$2)`,
+                 [archiveId, 'Le brut était faux.']))
+await refuse('la paie ne s’autorise pas elle-même',
+  `select public.repondre_modification_bulletin($1,true)`, [archiveId], /Action réservée/i)
+
+// Refusée, la demande disparaît et le bulletin reste figé.
+await connecte(admin)
+ok('l’administrateur peut refuser',
+   await reussit(`select public.repondre_modification_bulletin($1,false)`, [archiveId]))
+const apresRefus = await q1(`select * from public.bulletins_emis where id=$1`, [archiveId])
+ok('… la demande refusée s’efface', apresRefus.modification_demandee_le === null)
+ok('… et le bulletin reste verrouillé', apresRefus.modification_autorisee === false)
+await refuse('rien à répondre sans demande',
+  `select public.repondre_modification_bulletin($1,true)`, [archiveId], /Aucune modification/i)
+
+// Autorisée, elle ouvre une seule reprise.
+await connecte(paie)
+await reussit(`select public.demander_modification_bulletin($1,$2)`,
+              [archiveId, 'Le brut était faux.'])
+await connecte(admin)
+await reussit(`select public.repondre_modification_bulletin($1,true)`, [archiveId])
+ok('autorisée, la modification s’ouvre',
+   (await q1(`select modification_autorisee m from public.bulletins_emis where id=$1`,
+             [archiveId])).m === true)
+
+await connecte(paie)
+ok('la paie refait alors son bulletin',
+   await reussit(`select public.etablir_bulletin($1,$2,$3,$4,$5)`,
+                 [perTP, tAvec, brutAuto, 26, 0]))
+const refait = await q1(`select * from public.bulletins_emis where id=$1`, [archiveId])
+ok('… le bulletin gardé est le nouveau', num(refait.avance) === 0)
+ok('… il n’y en a toujours qu’un pour ce mois',
+   num((await q1(`select count(*) n from public.bulletins_emis
+                   where periode_id=$1 and employee_id=$2`, [perTP, tAvec])).n) === 1)
+ok('… et l’autorisation ne vaut qu’une fois', refait.modification_autorisee === false)
+await refuse('… la suivante repasse par l’administrateur',
+  `select public.etablir_bulletin($1,$2,null,null,null)`, [perTP, tAvec], /déjà été établi/i)
+
+// La suppression n'appartient qu'à l'administrateur.
+await connecte(admin)
+ok('l’administrateur supprime',
+   await reussit(`select public.supprimer_bulletin_emis($1)`, [archiveId]))
+ok('… et le bulletin a bien disparu',
+   num((await q1(`select count(*) n from public.bulletins_emis where id=$1`, [archiveId])).n) === 0)
+
 section('La photo suit-elle la fiche ?')
 
 const listeUnique = (await db.query(

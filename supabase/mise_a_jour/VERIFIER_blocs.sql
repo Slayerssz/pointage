@@ -108,7 +108,10 @@ with attendu (numero, bloc, objet, present) as (
   (36, 'Bulletin pour tous',       'bulletin_paie ne filtre plus les virements',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'bulletin_paie'
-                  and pg_get_functiondef(p.oid) not like '%like ''vir%%'))
+                  and pg_get_functiondef(p.oid) not like '%like ''vir%%')),
+  (37, 'Bulletins conservés',      'table bulletins_emis',
+       exists (select 1 from information_schema.tables
+                where table_schema = 'public' and table_name = 'bulletins_emis'))
 )
 select numero,
        bloc,
