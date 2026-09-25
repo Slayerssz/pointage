@@ -235,7 +235,7 @@ function BulletinsDuMois({
 
       {aSaisir && (
         <SaisieBulletin
-          bulletin={data.find((b) => b.employe.id === aSaisir)!}
+          nom={data.find((b) => b.employe.id === aSaisir)?.employe.nom_prenom ?? ''}
           onValider={(v) => { setUnSeul({ id: aSaisir, saisie: v }); setASaisir(null) }}
           onClose={() => setASaisir(null)}
         />

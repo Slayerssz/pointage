@@ -1,19 +1,16 @@
 import { useState } from 'react'
 import { useFermerSurEchap } from '../lib/impression'
-import { formatDH } from '../lib/paie'
-import type { Bulletin } from '../lib/bulletin'
 
 /**
  * LES TROIS CHIFFRES DU BULLETIN.
  *
- * Le service paie établit le bulletin à partir du salaire brut, du
- * nombre de jours travaillés et de l'avance éventuelle. Les deux
- * premiers arrivent préremplis avec ce que la paie a calculé : on
- * accepte d'un clic, ou on corrige — retaper cinquante salaires que le
- * système connaît déjà n'aurait pas de sens.
+ * Le service paie établit le bulletin à partir de trois chiffres qu'il
+ * saisit : le salaire brut, le nombre de jours travaillés, l'avance
+ * éventuelle. Les champs partent vides — c'est la réponse à ces
+ * questions qui fait le bulletin, pas ce que la paie avait calculé.
  *
- * Le reste du bulletin — C.N.S.S., A.M.O., I.G.R., net — se calcule à
- * partir de ces chiffres-là, côté base, avec les taux de la société.
+ * Le reste — C.N.S.S., A.M.O., I.G.R., net — se calcule à partir de ces
+ * chiffres-là, côté base, avec les taux de la société.
  */
 export interface SaisieBulletinValeurs {
   salaireBrut: number
@@ -22,27 +19,24 @@ export interface SaisieBulletinValeurs {
 }
 
 export default function SaisieBulletin({
-  bulletin,
+  nom,
   onValider,
   onClose,
 }: {
-  /** Le bulletin tel que la paie le calcule : sert de point de départ. */
-  bulletin: Bulletin
+  nom: string
   onValider: (v: SaisieBulletinValeurs) => void
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
 
-  const brutPaie = Number(bulletin.lignes.find((l) => l.code === '001')?.gain ?? 0)
-  const joursPaie = Number(bulletin.pied.jours_travailles ?? 0)
-
-  const [salaireBrut, setSalaireBrut] = useState(String(brutPaie))
-  const [jours, setJours] = useState(String(joursPaie))
-  const [avance, setAvance] = useState('0')
+  const [salaireBrut, setSalaireBrut] = useState('')
+  const [jours, setJours] = useState('')
+  const [avance, setAvance] = useState('')
 
   const n = (v: string) => Number(v.replace(',', '.')) || 0
-  const invalide = n(salaireBrut) < 0 || n(jours) < 0 || n(avance) < 0
-  const modifie = n(salaireBrut) !== brutPaie || n(jours) !== joursPaie || n(avance) !== 0
+  const vide = salaireBrut.trim() === '' || jours.trim() === ''
+  const negatif = n(salaireBrut) < 0 || n(jours) < 0 || n(avance) < 0
+  const invalide = vide || negatif
 
   const champ = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums'
 
@@ -57,7 +51,7 @@ export default function SaisieBulletin({
         }}
       >
         <h2 className="text-lg font-semibold text-slate-900">
-          Bulletin de {bulletin.employe.nom_prenom}
+          Bulletin de {nom}
         </h2>
         <p className="mt-1 text-sm text-slate-500">
           Trois chiffres, et le bulletin se calcule : cotisations, I.G.R. et net compris.
@@ -69,11 +63,9 @@ export default function SaisieBulletin({
             type="number" step="0.01" min="0" autoFocus
             value={salaireBrut}
             onChange={(e) => setSalaireBrut(e.target.value)}
+            placeholder="ex. 3046"
             className={champ}
           />
-          <span className="mt-1 block text-xs text-slate-500">
-            La paie a calculé {formatDH(brutPaie)}.
-          </span>
         </label>
 
         <label className="mt-3 block">
@@ -82,11 +74,9 @@ export default function SaisieBulletin({
             type="number" step="0.5" min="0"
             value={jours}
             onChange={(e) => setJours(e.target.value)}
+            placeholder="ex. 26"
             className={champ}
           />
-          <span className="mt-1 block text-xs text-slate-500">
-            Le pointage en compte {joursPaie}.
-          </span>
         </label>
 
         <label className="mt-3 block">
@@ -95,14 +85,15 @@ export default function SaisieBulletin({
             type="number" step="0.01" min="0"
             value={avance}
             onChange={(e) => setAvance(e.target.value)}
+            placeholder="0"
             className={champ}
           />
           <span className="mt-1 block text-xs text-slate-500">
-            Retenue sur le bulletin et déduite du net. Laissez 0 s’il n’y en a pas.
+            Portée en retenue et déduite du net. À laisser vide s’il n’y en a pas.
           </span>
         </label>
 
-        {invalide && (
+        {negatif && (
           <p className="mt-3 text-sm text-red-600">Un montant ne peut pas être négatif.</p>
         )}
 
@@ -119,7 +110,7 @@ export default function SaisieBulletin({
             disabled={invalide}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
           >
-            {modifie ? 'Établir le bulletin' : 'Établir sans changement'}
+            Établir le bulletin
           </button>
         </div>
       </form>
