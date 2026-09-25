@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { formatDH, moisLabel, usePeriodeDuMois } from '../../lib/paie'
-import { useBulletins } from '../../lib/bulletin'
+import { useBulletins, type SaisieBulletin as Saisie } from '../../lib/bulletin'
+import SaisieBulletin from '../../components/SaisieBulletin'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import BulletinPaiePrint from '../../components/BulletinPaiePrint'
 import RecapPaiePrint from '../../components/RecapPaiePrint'
@@ -107,7 +108,10 @@ function BulletinsDuMois({
   const { data: cleModele } = useModeleSociete(companyId)
   const { data, isLoading, error } = useBulletins(periodeId, null)
   const [forme, setForme] = useState<'individuel' | 'recap' | null>(null)
-  const [unSeul, setUnSeul] = useState<string | null>(null)
+  // Demander le bulletin de quelqu'un passe par trois questions : le
+  // brut, les jours, l'avance. Tant qu'on n'y a pas répondu, rien ne sort.
+  const [aSaisir, setASaisir] = useState<string | null>(null)
+  const [unSeul, setUnSeul] = useState<{ id: string; saisie: Saisie } | null>(null)
   const [recherche, setRecherche] = useState('')
 
   if (isLoading) return <Spinner label="Préparation des bulletins…" />
@@ -140,9 +144,16 @@ function BulletinsDuMois({
                               modeleDocument={cleModele} onClose={() => setForme(null)} />
   }
   if (unSeul) {
-    const un = data.filter((b) => b.employe.id === unSeul)
-    return <BulletinPaiePrint bulletins={un} entreprise={entreprise}
-                              modeleDocument={cleModele} onClose={() => setUnSeul(null)} />
+    return (
+      <BulletinUnSeul
+        periodeId={periodeId}
+        employeeId={unSeul.id}
+        saisie={unSeul.saisie}
+        entreprise={entreprise}
+        modeleDocument={cleModele}
+        onClose={() => setUnSeul(null)}
+      />
+    )
   }
 
   const q = recherche.trim().toLowerCase()
@@ -211,7 +222,7 @@ function BulletinsDuMois({
                   {formatDH(b.pied.net_a_payer)}
                 </span>
                 <button
-                  onClick={() => setUnSeul(b.employe.id)}
+                  onClick={() => setASaisir(b.employe.id)}
                   className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                 >
                   Bulletin
@@ -221,7 +232,42 @@ function BulletinsDuMois({
           ))}
         </ul>
       </div>
+
+      {aSaisir && (
+        <SaisieBulletin
+          bulletin={data.find((b) => b.employe.id === aSaisir)!}
+          onValider={(v) => { setUnSeul({ id: aSaisir, saisie: v }); setASaisir(null) }}
+          onClose={() => setASaisir(null)}
+        />
+      )}
     </>
+  )
+}
+
+/**
+ * Le bulletin d'une seule personne, recalculé d'après ce qui vient
+ * d'être saisi. C'est la base qui refait le calcul : les taux et le
+ * barème de l'I.G.R. sont chez elle, pas ici.
+ */
+function BulletinUnSeul({
+  periodeId, employeeId, saisie, entreprise, modeleDocument, onClose,
+}: {
+  periodeId: string
+  employeeId: string
+  saisie: Saisie
+  entreprise: string
+  modeleDocument?: string | null
+  onClose: () => void
+}) {
+  const { data, isLoading, error } = useBulletins(periodeId, employeeId, saisie)
+  if (isLoading) return <Spinner label="Établissement du bulletin…" />
+  if (error) return <ErrorNote>{error.message}</ErrorNote>
+  if (!data || data.length === 0) {
+    return <EmptyState>Ce bulletin n’a pas pu être établi.</EmptyState>
+  }
+  return (
+    <BulletinPaiePrint bulletins={data} entreprise={entreprise}
+                       modeleDocument={modeleDocument} onClose={onClose} />
   )
 }
 

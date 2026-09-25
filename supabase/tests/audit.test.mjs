@@ -1039,6 +1039,57 @@ const eAdmin = await employe('SUPPRIME PAR ADMIN', { cin: 'SUP2', cnss: '9400000
 ok('l’administrateur supprime aussi',
    await reussit(`select public.supprimer_employe($1)`, [eAdmin]))
 
+// ═══════════════════ LE BULLETIN SE REMPLIT-IL À LA MAIN ? ═════════════════
+// Le service paie saisit trois chiffres — brut, jours, avance — et tout le
+// reste s'en déduit. Laissés vides, ce sont ceux de la paie qui servent.
+
+section('Le bulletin saisi à la main')
+
+await connecte(paie)
+const bulDe = async (args) => (await q1(
+  `select public.bulletin_paie($1,$2,$3,$4,$5) as b`, args))?.b?.[0]
+
+const auto = await bulDe([perTP, tAvec, null, null, null])
+ok('sans saisie, le bulletin reste celui de la paie', Boolean(auto))
+const brutAuto = Number(auto.lignes.find((l) => l.code === '001').gain)
+
+// Le même bulletin, avec un brut saisi deux fois plus grand.
+const saisi = await bulDe([perTP, tAvec, brutAuto * 2, 30, 500])
+const ligneB = (b, c) => b.lignes.find((l) => l.code === c)
+ok('le brut saisi remplace celui de la paie',
+   Number(ligneB(saisi, '001').gain) === brutAuto * 2)
+ok('les jours saisis aussi', Number(ligneB(saisi, '001').taux) === 30)
+ok('la C.N.S.S. suit le brut saisi',
+   Number(ligneB(saisi, '068').retenue) > Number(ligneB(auto, '068').retenue))
+ok('l’A.M.O. aussi',
+   Number(ligneB(saisi, '069').retenue) === Number(ligneB(auto, '069').retenue) * 2)
+ok('l’avance s’inscrit en retenue', Number(ligneB(saisi, '012').retenue) === 500)
+
+const netAttendu = Number(ligneB(saisi, '001').gain)
+  - Number(ligneB(saisi, '068').retenue)
+  - Number(ligneB(saisi, '069').retenue)
+  - Number(ligneB(saisi, '070').retenue)
+  + Number(saisi.frais_transport) + Number(saisi.frais_panier)
+  - 500
+ok('le net déduit l’avance',
+   Math.abs(Number(saisi.pied.net_a_payer) - netAttendu) < 0.01,
+   `${saisi.pied.net_a_payer} vs ${netAttendu}`)
+ok('… et le pied annonce les jours saisis',
+   Number(saisi.pied.jours_travailles) === 30)
+
+// Ce qui est refusé.
+await refuse('pas de saisie sur un état d’ensemble',
+  `select public.bulletin_paie($1, null, 5000, null, null)`, [perTP], /un employé à la fois/i)
+await refuse('pas de montant négatif',
+  `select public.bulletin_paie($1,$2,-1,null,null)`, [perTP, tAvec], /négatif/i)
+
+// La paie elle-même n'a pas bougé : l'avance est une mention du bulletin.
+await connecte(bureau)
+ok('la ligne de paie est inchangée',
+   num((await q1(`select net_a_payer n from public.lignes_paie
+                   where periode_id=$1 and employee_id=$2`, [perTP, tAvec])).n)
+     === num((await lig(tAvec)).net))
+
 section('La photo suit-elle la fiche ?')
 
 const listeUnique = (await db.query(

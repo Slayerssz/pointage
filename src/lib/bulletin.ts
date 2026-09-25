@@ -49,6 +49,8 @@ export interface Bulletin {
   /** Indemnités mensuelles, hors assiette de cotisation. */
   frais_transport: number
   frais_panier: number
+  /** L'avance saisie à l'édition, retenue sur le net. */
+  avance?: number
   /** Vrai quand le brut dépasse le seuil mais qu'aucun barème n'est saisi. */
   bareme_igr_absent: boolean
 }
@@ -66,14 +68,28 @@ export interface TrancheIgr {
  * Les bulletins d'une période. Seuls les employés payés par virement
  * en ont un : ce sont les seuls déclarés à la C.N.S.S.
  */
-export function useBulletins(periodeId: string | null, employeeId?: string | null) {
+/** Les trois chiffres saisis à l'édition d'un bulletin, s'il y en a. */
+export interface SaisieBulletin {
+  salaireBrut: number
+  jours: number
+  avance: number
+}
+
+export function useBulletins(
+  periodeId: string | null,
+  employeeId?: string | null,
+  saisie?: SaisieBulletin | null,
+) {
   return useQuery({
-    queryKey: ['bulletins', periodeId, employeeId ?? null],
+    queryKey: ['bulletins', periodeId, employeeId ?? null, saisie ?? null],
     enabled: !!periodeId,
     queryFn: async (): Promise<Bulletin[]> => {
       const { data, error } = await supabase.rpc('bulletin_paie', {
         p_periode: periodeId,
         p_employee: employeeId ?? null,
+        p_salaire_brut: saisie?.salaireBrut ?? null,
+        p_jours: saisie?.jours ?? null,
+        p_avance: saisie?.avance ?? null,
       })
       if (error) throw error
       return (data ?? []) as Bulletin[]

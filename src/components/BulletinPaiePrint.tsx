@@ -177,9 +177,11 @@ export default function BulletinPaiePrint({
                   </thead>
                   <tbody>
                     {b.lignes
-                      // Une indemnité à zéro n'a rien à faire sur le bulletin :
-                      // celui qui n'en a pas retrouve exactement sa mise en page.
+                      // Une indemnité ou une avance à zéro n'a rien à faire
+                      // sur le bulletin : celui qui n'en a pas retrouve
+                      // exactement sa mise en page.
                       .filter((l) => !(['010', '011'].includes(l.code) && !Number(l.gain)))
+                      .filter((l) => !(l.code === '012' && !Number(l.retenue)))
                       .map((l, j) => {
                       const total = l.libelle === 'GAIN NET'
                       return (
