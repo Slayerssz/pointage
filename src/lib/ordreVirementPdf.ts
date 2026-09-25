@@ -8,15 +8,14 @@
  * On le trace donc au millimètre, d'après le modèle papier du groupe.
  */
 
-import { MOIS_FR } from './paie'
 import type { LignePaie } from './types'
 
 /** Page A4 et marges, en millimètres. */
 // Le haut est laissé libre : un en-tête de société viendra s'y poser.
-const P = { l: 210, h: 297, marge: 14, haut: 40 }
+const P = { l: 210, h: 297, marge: 12, haut: 40 }
 
-/** Les trois colonnes du tableau des bénéficiaires. */
-const COL = { nom: 76, rib: 64, montant: 42 }
+/** Les trois colonnes du tableau des bénéficiaires, au modèle. */
+const COL = { nom: 67, rib: 66, montant: 53 }
 const LARGEUR = COL.nom + COL.rib + COL.montant
 
 /** Cartouche : la colonne des intitulés, puis celle des valeurs. */
@@ -44,9 +43,8 @@ const n2 = (v: number | string | null | undefined) =>
     .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     .replace(/[\u202f\u00a0\s]/g, ' ')
 
-/** Un R.I.B. se lit par groupes de quatre chiffres. */
-const formaterRib = (v: string | null | undefined) =>
-  v ? v.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim() : ''
+/** Le modèle écrit les R.I.B. d'un seul tenant, sans séparateur. */
+const formaterRib = (v: string | null | undefined) => (v ? v.replace(/\s/g, '') : '')
 
 /**
  * Dessine les ordres et renvoie le document. Séparé de l'enregistrement
@@ -69,7 +67,8 @@ export async function dessinerOrdreVirement(opts: {
   doc.setLineWidth(0.4)
 
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
-  const libelle = `Virement Salaire mois ${MOIS_FR[mois - 1]} ${annee}`
+  const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
+  const ribPropre = formaterRib(ribOrdinateur)
 
   /** Une case : cadre, fond éventuel, puis le texte à l'intérieur. */
   const case_ = (
@@ -121,15 +120,32 @@ export async function dessinerOrdreVirement(opts: {
         y += CARTOUCHE.hauteur
       }
 
-      // La première ligne ne porte pas de cadre à droite, comme le modèle.
-      ligneCartouche(`Date        :   ${aujourdhui}`, '', { valeurCadre: false })
-      ligneCartouche('RAISON SOCIAL', entreprise.toUpperCase())
-      ligneCartouche('RIB ORDINATEUR', formaterRib(ribOrdinateur), { mono: true })
-      ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(ordre.lignes.length))
+      // La date, dans sa case, en haut à droite au-dessus du cartouche.
+      case_(x + COL.nom + COL.rib, y, COL.montant, CARTOUCHE.hauteur,
+            `Date        :   ${aujourdhui}`, { gras: true, taille: 9.5 })
+      y += CARTOUCHE.hauteur
+
+      ligneCartouche('RAISON SOCIAL', `SOCIETE ${entreprise.toUpperCase()}`, { valeurGrasse: true })
+      ligneCartouche('RIB ORDINATEUR', ribPropre, { valeurGrasse: true })
+      ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(ordre.lignes.length), { valeurGrasse: true })
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
 
-      y += 3
+      // La formule adressée à la banque, sous le cartouche.
+      y += 1.5
+      const phrase = [
+        'Nous Vous Prions De Bien Vouloir De Virer Par',
+        `Le Debit De Nous Compte N° ${ribPropre} De La Societe ${entreprise.toUpperCase()}`,
+      ]
+      for (const ligne of phrase) {
+        doc.setFont('times', 'bold').setFontSize(9.5)
+        doc.text(ligne, x, y + 3.4)
+        y += 4.6
+      }
+      doc.setFont('times', 'bold').setFontSize(9.5)
+      doc.text('Les Virements Suivants: La Somme de', x, y + 3.4)
+      doc.text(`${n2(total)} Dirhams`, x + 70, y + 3.4)
+      y += 6
 
       // ── Les bénéficiaires ─────────────────────────────────────────
       const hEntete = 9

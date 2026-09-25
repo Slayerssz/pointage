@@ -50,9 +50,10 @@ export default function OrdreVirementPrint({
 
   const n2 = (v: number | null | undefined) =>
     v == null ? '' : Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const rib = (v: string | null) => (v ? v.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim() : '')
+  // Le modèle écrit les R.I.B. d'un seul tenant, sans séparateur.
+  const rib = (v: string | null) => (v ? v.replace(/\s/g, '') : '')
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
-  const libelle = `Virement Salaire mois ${MOIS_FR[mois - 1]} ${annee}`
+  const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
   const nbTotal = ordres.reduce((s, o) => s + o.lignes.length, 0)
 
   const titre =
@@ -107,30 +108,40 @@ export default function OrdreVirementPrint({
                   className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
                   style={{
                     // Le haut reste libre pour un futur en-tête de société.
-                    width: '210mm', minHeight: '297mm', padding: '39mm 16mm 14mm',
+                    width: '210mm', minHeight: '297mm', padding: '39mm 12mm 14mm',
                     color: '#000', breakAfter: 'page', fontFamily: 'Georgia, "Times New Roman", serif',
                   }}
                 >
                   {/* Cartouche */}
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3mm' }}>
                     <tbody>
+                      {/* La date, dans sa case, en haut à droite */}
                       <tr>
-                        <td style={{ ...gras, width: '42%' }}>Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp; {aujourdhui}</td>
                         <td style={{ border: 'none' }} />
-                      </tr>
-                      <tr>
-                        <td style={gras}>RAISON SOCIAL</td>
-                        <td style={cell}>{entreprise.toUpperCase()}</td>
-                      </tr>
-                      <tr>
-                        <td style={gras}>RIB ORDINATEUR</td>
-                        <td style={{ ...cell, fontFamily: 'monospace', letterSpacing: '.04em' }}>
-                          {rib(ribOrdinateur)}
+                        <td style={{ border: 'none', padding: 0 }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ border: 'none', width: '55%' }} />
+                                <td style={gras}>
+                                  Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp; {aujourdhui}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </td>
                       </tr>
                       <tr>
+                        <td style={gras}>RAISON SOCIAL</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>SOCIETE {entreprise.toUpperCase()}</td>
+                      </tr>
+                      <tr>
+                        <td style={gras}>RIB ORDINATEUR</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>{rib(ribOrdinateur)}</td>
+                      </tr>
+                      <tr>
                         <td style={gras}>NOMBRE TOTAL D'OPERATIONS</td>
-                        <td style={cell}>{o.lignes.length}</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>{o.lignes.length}</td>
                       </tr>
                       <tr>
                         <td style={gras}>MONTANT TOTAL D'OPERATIONS</td>
@@ -143,12 +154,25 @@ export default function OrdreVirementPrint({
                     </tbody>
                   </table>
 
+                  {/* La formule adressée à la banque */}
+                  <div style={{ fontSize: '9.5pt', fontWeight: 700, margin: '1mm 0 2mm' }}>
+                    <p>Nous Vous Prions De Bien Vouloir De Virer Par</p>
+                    <p>
+                      Le Debit De Nous Compte N° {rib(ribOrdinateur)} De La Societe{' '}
+                      {entreprise.toUpperCase()}
+                    </p>
+                    <p>
+                      Les Virements Suivants: La Somme de
+                      <span style={{ marginLeft: '18mm' }}>{n2(total)} Dirhams</span>
+                    </p>
+                  </div>
+
                   {/* Bénéficiaires */}
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#d9d9d9', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
-                        <th style={{ ...gras, width: '42%', textAlign: 'center', padding: '2.6mm' }}>Nom Bénéficiare</th>
-                        <th style={{ ...gras, width: '35%', textAlign: 'center', padding: '2.6mm' }}>RIB Bénéficiare</th>
+                        <th style={{ ...gras, width: '36%', textAlign: 'center', padding: '2.6mm' }}>Nom Bénéficiare</th>
+                        <th style={{ ...gras, width: '36%', textAlign: 'center', padding: '2.6mm' }}>RIB Bénéficiare</th>
                         <th style={{ ...gras, textAlign: 'center', padding: '2.6mm' }}>Montant Virement</th>
                       </tr>
                     </thead>
