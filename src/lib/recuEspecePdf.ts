@@ -14,8 +14,8 @@ import { societeDe } from './societes'
 import type { LignePaie } from './types'
 
 const P = { l: 210, h: 297 }
-/** Trois talons par page. */
-const PAR_PAGE = 3
+/** Quatre talons par page. */
+const PAR_PAGE = 4
 const HAUTEUR = P.h / PAR_PAGE
 const MARGE = 14
 
@@ -76,7 +76,7 @@ export async function dessinerRecusEspece(opts: {
 
     const haut = place * HAUTEUR
     const x = MARGE
-    let y = haut + 16
+    let y = haut + 12
 
     // Le trait de découpe, entre deux talons.
     if (place > 0) {
@@ -88,16 +88,16 @@ export async function dessinerRecusEspece(opts: {
     }
 
     // La date en tête, sur la même ligne que la société.
-    texte(nomSociete, x, y, { gras: true, taille: 14 })
+    texte(nomSociete, x, y, { gras: true, taille: 13 })
     texte(dateTexte, P.l - MARGE, y, { taille: 10, aligne: 'right' })
-    y += 7
-    texte(`Reçue ${numeroRecu(annee, mois, i + 1)}`, x, y, { gras: true, taille: 12 })
-    y += 10
+    y += 6
+    texte(`Reçue ${numeroRecu(annee, mois, i + 1)}`, x, y, { gras: true, taille: 11 })
+    y += 8
 
     // Le cadre de signature commence à la hauteur du premier renseignement :
     // sur la même ligne, pas en dessous.
     const cadreL = 52
-    const cadreH = 26
+    const cadreH = 22
     const cadreX = P.l - MARGE - cadreL
     const cadreY = y - 4
     texte('SIGNATURE', cadreX + cadreL / 2, cadreY - 2, { taille: 9, aligne: 'center' })
@@ -110,9 +110,9 @@ export async function dessinerRecusEspece(opts: {
       ['Salaire Net :', n2(l.net_a_payer)],
     ]
     for (const [label, valeur] of champs) {
-      texte(label, x, y, { taille: 10 })
-      texte(valeur, x + 32, y, { taille: 10 })
-      y += 6.5
+      texte(label, x, y, { taille: 9.5 })
+      texte(valeur, x + 32, y, { taille: 9.5 })
+      y += 5.8
     }
 
   })

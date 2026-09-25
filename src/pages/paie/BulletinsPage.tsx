@@ -49,7 +49,8 @@ export default function BulletinsPage() {
       <div className="mb-5">
         <h1 className="mb-1 text-xl font-semibold text-slate-900">Bulletins de paie</h1>
         <p className="text-sm text-slate-500">
-          Le bulletin de chaque employé payé par virement, ou l’état d’ensemble du mois.
+          Le bulletin ne concerne que les employés payés par <strong>virement</strong> : ce sont
+          les seuls déclarés à la C.N.S.S. Un par personne, ou l’état d’ensemble du mois.
         </p>
       </div>
 
@@ -175,7 +176,7 @@ function BulletinsDuMois({
             Le bulletin d’une seule personne
           </h2>
           <span className="text-sm text-slate-500">
-            {data.length} employé(s) · {formatDH(total)}
+            {data.length} employé(s) par virement · {formatDH(total)}
           </span>
         </div>
         <input

@@ -142,16 +142,6 @@ export default function BulletinPaiePrint({
                       ]}
                       accent={entete.accent}
                     />
-                    <tr>
-                      <Libelle accent={entete.accent}>R.I.B.</Libelle>
-                      <td
-                        colSpan={5}
-                        className="px-1.5 py-1"
-                        style={{ border: '1px solid #444', fontSize: '8.5pt', letterSpacing: '0.02em' }}
-                      >
-                        {b.employe.rib || '—'}
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
 

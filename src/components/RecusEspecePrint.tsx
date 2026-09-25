@@ -9,7 +9,7 @@ import type { LignePaie } from '../lib/types'
 /**
  * LES REÇUS D'ESPÈCES — le talon que l'employé signe en prenant son argent.
  *
- * Trois talons par feuille, séparés par un trait de découpe. Le numéro
+ * Quatre talons par feuille, séparés par un trait de découpe. Le numéro
  * suit le matricule, donc un talon réimprimé garde le sien.
  *
  * Le PDF n'est pas cette page photographiée : il est tracé au millimètre
@@ -72,40 +72,40 @@ export default function RecusEspecePrint({
               key={l.id}
               className="mx-auto bg-white shadow-xl print:shadow-none"
               style={{
-                width: '210mm', height: '99mm', padding: '14mm 14mm 10mm',
+                width: '210mm', height: '74.25mm', padding: '10mm 14mm 8mm',
                 marginTop: i === 0 ? '1.5rem' : 0,
                 color: '#000', fontFamily: 'Arial, Helvetica, sans-serif',
                 position: 'relative',
-                // Trois talons par feuille, puis on change de page.
-                breakAfter: (i + 1) % 3 === 0 ? 'page' : 'auto',
-                borderTop: i % 3 === 0 ? 'none' : '1px dashed #999',
+                // Quatre talons par feuille, puis on change de page.
+                breakAfter: (i + 1) % 4 === 0 ? 'page' : 'auto',
+                borderTop: i % 4 === 0 ? 'none' : '1px dashed #999',
               }}
             >
               <div className="flex items-start justify-between">
-                <p style={{ fontSize: '14pt', fontWeight: 700 }}>{nomSociete}</p>
+                  <p style={{ fontSize: '13pt', fontWeight: 700 }}>{nomSociete}</p>
                 <p style={{ fontSize: '10pt' }}>{dateTexte}</p>
               </div>
-              <p style={{ fontSize: '12pt', fontWeight: 700, marginTop: '2mm' }}>
+              <p style={{ fontSize: '11pt', fontWeight: 700, marginTop: '1.5mm' }}>
                 Reçue {numeroRecu(annee, mois, i + 1)}
               </p>
 
               {/* Le cadre de signature démarre à la hauteur du premier
                   renseignement : sur la même ligne, pas en dessous. */}
-              <div style={{ position: 'absolute', right: '14mm', top: '35mm', width: '52mm' }}>
+              <div style={{ position: 'absolute', right: '14mm', top: '26mm', width: '52mm' }}>
                 <p style={{ fontSize: '9pt', textAlign: 'center', marginBottom: '1.5mm' }}>
                   SIGNATURE
                 </p>
-                <div style={{ height: '26mm', border: '1px solid #000', borderRadius: '2mm' }} />
+                <div style={{ height: '22mm', border: '1px solid #000', borderRadius: '2mm' }} />
               </div>
 
-              <dl style={{ marginTop: '7mm', fontSize: '10pt' }}>
+              <dl style={{ marginTop: '5mm', fontSize: '9.5pt' }}>
                 {[
                   ['Nom Prenom :', l.nom_prenom.toUpperCase()],
                   ['Matricul :', l.matricule != null ? String(l.matricule) : '—'],
                   ['Site:', (l.site_nom ?? '—').toUpperCase()],
                   ['Salaire Net :', n2(l.net_a_payer)],
                 ].map(([label, valeur]) => (
-                  <div key={label} className="flex" style={{ marginBottom: '2.2mm' }}>
+                  <div key={label} className="flex" style={{ marginBottom: '1.8mm' }}>
                     <dt style={{ width: '32mm', flexShrink: 0 }}>{label}</dt>
                     <dd style={{ margin: 0 }}>{valeur}</dd>
                   </div>
