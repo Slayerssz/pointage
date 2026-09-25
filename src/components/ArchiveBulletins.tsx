@@ -76,19 +76,11 @@ export default function ArchiveBulletins({
   const enAttente = (data ?? []).filter((b) => b.modification_demandee_le && !b.modification_autorisee)
 
   return (
-    <section className="mt-8">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
-          Les bulletins déjà établis
-        </h2>
-        <span className="text-sm text-slate-500">
-          {(data ?? []).length} bulletin{(data ?? []).length > 1 ? 's' : ''} conservé
-          {(data ?? []).length > 1 ? 's' : ''}
-        </span>
-      </div>
+    <section>
       <p className="mb-3 text-sm text-slate-500">
-        Chacun se rouvre tel qu’il a été remis. Pour en corriger un, demandez la
-        modification : l’administrateur doit l’autoriser.
+        {(data ?? []).length} bulletin{(data ?? []).length > 1 ? 's' : ''} conservé
+        {(data ?? []).length > 1 ? 's' : ''}. Chacun se rouvre tel qu’il a été remis. Pour
+        en corriger un, demandez la modification : l’administrateur doit l’autoriser.
       </p>
 
       {estAdmin && enAttente.length > 0 && (

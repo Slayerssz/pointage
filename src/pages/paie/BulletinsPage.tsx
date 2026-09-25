@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { formatDH, moisLabel, usePeriodeDuMois } from '../../lib/paie'
 import { useBulletins, type Bulletin } from '../../lib/bulletin'
-import { useEtablirBulletin } from '../../lib/archiveBulletins'
+import { useBulletinsEmis, useEtablirBulletin } from '../../lib/archiveBulletins'
 import ArchiveBulletins from '../../components/ArchiveBulletins'
 import SaisieBulletin from '../../components/SaisieBulletin'
 import { useModeleSociete } from '../../lib/modeleSociete'
@@ -10,14 +10,17 @@ import BulletinPaiePrint from '../../components/BulletinPaiePrint'
 import RecapPaiePrint from '../../components/RecapPaiePrint'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useSociete } from '../../lib/queries'
+import { useAuth } from '../../contexts/AuthContext'
 
 /**
  * LES BULLETINS DE PAIE.
  *
- * Un mois, et ce qu'on en tire : un bulletin par personne, l'état
- * d'ensemble pour la banque et le comptable, ou le bulletin d'un seul
- * employé qu'on cherche par son nom. Tout le monde y a droit, quel que
- * soit le mode de règlement.
+ * Deux volets. « Les bulletins du mois » : un bulletin par personne,
+ * l'état d'ensemble pour la banque et le comptable, ou le bulletin d'un
+ * seul employé qu'on cherche par son nom. « Les bulletins établis » :
+ * tout ce qui a déjà été remis, conservé tel quel.
+ *
+ * Tout le monde a droit à un bulletin, quel que soit le mode de règlement.
  */
 export default function BulletinsPage() {
   const { companyId } = useParams()
@@ -27,6 +30,15 @@ export default function BulletinsPage() {
   const { data: periode, isLoading, error } = usePeriodeDuMois(companyId, annee, mois)
 
   const { data: company } = useSociete(companyId)
+  const [onglet, setOnglet] = useState<'mois' | 'archive'>('mois')
+
+  // Le volet de l'archive est replié : sans ce compte, l'administrateur
+  // ne saurait pas qu'une demande de modification l'attend derrière.
+  const { profile } = useAuth()
+  const { data: emis } = useBulletinsEmis(companyId)
+  const aRepondre = profile?.role === 'admin'
+    ? (emis ?? []).filter((b) => b.modification_demandee_le && !b.modification_autorisee).length
+    : 0
 
   const decaler = (pas: number) => {
     const d = new Date(annee, mois - 1 + pas, 1)
@@ -44,49 +56,89 @@ export default function BulletinsPage() {
         </p>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => decaler(-1)}
-          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          title="Mois précédent"
-        >
-          ←
-        </button>
-        <span className="min-w-44 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-center text-sm font-semibold text-slate-900">
-          {moisLabel(annee, mois)}
-        </span>
-        <button
-          onClick={() => decaler(1)}
-          disabled={estMoisCourant}
-          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-          title={estMoisCourant ? 'Le mois en cours est le dernier' : 'Mois suivant'}
-        >
-          →
-        </button>
-        {!estMoisCourant && (
-          <button
-            onClick={() => { setAnnee(maintenant.getFullYear()); setMois(maintenant.getMonth() + 1) }}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Mois en cours
-          </button>
-        )}
+      <div className="mb-5 flex gap-1 border-b border-slate-200">
+        <Onglet actif={onglet === 'mois'} onClick={() => setOnglet('mois')}>
+          Les bulletins du mois
+        </Onglet>
+        <Onglet actif={onglet === 'archive'} onClick={() => setOnglet('archive')} compte={aRepondre}>
+          Les bulletins établis
+        </Onglet>
       </div>
 
-      {isLoading && <Spinner label="Ouverture du mois…" />}
-      {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
-      {!isLoading && !error && !periode && (
-        <EmptyState>Ce mois n’a pas encore commencé.</EmptyState>
+      {onglet === 'archive' && (
+        <ArchiveBulletins companyId={companyId} entreprise={company?.name ?? 'Entreprise'} />
       )}
 
-      {periode && (
-        <BulletinsDuMois
-          periodeId={periode.id}
-          entreprise={company?.name ?? 'Entreprise'}
-          companyId={companyId}
-        />
+      {onglet === 'mois' && (
+        <>
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => decaler(-1)}
+            className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            title="Mois précédent"
+          >
+            ←
+          </button>
+          <span className="min-w-44 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-center text-sm font-semibold text-slate-900">
+            {moisLabel(annee, mois)}
+          </span>
+          <button
+            onClick={() => decaler(1)}
+            disabled={estMoisCourant}
+            className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            title={estMoisCourant ? 'Le mois en cours est le dernier' : 'Mois suivant'}
+          >
+            →
+          </button>
+          {!estMoisCourant && (
+            <button
+              onClick={() => { setAnnee(maintenant.getFullYear()); setMois(maintenant.getMonth() + 1) }}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Mois en cours
+            </button>
+          )}
+        </div>
+
+        {isLoading && <Spinner label="Ouverture du mois…" />}
+        {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
+        {!isLoading && !error && !periode && (
+          <EmptyState>Ce mois n’a pas encore commencé.</EmptyState>
+        )}
+
+        {periode && (
+          <BulletinsDuMois
+            periodeId={periode.id}
+            entreprise={company?.name ?? 'Entreprise'}
+            companyId={companyId}
+          />
+        )}
+        </>
       )}
     </div>
+  )
+}
+
+/** Un onglet, et s'il y a lieu ce qui attend derrière. */
+function Onglet({
+  actif, onClick, compte, children,
+}: { actif: boolean; onClick: () => void; compte?: number; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+        actif
+          ? 'border-slate-900 text-slate-900'
+          : 'border-transparent text-slate-500 hover:text-slate-800'
+      }`}
+    >
+      {children}
+      {Boolean(compte) && (
+        <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white tabular-nums">
+          {compte}
+        </span>
+      )}
+    </button>
   )
 }
 
@@ -215,8 +267,6 @@ function BulletinsDuMois({
           ))}
         </ul>
       </div>
-
-      <ArchiveBulletins companyId={companyId} entreprise={entreprise} />
 
       {etablir.isPending && <Spinner label="Établissement du bulletin…" />}
       {etablir.error && (
