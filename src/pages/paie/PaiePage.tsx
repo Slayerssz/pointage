@@ -840,6 +840,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         <OrdreVirementPrint
           ordres={ordres}
           entreprise={company?.name ?? ''}
+          modeleDocument={cleModele}
           ribOrdinateur={company?.rib_ordinateur ?? null}
           annee={periode.annee}
           mois={periode.mois}

@@ -8,6 +8,7 @@
  * On le trace donc au millimètre, d'après le modèle papier du groupe.
  */
 
+import { societeDe } from './societes'
 import type { LignePaie } from './types'
 
 /** Page A4 et marges, en millimètres. */
@@ -64,6 +65,8 @@ const formaterRib = (v: string | null | undefined) => (v ? v.replace(/\s/g, '') 
 export async function dessinerOrdreVirement(opts: {
   ordres: OrdreDeVirement[]
   entreprise: string
+  /** Clé de modèle de la société : elle prime sur son nom. */
+  modeleDocument?: string | null
   ribOrdinateur: string | null
   annee: number
   mois: number
@@ -72,6 +75,9 @@ export async function dessinerOrdreVirement(opts: {
 }) {
   const { jsPDF } = opts.jsPDFModule ?? (await import('jspdf'))
   const { ordres, entreprise, ribOrdinateur, annee, mois } = opts
+  // La banque veut la raison sociale complète, pas le nom court du registre.
+  const raison = (societeDe(entreprise, opts.modeleDocument)?.raisonSociale ?? entreprise)
+    .toUpperCase()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc: any = new (jsPDF as any)({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -136,7 +142,7 @@ export async function dessinerOrdreVirement(opts: {
             `Date        :   ${aujourdhui}`, { gras: true, taille: 9.5 })
       y += CARTOUCHE.hauteur
 
-      ligneCartouche('RAISON SOCIAL', `SOCIETE ${entreprise.toUpperCase()}`, { valeurGrasse: true })
+      ligneCartouche('RAISON SOCIAL', `SOCIETE ${raison}`, { valeurGrasse: true })
       ligneCartouche('RIB ORDINATEUR', ribPropre, { valeurGrasse: true })
       ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(ordre.lignes.length), { valeurGrasse: true })
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
@@ -149,7 +155,7 @@ export async function dessinerOrdreVirement(opts: {
         doc.text('Nous Vous Prions De Bien Vouloir De Virer Par', x, y + 3.4)
         y += 4.6
         doc.text(
-          `Le Debit De Nous Compte N° ${ribPropre} De La Societe ${entreprise.toUpperCase()}`,
+          `Le Debit De Nous Compte N° ${ribPropre} De La Societe ${raison}`,
           x, y + 3.4,
         )
         y += 4.6
@@ -216,6 +222,7 @@ export async function dessinerOrdreVirement(opts: {
 export async function enregistrerOrdreVirementPdf(opts: {
   ordres: OrdreDeVirement[]
   entreprise: string
+  modeleDocument?: string | null
   ribOrdinateur: string | null
   annee: number
   mois: number

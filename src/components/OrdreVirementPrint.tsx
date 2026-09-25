@@ -3,6 +3,7 @@ import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impr
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
 import { enregistrerOrdreVirementPdf, LIGNES_PAR_PAGE } from '../lib/ordreVirementPdf'
+import { societeDe } from '../lib/societes'
 import type { LignePaie } from '../lib/types'
 
 /**
@@ -30,6 +31,7 @@ export interface OrdreDeSite {
 export default function OrdreVirementPrint({
   ordres,
   entreprise,
+  modeleDocument,
   ribOrdinateur,
   annee,
   mois,
@@ -38,6 +40,8 @@ export default function OrdreVirementPrint({
 }: {
   ordres: OrdreDeSite[]
   entreprise: string
+  /** Clé de modèle de la société : elle prime sur son nom. */
+  modeleDocument?: string | null
   ribOrdinateur: string | null
   annee: number
   mois: number
@@ -57,6 +61,8 @@ export default function OrdreVirementPrint({
   const nbTotal = ordres.reduce((s, o) => s + o.lignes.length, 0)
   // La formule d'usage : Vigilma et Serclean seulement, comme dans le PDF.
   const formule = ['VIGILMA', 'SERCLEAN'].some((m) => entreprise.toUpperCase().includes(m))
+  // La banque veut la raison sociale complète, pas le nom court du registre.
+  const raison = (societeDe(entreprise, modeleDocument)?.raisonSociale ?? entreprise).toUpperCase()
 
   const titre =
     ordres.length === 1
@@ -77,7 +83,7 @@ export default function OrdreVirementPrint({
           imprimer={imprimer}
           genererPdf={() =>
             enregistrerOrdreVirementPdf({
-              ordres, entreprise, ribOrdinateur, annee, mois,
+              ordres, entreprise, modeleDocument, ribOrdinateur, annee, mois,
               nomFichier:
                 ordres.length === 1
                   ? `Ordre_virement_${ordres[0].intitule.replace(/\s+/g, '_')}_${MOIS_FR[mois - 1]}_${annee}`
@@ -135,7 +141,7 @@ export default function OrdreVirementPrint({
                       </tr>
                       <tr>
                         <td style={gras}>RAISON SOCIAL</td>
-                        <td style={{ ...cell, fontWeight: 700 }}>SOCIETE {entreprise.toUpperCase()}</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>SOCIETE {raison}</td>
                       </tr>
                       <tr>
                         <td style={gras}>RIB ORDINATEUR</td>
@@ -160,8 +166,7 @@ export default function OrdreVirementPrint({
                     <div style={{ fontSize: '9.5pt', fontWeight: 700, margin: '1mm 0 2mm' }}>
                       <p>Nous Vous Prions De Bien Vouloir De Virer Par</p>
                       <p>
-                        Le Debit De Nous Compte N° {rib(ribOrdinateur)} De La Societe{' '}
-                        {entreprise.toUpperCase()}
+                        Le Debit De Nous Compte N° {rib(ribOrdinateur)} De La Societe {raison}
                       </p>
                       <p>
                         Les Virements Suivants: La Somme de
