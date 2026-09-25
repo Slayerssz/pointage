@@ -8,6 +8,7 @@
  * On le trace donc au millimètre, d'après le modèle papier du groupe.
  */
 
+import { montantEnLettres } from './montantEnLettres'
 import { societeDe } from './societes'
 import type { LignePaie } from './types'
 
@@ -159,9 +160,16 @@ export async function dessinerOrdreVirement(opts: {
           x, y + 3.4,
         )
         y += 4.6
-        doc.text('Les Virements Suivants: La Somme de', x, y + 3.4)
-        doc.text(`${n2(total)} Dirhams`, x + 70, y + 3.4)
-        y += 6
+        // La somme en toutes lettres : c'est elle qui fait foi.
+        const enLettres = montantEnLettres(total)
+        const lignesSomme = doc.splitTextToSize(
+          `Les Virements Suivants: La Somme de ${enLettres}`, LARGEUR,
+        ) as string[]
+        for (const l of lignesSomme) {
+          doc.text(l, x, y + 3.4)
+          y += 4.6
+        }
+        y += 1.4
       } else {
         y += 3
       }

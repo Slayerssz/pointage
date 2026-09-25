@@ -3,6 +3,7 @@ import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impr
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
 import { enregistrerOrdreVirementPdf, LIGNES_PAR_PAGE } from '../lib/ordreVirementPdf'
+import { montantEnLettres } from '../lib/montantEnLettres'
 import { societeDe } from '../lib/societes'
 import type { LignePaie } from '../lib/types'
 
@@ -168,10 +169,7 @@ export default function OrdreVirementPrint({
                       <p>
                         Le Debit De Nous Compte N° {rib(ribOrdinateur)} De La Societe {raison}
                       </p>
-                      <p>
-                        Les Virements Suivants: La Somme de
-                        <span style={{ marginLeft: '18mm' }}>{n2(total)} Dirhams</span>
-                      </p>
+                      <p>Les Virements Suivants: La Somme de {montantEnLettres(total)}</p>
                     </div>
                   )}
 
