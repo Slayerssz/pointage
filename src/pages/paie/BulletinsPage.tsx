@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
 import { formatDH, moisLabel, usePeriodeDuMois } from '../../lib/paie'
 import { useBulletins, type SaisieBulletin as Saisie } from '../../lib/bulletin'
 import SaisieBulletin from '../../components/SaisieBulletin'
@@ -9,6 +7,7 @@ import { useModeleSociete } from '../../lib/modeleSociete'
 import BulletinPaiePrint from '../../components/BulletinPaiePrint'
 import RecapPaiePrint from '../../components/RecapPaiePrint'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import { useSociete } from '../../lib/queries'
 
 /**
  * LES BULLETINS DE PAIE.
@@ -27,16 +26,7 @@ export default function BulletinsPage() {
   const [mois, setMois] = useState(maintenant.getMonth() + 1)
   const { data: periode, isLoading, error } = usePeriodeDuMois(companyId, annee, mois)
 
-  const { data: company } = useQuery({
-    queryKey: ['company', companyId],
-    enabled: Boolean(companyId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies').select('id, name').eq('id', companyId!).single()
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: company } = useSociete(companyId)
 
   const decaler = (pas: number) => {
     const d = new Date(annee, mois - 1 + pas, 1)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -24,6 +24,7 @@ import RecusEspecePrint from '../../components/RecusEspecePrint'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useModeleSociete } from '../../lib/modeleSociete'
+import { useSociete } from '../../lib/queries'
 
 export default function PaiePage() {
   const { companyId } = useParams()
@@ -144,16 +145,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   // Vient d'être validée → on met les exports en avant
   const [vientDeValider, setVientDeValider] = useState(false)
 
-  const { data: company } = useQuery({
-    queryKey: ['company', companyId],
-    enabled: Boolean(companyId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies').select('id, name, rib_ordinateur').eq('id', companyId!).single()
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: company } = useSociete(companyId)
 
   // Le bureau couvre la paie : il modifie les lignes comme le service paie.
   const estPaie =

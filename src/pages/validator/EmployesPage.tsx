@@ -8,7 +8,7 @@ import {
   jourDeReposLabel,
   retirementStatus,
 } from '../../lib/dates'
-import { useEmployeFiltres, useSites, useSitesPrincipaux, useTousLesSites } from '../../lib/queries'
+import { useEmployeFiltres, useSites, useSitesPrincipaux, useSociete, useTousLesSites } from '../../lib/queries'
 import { BANQUES, normaliserBanque } from '../../lib/banques'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatGardes } from '../../lib/gardes'
@@ -71,16 +71,7 @@ export default function EmployesPage() {
   const sitesImpression = estAdmin && toutesEntreprises ? (tousLesSites ?? sites ?? []) : (sites ?? [])
   const entrepriseDe = (emp: Employee) =>
     entreprises?.find((c) => c.id === emp.company_id)?.name ?? company?.name ?? ''
-  const { data: company } = useQuery({
-    queryKey: ['company', companyId],
-    enabled: Boolean(companyId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies').select('id, name').eq('id', companyId!).single()
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: company } = useSociete(companyId)
   // La colonne « Jours » montre un mois, pas un cumul depuis toujours.
   const maintenant = new Date()
   const [filtresOuverts, setFiltresOuverts] = useState(false)

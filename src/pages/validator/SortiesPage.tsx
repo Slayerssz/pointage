@@ -19,6 +19,7 @@ import { useDocuments } from '../../lib/documents'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
+import { useSociete } from '../../lib/queries'
 
 /**
  * LES SORTIES.
@@ -34,16 +35,7 @@ import type { Employee } from '../../lib/types'
 export default function SortiesPage() {
   const { companyId } = useParams()
   const { profile } = useAuth()
-  const { data: company } = useQuery({
-    queryKey: ['company', companyId],
-    enabled: Boolean(companyId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies').select('id, name').eq('id', companyId!).single()
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: company } = useSociete(companyId)
 
   const { data: employes, isLoading } = useQuery({
     queryKey: ['employees-actifs', companyId],

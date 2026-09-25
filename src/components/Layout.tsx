@@ -1,7 +1,6 @@
 import { NavLink, Outlet, useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useSociete } from '../lib/queries'
 
 const ICONS = {
   pointage: (
@@ -67,19 +66,7 @@ export default function Layout() {
   const { companyId } = useParams()
   const { profile, signOut } = useAuth()
 
-  const { data: company } = useQuery({
-    queryKey: ['company', companyId],
-    enabled: Boolean(companyId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('id', companyId!)
-        .single()
-      if (error) throw error
-      return data
-    },
-  })
+  const { data: company } = useSociete(companyId)
 
   const tabs =
     profile?.role === 'admin'

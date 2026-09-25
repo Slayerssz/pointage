@@ -171,3 +171,28 @@ export function useEmployeFiltres(companyId: string | undefined) {
     },
   })
 }
+
+/**
+ * La société ouverte : id, nom, et son R.I.B.
+ *
+ * Une seule requête pour tout le monde. Auparavant cinq écrans
+ * interrogeaient la table sous la MÊME clé de cache mais avec des
+ * colonnes différentes : celui qui répondait le premier remplissait le
+ * cache, et la paie lisait un R.I.B. absent — d'où la ligne « RIB
+ * ORDINATEUR » vide sur l'ordre de virement, un coup sur deux.
+ */
+export function useSociete(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['company', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, rib_ordinateur')
+        .eq('id', companyId!)
+        .single()
+      if (error) throw error
+      return data as { id: string; name: string; rib_ordinateur: string | null }
+    },
+  })
+}
