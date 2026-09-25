@@ -55,6 +55,8 @@ export default function OrdreVirementPrint({
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
   const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
   const nbTotal = ordres.reduce((s, o) => s + o.lignes.length, 0)
+  // La formule d'usage : Vigilma et Serclean seulement, comme dans le PDF.
+  const formule = ['VIGILMA', 'SERCLEAN'].some((m) => entreprise.toUpperCase().includes(m))
 
   const titre =
     ordres.length === 1
@@ -153,6 +155,20 @@ export default function OrdreVirementPrint({
                       </tr>
                     </tbody>
                   </table>
+
+                  {formule && (
+                    <div style={{ fontSize: '9.5pt', fontWeight: 700, margin: '1mm 0 2mm' }}>
+                      <p>Nous Vous Prions De Bien Vouloir De Virer Par</p>
+                      <p>
+                        Le Debit De Nous Compte N° {rib(ribOrdinateur)} De La Societe{' '}
+                        {entreprise.toUpperCase()}
+                      </p>
+                      <p>
+                        Les Virements Suivants: La Somme de
+                        <span style={{ marginLeft: '18mm' }}>{n2(total)} Dirhams</span>
+                      </p>
+                    </div>
+                  )}
 
                   {/* Bénéficiaires */}
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>

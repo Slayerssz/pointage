@@ -26,6 +26,17 @@ export const LIGNES_PAR_PAGE = 18
 
 const GRIS: [number, number, number] = [217, 217, 217]
 
+/**
+ * Les banques de Vigilma et de Serclean veulent la formule d'usage sous
+ * le cartouche ; les autres ne la demandent pas. Elle n'est donc imprimée
+ * que pour ces deux sociétés-là.
+ */
+const AVEC_FORMULE = ['VIGILMA', 'SERCLEAN']
+const veutLaFormule = (entreprise: string) => {
+  const n = entreprise.toUpperCase()
+  return AVEC_FORMULE.some((m) => n.includes(m))
+}
+
 export interface OrdreDeVirement {
   /** Ce qui identifie la feuille : le site, la banque… */
   intitule: string
@@ -131,7 +142,23 @@ export async function dessinerOrdreVirement(opts: {
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
 
-      y += 3
+      // La formule adressée à la banque : Vigilma et Serclean seulement.
+      if (veutLaFormule(entreprise)) {
+        y += 1.5
+        doc.setFont('times', 'bold').setFontSize(9.5)
+        doc.text('Nous Vous Prions De Bien Vouloir De Virer Par', x, y + 3.4)
+        y += 4.6
+        doc.text(
+          `Le Debit De Nous Compte N° ${ribPropre} De La Societe ${entreprise.toUpperCase()}`,
+          x, y + 3.4,
+        )
+        y += 4.6
+        doc.text('Les Virements Suivants: La Somme de', x, y + 3.4)
+        doc.text(`${n2(total)} Dirhams`, x + 70, y + 3.4)
+        y += 6
+      } else {
+        y += 3
+      }
 
       // ── Les bénéficiaires ─────────────────────────────────────────
       const hEntete = 9
