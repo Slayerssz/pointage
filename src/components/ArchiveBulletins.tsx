@@ -155,6 +155,8 @@ export default function ArchiveBulletins({
                   <span className="block text-xs text-slate-500">
                     Établi le {formatDateFr(b.cree_le.slice(0, 10))}
                     {Number(b.avance) > 0 && ` · avance ${formatDH(b.avance)}`}
+                    {Number(b.gain_montant) > 0 &&
+                      ` · ${b.gain_libelle} ${formatDH(b.gain_montant)}`}
                     {b.modification_autorisee && (
                       <span className="font-medium text-emerald-700">
                         {' '}· modification autorisée

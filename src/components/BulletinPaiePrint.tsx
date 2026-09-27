@@ -33,7 +33,12 @@ export default function BulletinPaiePrint({
   useModeImpression()
 
   const entete = enteteDe(entreprise, modeleDocument)
-  const { pret, imprimer } = useImpression(entete.logo ? bulletins.length : 0)
+  // Le papier à en-tête, quand la société nous l'a fourni : une page A4
+  // entière posée sous le bulletin. Il porte déjà le nom et le logo, si
+  // bien que le bandeau du bulletin n'a plus à les répéter.
+  const papier = entete.papier
+  const parBulletin = (entete.logo && !papier ? 1 : 0) + (papier ? 1 : 0)
+  const { pret, imprimer } = useImpression(parBulletin * bulletins.length)
 
   const b0 = bulletins[0]
   const periodeLabel = b0
@@ -66,24 +71,44 @@ export default function BulletinPaiePrint({
                 key={b.ligne_id}
                 className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
                 style={{
-                  width: '186mm',
-                  padding: '10mm 12mm',
+                  width: papier ? '210mm' : '186mm',
+                  minHeight: papier ? '297mm' : undefined,
+                  position: 'relative',
+                  padding: papier ? 0 : '10mm 12mm',
                   color: '#111',
                   fontSize: '8.5pt',
                   breakAfter: i === bulletins.length - 1 ? 'auto' : 'page',
                 }}
               >
+                {papier && (
+                  <img
+                    src={papier.image}
+                    alt=""
+                    style={{
+                      position: 'absolute', top: 0, left: 0,
+                      width: '210mm', height: '297mm',
+                    }}
+                  />
+                )}
+                <div
+                  style={{
+                    position: 'relative',
+                    padding: papier ? `${papier.haut}mm 12mm ${297 - papier.bas}mm` : undefined,
+                  }}
+                >
                 {/* En-tête de la société */}
                 <header
                   className="flex items-start justify-between gap-4 pb-2"
                   style={{ borderBottom: `2px solid ${entete.accent}` }}
                 >
-                  {entete.logo ? (
+                  {entete.logo && !papier ? (
                     <img
                       src={entete.logo}
                       alt={entreprise}
                       style={{ height: '18mm', objectFit: 'contain' }}
                     />
+                  ) : papier ? (
+                    <span />
                   ) : (
                     <p
                       className="font-bold uppercase"
@@ -180,7 +205,7 @@ export default function BulletinPaiePrint({
                       // Une indemnité ou une avance à zéro n'a rien à faire
                       // sur le bulletin : celui qui n'en a pas retrouve
                       // exactement sa mise en page.
-                      .filter((l) => !(['010', '011'].includes(l.code) && !Number(l.gain)))
+                      .filter((l) => !(['010', '011', '013'].includes(l.code) && !Number(l.gain)))
                       .filter((l) => !(l.code === '012' && !Number(l.retenue)))
                       .map((l, j) => {
                       const total = l.libelle === 'GAIN NET'
@@ -326,10 +351,14 @@ export default function BulletinPaiePrint({
                   Net calculé sur {n2(brut?.taux)} jours travaillés · Édité le{' '}
                   {new Date().toLocaleDateString('fr-FR')} · Gain net {n2(net?.gain)} {devise}
                 </p>
+                </div>
               </article>
             )
           })}
         </div>
+        {papier && (
+          <style>{`@media print { @page { size: A4 portrait; margin: 0; } }`}</style>
+        )}
       </div>
     </PortailImpression>
   )

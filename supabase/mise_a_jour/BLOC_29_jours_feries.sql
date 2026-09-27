@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 29 sur 30 — Les jours fériés
+--  BLOC 29 sur 38 — Les jours fériés
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 28.
 --

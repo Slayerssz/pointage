@@ -24,6 +24,8 @@ export interface BulletinEmis {
   salaire_brut: number
   jours: number
   avance: number
+  gain_libelle: string | null
+  gain_montant: number
   net_a_payer: number
   document: Bulletin
   cree_le: string
@@ -34,7 +36,8 @@ export interface BulletinEmis {
 
 const CHAMPS =
   'id, periode_id, employee_id, annee, mois, nom_prenom, matricule, salaire_brut, jours,' +
-  ' avance, net_a_payer, document, cree_le, modification_motif, modification_demandee_le,' +
+  ' avance, gain_libelle, gain_montant, net_a_payer, document, cree_le,' +
+  ' modification_motif, modification_demandee_le,' +
   ' modification_autorisee'
 
 export function useBulletinsEmis(companyId: string | undefined) {
@@ -74,6 +77,8 @@ export function useEtablirBulletin(companyId: string | undefined) {
         p_salaire_brut: v.saisie.salaireBrut,
         p_jours: v.saisie.jours,
         p_avance: v.saisie.avance,
+        p_gain_libelle: v.saisie.gainLibelle || null,
+        p_gain_montant: v.saisie.gainMontant,
       })
       if (error) throw error
       const { data, error: erreurLecture } = await supabase

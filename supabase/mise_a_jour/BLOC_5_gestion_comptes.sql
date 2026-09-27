@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 5 sur 5 — Désactiver / supprimer un compte, réinitialiser un mot de passe
+--  BLOC 5 sur 38 — Désactiver / supprimer un compte, réinitialiser un mot de passe
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 4.
 --

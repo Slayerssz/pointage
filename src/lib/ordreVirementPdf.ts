@@ -9,12 +9,14 @@
  */
 
 import { montantEnLettres } from './montantEnLettres'
+import { enteteDe } from './entetes'
 import { societeDe } from './societes'
 import type { LignePaie } from './types'
 
 /** Page A4 et marges, en millimètres. */
-// Le haut est laissé libre : un en-tête de société viendra s'y poser.
-const P = { l: 210, h: 297, marge: 12, haut: 40 }
+// Sans papier à en-tête, le document garde ses propres marges : le haut
+// reste libre, au cas où la feuille serait pré-imprimée.
+const P = { l: 210, h: 297, marge: 12, haut: 40, bas: 285 }
 
 /** Les trois colonnes du tableau des bénéficiaires, au modèle. */
 const COL = { nom: 67, rib: 66, montant: 53 }
@@ -24,7 +26,79 @@ const LARGEUR = COL.nom + COL.rib + COL.montant
 const CARTOUCHE = { label: 74, valeur: LARGEUR - 74, hauteur: 7 }
 
 const LIGNE = 7.5
-export const LIGNES_PAR_PAGE = 18
+
+/** Les hauteurs fixes de la feuille, en millimètres. */
+const H_CARTOUCHE = CARTOUCHE.hauteur * 6 // la case date, puis cinq intitulés
+const H_ENTETE_TABLEAU = 9
+/** Deux lignes d'adresse, et trois réservées à la somme en toutes lettres. */
+const H_FORMULE = 1.5 + 4.6 * 5 + 1.4
+const H_SANS_FORMULE = 3
+/** Le pavé des signatures, sur la dernière feuille d'un ordre. */
+const H_SIGNATURES = 6 + 7 + 40
+
+/**
+ * Combien de bénéficiaires par feuille ? Cela dépend du papier : celui
+ * de Serclean s'arrête à 240 mm — son angle décoratif — quand celui de
+ * Megainter descend jusqu'à 279. L'un tient donc six lignes de moins que
+ * l'autre, et la dernière feuille en perd encore pour les signatures.
+ *
+ * Le PDF et l'aperçu à l'écran appellent tous deux cette fonction : ils
+ * ne peuvent pas se mettre à pagineront différemment.
+ */
+export function paginerOrdre(
+  nbLignes: number,
+  o: { haut: number; bas: number; avecFormule: boolean },
+): number[] {
+  const tete = H_CARTOUCHE + (o.avecFormule ? H_FORMULE : H_SANS_FORMULE) + H_ENTETE_TABLEAU
+  const dispo = o.bas - o.haut - tete
+  const plein = Math.max(1, Math.floor(dispo / LIGNE))
+  // Sur la dernière feuille, les signatures prennent leur place. Si rien
+  // ne tient plus, elles passent sur une feuille à elles.
+  const dernier = Math.floor((dispo - H_SIGNATURES) / LIGNE)
+
+  if (nbLignes <= 0) return [0]
+  // Sans place pour les signatures, elles prennent une feuille à elles.
+  if (dernier < 1) {
+    const pages: number[] = []
+    for (let r = nbLignes; r > 0; r -= plein) pages.push(Math.min(plein, r))
+    pages.push(0)
+    return pages
+  }
+  if (nbLignes <= dernier) return [nbLignes]
+
+  // Combien de feuilles au minimum ? La dernière porte les signatures et
+  // tient donc moins de monde que les autres.
+  let k = 1
+  while ((k - 1) * plein + dernier < nbLignes) k++
+
+  // Réparti au plus juste : mieux vaut trois feuilles de onze qu'une
+  // pleine et une presque vide.
+  const pages: number[] = []
+  const fin = Math.min(dernier, Math.ceil(nbLignes / k))
+  let reste = nbLignes - fin
+  for (let i = k - 1; i > 0; i--) {
+    const t = Math.min(plein, Math.ceil(reste / i))
+    pages.push(t)
+    reste -= t
+  }
+  pages.push(fin)
+  return pages
+}
+
+/** Découpe les lignes d'après la pagination calculée. */
+export function decouperOrdre<T>(
+  lignes: T[],
+  o: { haut: number; bas: number; avecFormule: boolean },
+): T[][] {
+  const tailles = paginerOrdre(lignes.length, o)
+  const pages: T[][] = []
+  let i = 0
+  for (const t of tailles) {
+    pages.push(lignes.slice(i, i + t))
+    i += t
+  }
+  return pages
+}
 
 const GRIS: [number, number, number] = [217, 217, 217]
 
@@ -34,9 +108,46 @@ const GRIS: [number, number, number] = [217, 217, 217]
  * que pour ces deux sociétés-là.
  */
 const AVEC_FORMULE = ['VIGILMA', 'SERCLEAN']
-const veutLaFormule = (entreprise: string) => {
+export const veutLaFormule = (entreprise: string) => {
   const n = entreprise.toUpperCase()
   return AVEC_FORMULE.some((m) => n.includes(m))
+}
+
+/**
+ * Le papier à en-tête, prêt à être posé dans le PDF. jsPDF veut les
+ * données de l'image, pas son adresse : on va donc la chercher.
+ *
+ * Le chargement peut échouer — réseau coupé, fichier absent. Dans ce cas
+ * le document sort sans son papier plutôt que pas du tout : un ordre de
+ * virement sur feuille blanche reste un ordre de virement.
+ */
+async function chargerPapier(url: string): Promise<string | null> {
+  try {
+    const reponse = await fetch(url)
+    if (!reponse.ok) return null
+    const blob = await reponse.blob()
+    return await new Promise<string>((resoudre, rejeter) => {
+      const lecteur = new FileReader()
+      lecteur.onload = () => resoudre(String(lecteur.result))
+      lecteur.onerror = () => rejeter(lecteur.error)
+      lecteur.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Le papier de la société et les marges qu'il impose. Sans papier, on
+ * retombe sur celles d'origine — la feuille blanche reste utilisable.
+ */
+export function papierDe(entreprise: string, modeleDocument?: string | null) {
+  const papier = enteteDe(entreprise, modeleDocument).papier
+  return {
+    papier: papier ?? null,
+    haut: papier?.haut ?? P.haut,
+    bas: papier?.bas ?? P.bas,
+  }
 }
 
 export interface OrdreDeVirement {
@@ -73,6 +184,8 @@ export async function dessinerOrdreVirement(opts: {
   mois: number
   /** Injectable pour les essais hors navigateur. */
   jsPDFModule?: { jsPDF: new (o: object) => unknown }
+  /** Injectable pour les essais : à défaut, l'image est allée chercher. */
+  papierCharge?: (url: string) => Promise<string | null>
 }) {
   const { jsPDF } = opts.jsPDFModule ?? (await import('jspdf'))
   const { ordres, entreprise, ribOrdinateur, annee, mois } = opts
@@ -80,9 +193,23 @@ export async function dessinerOrdreVirement(opts: {
   const raison = (societeDe(entreprise, opts.modeleDocument)?.raisonSociale ?? entreprise)
     .toUpperCase()
 
+  // Le papier à en-tête de la société, et la bande de page qu'il laisse
+  // libre. S'il n'a pas pu être chargé, le document sort sur feuille
+  // blanche, avec les marges d'origine : mieux vaut cela que rien.
+  const { papier } = papierDe(entreprise, opts.modeleDocument)
+  const image = papier ? await (opts.papierCharge ?? chargerPapier)(papier.image) : null
+  const haut = image ? papier!.haut : P.haut
+  const bas = image ? papier!.bas : P.bas
+  const avecFormule = veutLaFormule(entreprise)
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc: any = new (jsPDF as any)({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   doc.setLineWidth(0.4)
+
+  /** Pose le papier à en-tête sur la feuille courante, sous tout le reste. */
+  const poserLePapier = () => {
+    if (image) doc.addImage(image, 'JPEG', 0, 0, P.l, P.h)
+  }
 
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
   const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
@@ -113,19 +240,20 @@ export async function dessinerOrdreVirement(opts: {
   let premiere = true
 
   for (const ordre of ordres) {
-    const total = ordre.lignes.reduce((s, l) => s + Number(l.net_a_payer), 0)
-    const pages: LignePaie[][] = []
-    for (let i = 0; i < ordre.lignes.length; i += LIGNES_PAR_PAGE) {
-      pages.push(ordre.lignes.slice(i, i + LIGNES_PAR_PAGE))
-    }
-    if (pages.length === 0) pages.push([])
+    const pages = decouperOrdre(ordre.lignes, { haut, bas, avecFormule })
 
     pages.forEach((page, p) => {
+      // Chaque feuille est un ordre à elle seule : elle ne compte et ne
+      // totalise que les virements qu'elle porte. Reprendre le total de
+      // l'ordre entier ferait annoncer à la banque, sur chaque feuille,
+      // une somme qui ne correspond pas aux lignes imprimées dessous.
+      const total = page.reduce((s, l) => s + Number(l.net_a_payer), 0)
       if (!premiere) doc.addPage('a4', 'portrait')
       premiere = false
+      poserLePapier()
 
       const x = P.marge
-      let y = P.haut
+      let y = haut
 
       // ── Le cartouche ──────────────────────────────────────────────
       const ligneCartouche = (label: string, valeur: string, o: {
@@ -145,12 +273,15 @@ export async function dessinerOrdreVirement(opts: {
 
       ligneCartouche('RAISON SOCIAL', `SOCIETE ${raison}`, { valeurGrasse: true })
       ligneCartouche('RIB ORDINATEUR', ribPropre, { valeurGrasse: true })
-      ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(ordre.lignes.length), { valeurGrasse: true })
+      ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(page.length), { valeurGrasse: true })
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
 
       // La formule adressée à la banque : Vigilma et Serclean seulement.
-      if (veutLaFormule(entreprise)) {
+      if (avecFormule) {
+        // Sa hauteur est fixée d'avance — c'est elle qui a servi à
+        // paginer. On dessine dedans, puis on reprend au millimètre prévu.
+        const depart = y
         y += 1.5
         doc.setFont('times', 'bold').setFontSize(9.5)
         doc.text('Nous Vous Prions De Bien Vouloir De Virer Par', x, y + 3.4)
@@ -162,20 +293,20 @@ export async function dessinerOrdreVirement(opts: {
         y += 4.6
         // La somme en toutes lettres : c'est elle qui fait foi.
         const enLettres = montantEnLettres(total)
-        const lignesSomme = doc.splitTextToSize(
+        const lignesSomme = (doc.splitTextToSize(
           `Les Virements Suivants: La Somme de ${enLettres}`, LARGEUR,
-        ) as string[]
+        ) as string[]).slice(0, 3)
         for (const l of lignesSomme) {
           doc.text(l, x, y + 3.4)
           y += 4.6
         }
-        y += 1.4
+        y = depart + H_FORMULE
       } else {
-        y += 3
+        y += H_SANS_FORMULE
       }
 
       // ── Les bénéficiaires ─────────────────────────────────────────
-      const hEntete = 9
+      const hEntete = H_ENTETE_TABLEAU
       case_(x, y, COL.nom, hEntete, 'Nom Bénéficiare', { gras: true, fond: true, aligne: 'center' })
       case_(x + COL.nom, y, COL.rib, hEntete, 'RIB Bénéficiare', { gras: true, fond: true, aligne: 'center' })
       case_(x + COL.nom + COL.rib, y, COL.montant, hEntete, 'Montant Virement', {

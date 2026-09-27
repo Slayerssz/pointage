@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 22 sur 24 — La date de fin d'un contrat devient obligatoire
+--  BLOC 22 sur 38 — La date de fin d'un contrat devient obligatoire
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 21.
 --

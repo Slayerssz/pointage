@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 15 sur 15 — Bulletin de paie (employés payés par virement)
+--  BLOC 15 sur 38 — Bulletin de paie (employés payés par virement)
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 14.
 --

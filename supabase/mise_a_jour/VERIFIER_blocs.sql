@@ -101,17 +101,22 @@ with attendu (numero, bloc, objet, present) as (
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'supprimer_employe'
                   and pg_get_functiondef(p.oid) like '%paie_validee%')),
-  (35, 'Bulletin saisi à la main', 'bulletin_paie à cinq arguments',
+  -- Le BLOC 38 en a ajouté deux : on vérifie qu'il en reste au moins cinq.
+  (35, 'Bulletin saisi à la main', 'bulletin_paie prend les chiffres saisis',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'bulletin_paie'
-                  and p.pronargs = 5)),
+                  and p.pronargs >= 5)),
   (36, 'Bulletin pour tous',       'bulletin_paie ne filtre plus les virements',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'bulletin_paie'
                   and pg_get_functiondef(p.oid) not like '%like ''vir%%')),
   (37, 'Bulletins conservés',      'table bulletins_emis',
        exists (select 1 from information_schema.tables
-                where table_schema = 'public' and table_name = 'bulletins_emis'))
+                where table_schema = 'public' and table_name = 'bulletins_emis')),
+  (38, 'Gain saisi au bulletin',   'bulletin_paie prend un intitulé',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'bulletin_paie'
+                  and pg_get_function_identity_arguments(p.oid) like '%text%'))
 )
 select numero,
        bloc,

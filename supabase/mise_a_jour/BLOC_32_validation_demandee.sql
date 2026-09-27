@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 32 sur 33 — Un état de plus pour la paie
+--  BLOC 32 sur 38 — Un état de plus pour la paie
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 31.
 --

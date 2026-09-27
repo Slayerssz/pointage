@@ -1104,6 +1104,60 @@ ok('la ligne de paie est inchangée',
                    where periode_id=$1 and employee_id=$2`, [perTP, tAvec])).n)
      === num((await lig(tAvec)).net))
 
+// ═══════════ UN GAIN QUI S'AJOUTE, SOUS LE NOM QU'ON LUI DONNE ═══════════
+// L'avance se retranche ; celui-ci s'ajoute. Comme il change de nom d'un
+// mois à l'autre, c'est la paie qui l'écrit.
+
+section('Le gain saisi')
+
+await connecte(paie)
+const bulGain = async (libelle, montant) => (await q1(
+  `select public.bulletin_paie($1,$2,$3,$4,$5,$6,$7) as b`,
+  [perTP, tAvec, brutAuto, 26, 0, libelle, montant]))?.b?.[0]
+
+const sansGain = await bulGain(null, null)
+// Comme le transport, le panier et l'avance, la ligne existe toujours
+// dans le document ; c'est l'impression qui masque celles à zéro.
+ok('sans gain saisi, la ligne reste à zéro',
+   Number(sansGain.lignes.find((l) => l.code === '013')?.gain) === 0)
+
+const avecGain = await bulGain('prime exceptionnelle', 500)
+const l013 = avecGain.lignes.find((l) => l.code === '013')
+ok('le gain saisi fait sa ligne', Boolean(l013))
+ok('… sous le nom qu’on lui a donné', l013?.libelle === 'PRIME EXCEPTIONNELLE')
+ok('… porté en gain, pas en retenue',
+   Number(l013?.gain) === 500 && l013?.retenue === null)
+ok('… et le net s’en trouve augmenté',
+   Math.abs(Number(avecGain.pied.net_a_payer) - Number(sansGain.pied.net_a_payer) - 500) < 0.01,
+   `${avecGain.pied.net_a_payer} vs ${sansGain.pied.net_a_payer}`)
+
+// Hors assiette : les trois retenues ne bougent pas d'un centime.
+const memeRetenue = (code) =>
+  Number(avecGain.lignes.find((l) => l.code === code).retenue)
+  === Number(sansGain.lignes.find((l) => l.code === code).retenue)
+ok('la C.N.S.S. ne bouge pas', memeRetenue('068'))
+ok('l’A.M.O. non plus', memeRetenue('069'))
+ok('l’I.G.R. non plus', memeRetenue('070'))
+
+// Il s'additionne à l'avance, en sens contraire.
+const lesDeux = (await q1(
+  `select public.bulletin_paie($1,$2,$3,$4,$5,$6,$7) as b`,
+  [perTP, tAvec, brutAuto, 26, 200, 'rappel', 500])).b[0]
+ok('avance et gain se compensent dans le net',
+   Math.abs(Number(lesDeux.pied.net_a_payer)
+            - Number(sansGain.pied.net_a_payer) - 300) < 0.01,
+   String(lesDeux.pied.net_a_payer))
+
+await refuse('un montant sans intitulé est refusé',
+  `select public.bulletin_paie($1,$2,$3,$4,$5,$6,$7)`,
+  [perTP, tAvec, brutAuto, 26, 0, '   ', 500], /à quel titre/i)
+await refuse('un gain négatif est refusé',
+  `select public.bulletin_paie($1,$2,$3,$4,$5,$6,$7)`,
+  [perTP, tAvec, brutAuto, 26, 0, 'rappel', -1], /négatif/i)
+await refuse('pas de gain sur un état d’ensemble',
+  `select public.bulletin_paie($1, null, null, null, null, 'rappel', 500)`,
+  [perTP], /un employé à la fois/i)
+
 // ═════════════ LE BULLETIN ÉTABLI RESTE-T-IL CONSULTABLE ? ════════════
 // Un bulletin remis est une pièce : il se garde tel qu'il a été édité.
 // La paie l'établit, mais ne le refait pas sans l'accord de
@@ -1126,6 +1180,7 @@ ok('… le net conservé est celui du bulletin édité',
 ok('… le mois vient de la période', arch.annee === 2026 || arch.mois >= 1)
 ok('… et le document entier est conservé',
    Array.isArray(arch.document?.lignes) && arch.document.lignes.length > 0)
+
 
 // Le refaire ne va pas de soi.
 await refuse('on ne refait pas un bulletin déjà établi',
@@ -1189,6 +1244,21 @@ ok('l’administrateur supprime',
    await reussit(`select public.supprimer_bulletin_emis($1)`, [archiveId]))
 ok('… et le bulletin a bien disparu',
    num((await q1(`select count(*) n from public.bulletins_emis where id=$1`, [archiveId])).n) === 0)
+
+// Le gain saisi se conserve lui aussi, intitulé compris.
+await connecte(bureau)
+const eGain = await employe('GAIN SAISI', { cin: 'BP2', cnss: '950000002' })
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [perTP])
+await connecte(paie)
+const idGain = (await q1(
+  `select public.etablir_bulletin($1,$2,$3,$4,$5,$6,$7) as id`,
+  [perTP, eGain, brutAuto, 26, 0, 'rappel de salaire', 750])).id
+const archGain = await q1(`select * from public.bulletins_emis where id=$1`, [idGain])
+ok('l’archive garde l’intitulé du gain', archGain.gain_libelle === 'rappel de salaire')
+ok('… et son montant', num(archGain.gain_montant) === 750)
+ok('… et le bulletin conservé le porte',
+   archGain.document.lignes.some((l) => l.code === '013' && Number(l.gain) === 750))
 
 section('La photo suit-elle la fiche ?')
 

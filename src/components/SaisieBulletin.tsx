@@ -16,6 +16,9 @@ export interface SaisieBulletinValeurs {
   salaireBrut: number
   jours: number
   avance: number
+  /** L'intitulé du gain saisi, s'il y en a un. */
+  gainLibelle: string
+  gainMontant: number
 }
 
 export default function SaisieBulletin({
@@ -32,11 +35,17 @@ export default function SaisieBulletin({
   const [salaireBrut, setSalaireBrut] = useState('')
   const [jours, setJours] = useState('')
   const [avance, setAvance] = useState('')
+  // Le contraire de l'avance : un montant qui s'ajoute, sous le nom que
+  // la paie lui donne — il change d'un mois à l'autre.
+  const [gainLibelle, setGainLibelle] = useState('')
+  const [gainMontant, setGainMontant] = useState('')
 
   const n = (v: string) => Number(v.replace(',', '.')) || 0
   const vide = salaireBrut.trim() === '' || jours.trim() === ''
-  const negatif = n(salaireBrut) < 0 || n(jours) < 0 || n(avance) < 0
-  const invalide = vide || negatif
+  const negatif = n(salaireBrut) < 0 || n(jours) < 0 || n(avance) < 0 || n(gainMontant) < 0
+  // Un montant sans nom n'aurait pas de libellé sur le bulletin.
+  const gainSansNom = n(gainMontant) > 0 && gainLibelle.trim() === ''
+  const invalide = vide || negatif || gainSansNom
 
   const champ = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums'
 
@@ -47,7 +56,12 @@ export default function SaisieBulletin({
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
-          if (!invalide) onValider({ salaireBrut: n(salaireBrut), jours: n(jours), avance: n(avance) })
+          if (!invalide) {
+            onValider({
+              salaireBrut: n(salaireBrut), jours: n(jours), avance: n(avance),
+              gainLibelle: gainLibelle.trim(), gainMontant: n(gainMontant),
+            })
+          }
         }}
       >
         <h2 className="text-lg font-semibold text-slate-900">
@@ -92,6 +106,33 @@ export default function SaisieBulletin({
             Portée en retenue et déduite du net. À laisser vide s’il n’y en a pas.
           </span>
         </label>
+
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-sm font-medium text-slate-700">Un montant à ajouter ?</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Le contraire de l’avance : il s’ajoute au net. Donnez-lui son nom — il
+            paraîtra tel quel sur le bulletin. À laisser vide s’il n’y en a pas.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={gainLibelle}
+              onChange={(e) => setGainLibelle(e.target.value)}
+              placeholder="ex. Prime exceptionnelle"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="number" step="0.01" min="0"
+              value={gainMontant}
+              onChange={(e) => setGainMontant(e.target.value)}
+              placeholder="0"
+              className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums"
+            />
+          </div>
+          {gainSansNom && (
+            <p className="mt-2 text-sm text-red-600">Dites à quel titre ce montant s’ajoute.</p>
+          )}
+        </div>
 
         {negatif && (
           <p className="mt-3 text-sm text-red-600">Un montant ne peut pas être négatif.</p>

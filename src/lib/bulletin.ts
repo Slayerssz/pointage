@@ -52,6 +52,9 @@ export interface Bulletin {
   frais_panier: number
   /** L'avance saisie à l'édition, retenue sur le net. */
   avance?: number
+  /** Le gain saisi à l'édition, ajouté au net, et son intitulé. */
+  gain_libre?: number
+  gain_libelle?: string | null
   /** Vrai quand le brut dépasse le seuil mais qu'aucun barème n'est saisi. */
   bareme_igr_absent: boolean
 }
@@ -74,6 +77,9 @@ export interface SaisieBulletin {
   salaireBrut: number
   jours: number
   avance: number
+  /** Un montant qui s'ajoute au net, sous l'intitulé qu'on lui donne. */
+  gainLibelle: string
+  gainMontant: number
 }
 
 export function useBulletins(
@@ -91,6 +97,8 @@ export function useBulletins(
         p_salaire_brut: saisie?.salaireBrut ?? null,
         p_jours: saisie?.jours ?? null,
         p_avance: saisie?.avance ?? null,
+        p_gain_libelle: saisie?.gainLibelle || null,
+        p_gain_montant: saisie?.gainMontant ?? null,
       })
       if (error) throw error
       return (data ?? []) as Bulletin[]

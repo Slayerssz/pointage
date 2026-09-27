@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 24 sur 24 — Une pièce ne produit son effet qu'une fois signée
+--  BLOC 24 sur 38 — Une pièce ne produit son effet qu'une fois signée
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 23.
 --

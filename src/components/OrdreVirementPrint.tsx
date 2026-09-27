@@ -2,7 +2,9 @@ import { MOIS_FR } from '../lib/paie'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
-import { enregistrerOrdreVirementPdf, LIGNES_PAR_PAGE } from '../lib/ordreVirementPdf'
+import {
+  decouperOrdre, enregistrerOrdreVirementPdf, papierDe, veutLaFormule,
+} from '../lib/ordreVirementPdf'
 import { montantEnLettres } from '../lib/montantEnLettres'
 import { societeDe } from '../lib/societes'
 import type { LignePaie } from '../lib/types'
@@ -60,8 +62,11 @@ export default function OrdreVirementPrint({
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
   const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
   const nbTotal = ordres.reduce((s, o) => s + o.lignes.length, 0)
+  // Le papier à en-tête de la société, et la bande de page qu'il laisse
+  // libre : l'aperçu se cale exactement sur ce que dessinera le PDF.
+  const { papier, haut, bas } = papierDe(entreprise, modeleDocument)
   // La formule d'usage : Vigilma et Serclean seulement, comme dans le PDF.
-  const formule = ['VIGILMA', 'SERCLEAN'].some((m) => entreprise.toUpperCase().includes(m))
+  const formule = veutLaFormule(entreprise)
   // La banque veut la raison sociale complète, pas le nom court du registre.
   const raison = (societeDe(entreprise, modeleDocument)?.raisonSociale ?? entreprise).toUpperCase()
 
@@ -101,23 +106,27 @@ export default function OrdreVirementPrint({
 
         <div className="document-imprimable">
           {ordres.map((o) => {
-            const total = o.lignes.reduce((s, l) => s + Number(l.net_a_payer), 0)
-            const pages: LignePaie[][] = []
-            for (let i = 0; i < o.lignes.length; i += LIGNES_PAR_PAGE) {
-              pages.push(o.lignes.slice(i, i + LIGNES_PAR_PAGE))
-            }
-            if (pages.length === 0) pages.push([])
+            const pages = decouperOrdre(o.lignes, {
+              haut, bas, avecFormule: veutLaFormule(entreprise),
+            })
 
             return pages.map((page, p) => {
               const derniere = p === pages.length - 1
+              // Chaque feuille ne totalise que ses propres virements.
+              const total = page.reduce((s, l) => s + Number(l.net_a_payer), 0)
 
               return (
                 <article
                   key={`${o.intitule}-${p}`}
                   className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
                   style={{
-                    // Le haut reste libre pour un futur en-tête de société.
-                    width: '210mm', minHeight: '297mm', padding: '39mm 12mm 14mm',
+                    // Le papier de la société sert de fond ; à défaut, la
+                    // feuille reste blanche avec les marges d'origine.
+                    width: '210mm', minHeight: '297mm',
+                    padding: `${haut}mm 12mm ${297 - bas}mm`,
+                    backgroundImage: papier ? `url(${papier.image})` : undefined,
+                    backgroundSize: '210mm 297mm',
+                    backgroundRepeat: 'no-repeat',
                     color: '#000', breakAfter: 'page', fontFamily: 'Georgia, "Times New Roman", serif',
                   }}
                 >
@@ -150,7 +159,7 @@ export default function OrdreVirementPrint({
                       </tr>
                       <tr>
                         <td style={gras}>NOMBRE TOTAL D'OPERATIONS</td>
-                        <td style={{ ...cell, fontWeight: 700 }}>{o.lignes.length}</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>{page.length}</td>
                       </tr>
                       <tr>
                         <td style={gras}>MONTANT TOTAL D'OPERATIONS</td>

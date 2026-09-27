@@ -420,110 +420,39 @@ export default function EmployesPage() {
       {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
       {data && lignes.length === 0 && <EmptyState>Aucun employé trouvé.</EmptyState>}
 
-      {/* Sur téléphone, une carte par employé : douze colonnes ne tiennent
-          pas dans une main. Le détail complet reste à un doigt — toucher
-          la carte ouvre la fiche, comme toucher la ligne du tableau. */}
+      {/* Sur téléphone, la liste s'en tient aux noms : le détail tient
+          dans la fiche, qui s'ouvre d'une touche — comme la ligne du
+          tableau l'ouvre sur ordinateur. */}
       {data && lignes.length > 0 && (
-        <ul className={`space-y-2 md:hidden ${isPlaceholderData ? 'opacity-60' : ''}`}>
+        <ul className={`divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white md:hidden ${
+          isPlaceholderData ? 'opacity-60' : ''
+        }`}>
           {lignes.map((emp) => {
             const retirement = retirementStatus(emp.date_naissance)
             const isRetired = retirement?.kind === 'retired'
             const isGone = !emp.actif
-            const contrat = contrats?.get(emp.id)
-            const aff = contratAffichage(contrat?.statut ?? null, contrat?.jours_restants ?? null)
-            const j = joursDuMois?.[emp.id]
+            const aff = contratAffichage(
+              contrats?.get(emp.id)?.statut ?? null,
+              contrats?.get(emp.id)?.jours_restants ?? null,
+            )
             return (
-              <li
-                key={emp.id}
-                className={`rounded-2xl border border-slate-200 p-3 shadow-sm ${
-                  isGone ? 'bg-slate-50' : isRetired ? 'bg-red-50' : (aff?.ligne || 'bg-white')
-                }`}
-              >
+              <li key={emp.id} className={
+                isGone ? 'bg-slate-50' : isRetired ? 'bg-red-50' : (aff?.ligne || '')
+              }>
                 <button
                   onClick={() => setApercu(emp)}
-                  className="flex w-full items-start gap-2.5 text-left"
+                  className="flex w-full items-center gap-2.5 px-3 py-3 text-left"
                 >
-                  <span className="mt-0.5 shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-slate-600">
+                  <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-slate-600">
                     {emp.matricule ?? '—'}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate font-medium ${
-                      isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'
-                    }`}>
-                      {emp.nom_prenom}
-                    </span>
-                    {emp.qualification && (
-                      <span className="block truncate text-xs text-slate-500">{emp.qualification}</span>
-                    )}
+                  <span className={`min-w-0 flex-1 truncate font-medium ${
+                    isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'
+                  }`}>
+                    {emp.nom_prenom}
                   </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block text-sm font-semibold tabular-nums text-slate-900">
-                      {emp.salaire != null ? formatDH(emp.salaire) : '—'}
-                    </span>
-                    <span className="block text-xs text-slate-500 tabular-nums">
-                      {j ? `${formatGardes(j.travailles)} j` : '0 j'}
-                    </span>
-                  </span>
+                  <span className="shrink-0 text-slate-300">›</span>
                 </button>
-
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {isGone && (
-                    <Chip tone="slate">
-                      Sorti{emp.date_sortie ? ` — ${formatDateFr(emp.date_sortie)}` : ''}
-                    </Chip>
-                  )}
-                  {retirement?.kind === 'retired' && <Chip tone="red">Retraite atteinte</Chip>}
-                  {retirement?.kind === 'approaching' && (
-                    <Chip tone={retirement.daysLeft <= 7 ? 'red' : 'amber'}>
-                      {retirement.daysLeft === 0
-                        ? 'Retraite aujourd’hui'
-                        : `Retraite dans ${retirement.daysLeft} j`}
-                    </Chip>
-                  )}
-                  {aff && (aff.chip === 'blue' || aff.chip === 'amber') && (
-                    <Chip tone={aff.chip}>{aff.label}</Chip>
-                  )}
-                </div>
-
-                <dl className="mt-2 space-y-0.5 text-xs text-slate-600">
-                  <div className="flex gap-2">
-                    <dt className="w-20 shrink-0 text-slate-400">Annexe</dt>
-                    <dd className="min-w-0 truncate">{siteCell(emp.site_id)}</dd>
-                  </div>
-                  <div className="flex gap-2">
-                    <dt className="w-20 shrink-0 text-slate-400">Téléphone</dt>
-                    <dd className="min-w-0 truncate">
-                      {emp.telephone
-                        ? <a href={`tel:${emp.telephone}`} className="text-blue-700 underline">{emp.telephone}</a>
-                        : '—'}
-                    </dd>
-                  </div>
-                  <div className="flex gap-2">
-                    <dt className="w-20 shrink-0 text-slate-400">Règlement</dt>
-                    <dd className="min-w-0 truncate">{emp.mode_reglement ?? '—'}</dd>
-                  </div>
-                  {Number(emp.dette) > 0 && (
-                    <div className="flex gap-2">
-                      <dt className="w-20 shrink-0 text-slate-400">Dette</dt>
-                      <dd className="font-medium text-amber-700">{formatDH(emp.dette)}</dd>
-                    </div>
-                  )}
-                </dl>
-
-                <div className="mt-2.5 flex gap-2">
-                  <button
-                    onClick={() => setFicheAChoisir(emp)}
-                    className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                  >
-                    Fiche
-                  </button>
-                  <button
-                    onClick={() => setEditing(emp)}
-                    className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
-                  >
-                    Modifier
-                  </button>
-                </div>
               </li>
             )
           })}
