@@ -1,6 +1,33 @@
-import { NavLink, Outlet, useParams, Link } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useParams, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useSociete } from '../lib/queries'
+
+/**
+ * La barre du bas d'un téléphone tient quatre entrées, pas dix. Les
+ * onglets marqués `principal` y restent ; les autres se rangent derrière
+ * « Plus », qui les montre tous — y compris les quatre, pour qu'on n'ait
+ * jamais à se demander où chercher.
+ */
+const AU_PLUS_EN_BAS = 4
+
+function roleLisible(role: string | null | undefined) {
+  return role === 'admin' ? 'admin'
+    : role === 'validator' ? 'validateur'
+    : role === 'paie' ? 'paie'
+    : role === 'rh' ? 'personnel'
+    : 'agent'
+}
+
+interface Onglet {
+  to: string
+  label: string
+  /** Nom court pour la barre du bas, où la place manque. */
+  court?: string
+  icon: React.ReactNode
+  /** Vrai si l'onglet a sa place dans la barre du bas. */
+  principal?: boolean
+}
 
 const ICONS = {
   pointage: (
@@ -65,17 +92,20 @@ const ICONS = {
 export default function Layout() {
   const { companyId } = useParams()
   const { profile, signOut } = useAuth()
+  const { pathname } = useLocation()
+  const [menu, setMenu] = useState(false)
 
   const { data: company } = useSociete(companyId)
 
-  const tabs =
+  const tabs: Onglet[] =
     profile?.role === 'admin'
       ? [
-          { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+          { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes, principal: true },
           { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
-          { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
-          { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
-          { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', icon: ICONS.bulletins },
+          { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation, principal: true },
+          { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie, principal: true },
+          { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', court: 'Bulletins',
+            icon: ICONS.bulletins, principal: true },
           { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           { to: `/c/${companyId}/feries`, label: 'Jours fériés', icon: ICONS.feries },
           { to: `/c/${companyId}/entreprises`, label: 'Entreprises', icon: ICONS.entreprises },
@@ -85,24 +115,33 @@ export default function Layout() {
         ]
       : profile?.role === 'validator'
         ? [
-            { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes },
+            { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes, principal: true },
             { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
-            { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation },
+            { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation, principal: true },
             // Le bureau couvre la paie ; l'inverse n'est pas vrai.
-            { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
-            { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', icon: ICONS.bulletins },
+            { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie, principal: true },
+            { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', court: 'Bulletins',
+            icon: ICONS.bulletins, principal: true },
             { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           ]
         : profile?.role === 'rh'
           ? [{ to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes }]
           : profile?.role === 'paie'
             ? [
-                { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie },
-                { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', icon: ICONS.bulletins },
+                { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie, principal: true },
+                { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', court: 'Bulletins',
+            icon: ICONS.bulletins, principal: true },
               ]
-            : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage }]
+            : [{ to: `/c/${companyId}/pointage`, label: 'Pointage', icon: ICONS.pointage, principal: true }]
 
-  const navItem = (tab: (typeof tabs)[number]) => (
+  const enBas = tabs.length <= AU_PLUS_EN_BAS + 1
+    ? tabs
+    : tabs.filter((t) => t.principal).slice(0, AU_PLUS_EN_BAS)
+  const dansLeMenu = tabs.filter((t) => !enBas.includes(t))
+  // « Plus » s'allume quand c'est derrière lui que se trouve la page ouverte.
+  const ailleurs = dansLeMenu.some((t) => pathname.startsWith(t.to))
+
+  const navItem = (tab: Onglet) => (
     <NavLink
       key={tab.to}
       to={tab.to}
@@ -144,19 +183,7 @@ export default function Layout() {
         <div className="border-t border-slate-800 pt-3">
           <p className="truncate px-1 text-xs text-slate-400">
             {profile?.full_name || profile?.username}
-            <span className="ml-1 text-slate-500">
-              (
-              {profile?.role === 'admin'
-                ? 'admin'
-                : profile?.role === 'validator'
-                  ? 'validateur'
-                  : profile?.role === 'paie'
-                    ? 'paie'
-                    : profile?.role === 'rh'
-                      ? 'personnel'
-                      : 'agent'}
-              )
-            </span>
+            <span className="ml-1 text-slate-500">({roleLisible(profile?.role)})</span>
           </p>
           <button
             onClick={signOut}
@@ -190,23 +217,58 @@ export default function Layout() {
         </button>
       </header>
 
-      {/* Bottom nav (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-around overflow-x-auto border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] md:hidden">
-        {tabs.map((tab) => (
+      {/* Barre du bas (téléphone) */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-slate-800 bg-slate-900 pb-[env(safe-area-inset-bottom)] md:hidden">
+        {enBas.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `flex min-w-16 flex-1 shrink-0 flex-col items-center gap-0.5 py-2.5 text-xs font-medium ${
+              `flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium leading-tight ${
                 isActive ? 'text-emerald-400' : 'text-slate-400'
               }`
             }
           >
             {tab.icon}
-            {tab.label}
+            <span className="text-center">{tab.court ?? tab.label}</span>
           </NavLink>
         ))}
+        {dansLeMenu.length > 0 && (
+          <button
+            onClick={() => setMenu(true)}
+            className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium leading-tight ${
+              ailleurs ? 'text-emerald-400' : 'text-slate-400'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <span>Plus</span>
+          </button>
+        )}
       </nav>
+
+      {/* Ce que « Plus » ouvre : tous les onglets, et le compte. */}
+      {menu && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/50 md:hidden"
+          onClick={() => setMenu(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-slate-900 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700" />
+            <nav className="flex flex-col gap-1" onClick={() => setMenu(false)}>
+              {tabs.map(navItem)}
+            </nav>
+            <p className="mt-3 border-t border-slate-800 px-1 pt-3 text-xs text-slate-400">
+              {profile?.full_name || profile?.username}
+              <span className="ml-1 text-slate-500">({roleLisible(profile?.role)})</span>
+            </p>
+          </div>
+        </div>
+      )}
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-18 md:ml-60 md:px-8 md:pb-10 md:pt-8">
         <Outlet />

@@ -165,7 +165,7 @@ export default function ArchiveBulletins({
                     )}
                   </span>
                 </span>
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center justify-end gap-2">
                   <span className="text-sm font-semibold tabular-nums text-slate-900">
                     {formatDH(b.net_a_payer)}
                   </span>
@@ -231,7 +231,7 @@ function DemanderModification({
   const demander = useDemanderModification(companyId)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form
         className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -293,7 +293,7 @@ function Confirmer({
 }) {
   useFermerSurEchap(onClose)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-semibold text-slate-900">{titre}</h2>
         <p className="mt-1 text-sm text-slate-500">{detail}</p>

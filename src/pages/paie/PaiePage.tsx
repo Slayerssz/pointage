@@ -8,6 +8,7 @@ import {
   estVirement,
   formatDH,
   formatNombre,
+  formatMontant,
   moisLabel,
   usePaieInvalidation,
   useDettesOuvertes,
@@ -672,7 +673,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
           placeholder="Rechercher un nom, un matricule…"
-          className="w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm sm:w-52"
         />
 
         {filtreActif && (
@@ -689,8 +690,81 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         <p className="ml-auto text-sm text-slate-500">{filtrees.length} ligne(s)</p>
       </div>
 
+      {/* Sur téléphone, une carte par employé : quinze colonnes ne tiennent
+          pas dans une main. Les mêmes montants s'y saisissent. */}
+      <div className="space-y-4 md:hidden">
+        {groupes.map((g) => (
+          <div key={g.mode}>
+            <div className="mb-2 rounded-xl bg-slate-100 px-3 py-2">
+              <p className="text-xs font-semibold tracking-wide text-slate-700 uppercase">
+                {g.mode}
+                <span className="ml-2 font-normal normal-case text-slate-500">
+                  {g.liste.length} employé{g.liste.length > 1 ? 's' : ''} ·{' '}
+                  {formatDH(g.totaux.total_net)}
+                </span>
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {g.mode === 'Espèces' && (
+                  <button
+                    onClick={() => imprimerPour('Espèces', g.liste)}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Reçus
+                  </button>
+                )}
+                {g.mode === 'Versement' && (
+                  <button
+                    onClick={() => imprimerPour('Versement', g.liste)}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Liste des versements
+                  </button>
+                )}
+                {g.mode === 'Virement' && (
+                  <button
+                    onClick={() => imprimerPour('Virement', g.liste)}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Ordre de virement
+                  </button>
+                )}
+                {groupes.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => exporter('pdf', { lignes: g.liste, libelle: g.mode })}
+                      disabled={exportEnCours != null}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+                    >
+                      PDF {g.mode.toLowerCase()}
+                    </button>
+                    <button
+                      onClick={() => exporter('excel', { lignes: g.liste, libelle: g.mode })}
+                      disabled={exportEnCours != null}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+                    >
+                      Excel
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            <ul className="space-y-2">
+              {g.liste.map((l) => (
+                <CartePaie
+                  key={l.id}
+                  ligne={l}
+                  modifiable={modifiable}
+                  resteDette={dettes?.get(l.employee_id) ?? 0}
+                  onSaved={invalider}
+                />
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
       {/* Tableau de paie */}
-      <div className="tableau-large rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="tableau-large hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full min-w-[1500px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
@@ -919,17 +993,13 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
 
 /** Une ligne de paie : les montants ajustables sont éditables sur place. */
-function LigneRow({
-  ligne,
-  modifiable,
-  resteDette,
-  onSaved,
-}: {
-  ligne: LignePaie
-  modifiable: boolean
-  resteDette: number
-  onSaved: () => void
-}) {
+/**
+ * Les cinq montants qu'on saisit sur une ligne de paie, et leur
+ * enregistrement. Le tableau (sur ordinateur) et la carte (sur
+ * téléphone) montrent les mêmes champs : ils partagent donc leur
+ * mécanique, pour qu'aucune des deux vues ne prenne du retard.
+ */
+function useSaisieLigne(ligne: LignePaie, modifiable: boolean, onSaved: () => void) {
   const [prime, setPrime] = useState(String(ligne.prime ?? 0))
   const [dette, setDette] = useState(String(ligne.retenue_dette ?? 0))
   const [autres, setAutres] = useState(String(ligne.autres_retenues ?? 0))
@@ -979,11 +1049,25 @@ function LigneRow({
       disabled={!modifiable}
       onChange={(e) => set(e.target.value)}
       onBlur={() => modifie && enregistrer.mutate()}
-      className="w-24 rounded border border-slate-300 px-2 py-1 text-right text-sm tabular-nums disabled:border-transparent disabled:bg-transparent"
+      className="w-full rounded border border-slate-300 px-2 py-1 text-right text-sm tabular-nums disabled:border-transparent disabled:bg-transparent md:w-24"
     />
   )
 
-  const complet = Number(ligne.jours_payes) >= Number(ligne.jours_base)
+  return {
+    prime, setPrime, dette, setDette, autres, setAutres,
+    transport, setTransport, panier, setPanier,
+    champ, enregistrer,
+    complet: Number(ligne.jours_payes) >= Number(ligne.jours_base),
+  }
+}
+
+function LigneRow({
+  ligne, modifiable, resteDette, onSaved,
+}: { ligne: LignePaie; modifiable: boolean; resteDette: number; onSaved: () => void }) {
+  const {
+    prime, setPrime, dette, setDette, autres, setAutres,
+    transport, setTransport, panier, setPanier, champ, enregistrer, complet,
+  } = useSaisieLigne(ligne, modifiable, onSaved)
 
   return (
     <tr className={enregistrer.isError ? 'bg-red-50' : 'bg-white'}>
@@ -1052,5 +1136,98 @@ function LigneRow({
         )}
       </td>
     </tr>
+  )
+}
+
+/**
+ * La même ligne de paie, sur un téléphone : quinze colonnes deviennent
+ * une carte. Les cinq montants se saisissent côte à côte, et ce qui est
+ * seulement lu — jours, brut, net — se lit au-dessus.
+ */
+function CartePaie({
+  ligne, modifiable, resteDette, onSaved,
+}: { ligne: LignePaie; modifiable: boolean; resteDette: number; onSaved: () => void }) {
+  const {
+    prime, setPrime, dette, setDette, autres, setAutres,
+    transport, setTransport, panier, setPanier, champ, enregistrer, complet,
+  } = useSaisieLigne(ligne, modifiable, onSaved)
+
+  const chiffre = (etiquette: string, valeur: React.ReactNode) => (
+    <div>
+      <dt className="text-[11px] text-slate-400">{etiquette}</dt>
+      <dd className="whitespace-nowrap text-sm tabular-nums text-slate-800">{valeur}</dd>
+    </div>
+  )
+  const saisie = (etiquette: string, noeud: React.ReactNode, sous?: React.ReactNode) => (
+    <label className="block">
+      <span className="mb-0.5 block text-[11px] text-slate-500">{etiquette}</span>
+      {noeud}
+      {sous}
+    </label>
+  )
+
+  return (
+    <li className={`rounded-2xl border p-3 shadow-sm ${
+      enregistrer.isError ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'
+    }`}>
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-slate-600">
+          {ligne.matricule ?? '—'}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-slate-900">{ligne.nom_prenom}</p>
+          <p className="truncate text-xs text-slate-500">
+            {ligne.site_nom ?? '—'}
+            {ligne.qualification ? ` · ${ligne.qualification}` : ''}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] text-slate-400">Net à payer</p>
+          <p className="font-semibold tabular-nums text-slate-900">{formatDH(ligne.net_a_payer)}</p>
+        </div>
+      </div>
+
+      <dl className="mt-2.5 grid grid-cols-4 gap-2 border-y border-slate-100 py-2">
+        {chiffre('Base DH', formatMontant(ligne.salaire_base))}
+        {chiffre('Jours', formatNombre(ligne.gardes_travaillees))}
+        {chiffre('Payés', (
+          <span className={`inline-block rounded px-1.5 font-semibold ${
+            complet ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+          }`}>
+            {formatNombre(ligne.jours_payes)}
+          </span>
+        ))}
+        {chiffre('Brut DH', formatMontant(ligne.salaire_brut))}
+      </dl>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {saisie('Transport', champ(transport, setTransport))}
+        {saisie('Panier', champ(panier, setPanier))}
+        {saisie('Prime', champ(prime, setPrime))}
+        {saisie('Autres retenues', champ(autres, setAutres))}
+        {saisie(
+          'Dette',
+          champ(dette, setDette, resteDette || undefined),
+          resteDette > 0 && (
+            <span className="mt-0.5 block text-[10px] text-amber-700">
+              reste {formatDH(resteDette)}
+            </span>
+          ),
+        )}
+      </div>
+
+      <p className="mt-2 text-xs text-slate-500">
+        {ligne.mode_reglement ?? '—'}
+        {estVirement(ligne.mode_reglement) && (
+          <span className="block truncate text-[10px]">
+            {ligne.banque ?? 'banque ?'} · {ligne.rib ?? 'RIB manquant'}
+          </span>
+        )}
+      </p>
+
+      {enregistrer.isError && (
+        <p className="mt-1 text-xs text-red-600">{(enregistrer.error as Error).message}</p>
+      )}
+    </li>
   )
 }

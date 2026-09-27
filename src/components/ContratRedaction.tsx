@@ -98,7 +98,7 @@ export function RedactionDocument({
 
   if (!modele) {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <div className="modale fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
         <div className="max-w-md rounded-2xl bg-white p-5 text-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
           <p className="font-semibold text-slate-900">Aucun modèle</p>
           <p className="mt-1 text-slate-600">

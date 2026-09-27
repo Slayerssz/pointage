@@ -79,6 +79,77 @@ body {
   background: var(--color-slate-200);
 }
 
+/* ==================================================================
+   SUR TÉLÉPHONE
+
+   L'application se tient dans une main : ces règles-là valent pour
+   tout l'écran, et dispensent d'y penser écran par écran.
+   ================================================================== */
+
+/* 1. Les champs ne font plus zoomer la page.
+      Sous iOS, tout champ dont le texte est sous 16 px déclenche un zoom
+      à la sélection, et la page reste de travers ensuite. On remonte donc
+      les champs à 16 px sur petit écran — l'affichage, lui, garde sa
+      taille : ce sont les champs de saisie seuls qui changent. */
+@media screen and (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* 2. De quoi viser avec le pouce.
+      Beaucoup de boutons sont dessinés pour la souris (un ou deux
+      millimètres de haut). `min-height` ne rétrécit rien : elle ne fait
+      que relever ceux qui sont trop petits. */
+@media screen and (max-width: 767px) {
+  button,
+  a[role='button'] {
+    min-height: 2.5rem;
+  }
+  /* Sauf là où la hauteur est le sens même de l'élément */
+  .cible-libre,
+  .cible-libre button {
+    min-height: 0;
+  }
+}
+
+/* 3. Les boîtes de dialogue montent du bas, comme partout ailleurs sur
+      un téléphone, et leur contenu défile au lieu d'être coupé. Le
+      `> *` vise le panneau blanc, quelle que soit la page qui l'ouvre. */
+@media screen and (max-width: 639px) {
+  .modale {
+    align-items: flex-end;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .modale > * {
+    /* Certaines boîtes se centraient avec une marge : la feuille, elle,
+       est collée au bas de l'écran. */
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 92vh;
+    overflow-y: auto;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* 4. L'aperçu d'un document A4 tient dans la largeur de l'écran.
+      `zoom` plutôt qu'une transformation : elle réduit aussi la place
+      occupée, donc rien ne déborde sur le côté. `screen` est nécessaire —
+      à l'impression, la page est étroite elle aussi, et le document
+      sortirait réduit de moitié. */
+@media screen and (max-width: 767px) {
+  .document-imprimable {
+    zoom: var(--zoom-apercu, 0.46);
+  }
+}
+
 /* ------------------------------------------------------------------
    Impression d'un document
 

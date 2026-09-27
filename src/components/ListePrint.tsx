@@ -1,3 +1,4 @@
+import type React from 'react'
 import { formatDateFr } from '../lib/dates'
 import type { Employee, SitePrincipal } from '../lib/types'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
@@ -73,7 +74,9 @@ export default function ListePrint({
       />
 
       {/* A4 paysage : le tableau a besoin de largeur */}
-      <div className="document-imprimable mx-auto my-6 max-w-[297mm] bg-white p-[12mm] text-[9pt] leading-snug text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
+      <div
+        style={{ '--zoom-apercu': 0.34 } as React.CSSProperties}
+        className="document-imprimable mx-auto my-6 max-w-[297mm] bg-white p-[12mm] text-[9pt] leading-snug text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
         <header className="mb-5 border-b-2 border-black pb-3 text-center">
           <h1 className="text-base font-bold uppercase tracking-wide">
             {entreprises ? 'TOUTES LES ENTREPRISES' : entreprise}

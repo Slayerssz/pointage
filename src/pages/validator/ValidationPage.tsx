@@ -168,7 +168,59 @@ function SiteWeekGrid({
   if (rows.length === 0) return <EmptyState>Aucun employé affecté à ce site.</EmptyState>
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Sur téléphone, la semaine ne tient pas en colonnes à côté d'un
+        nom : chaque employé prend une carte, et ses sept jours toute la
+        largeur — de quoi pointer au pouce. */}
+    <ul className="space-y-2 p-3 md:hidden">
+      {rows.map((emp) => {
+        const empDays = pointages.data?.get(emp.id)
+        return (
+          <li key={emp.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <p className="min-w-0 truncate font-medium text-slate-900">{emp.nom_prenom}</p>
+              {emp.matricule != null && (
+                <span className="shrink-0 text-xs text-slate-400">Mat. {emp.matricule}</span>
+              )}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {dates.map((d, i) => (
+                <div key={d} className="flex min-w-0 flex-col items-center gap-0.5">
+                  <span className={`text-[10px] leading-none ${
+                    d === today ? 'font-bold text-emerald-600' : 'text-slate-400'
+                  }`}>
+                    {JOURS_COURTS[i].slice(0, 1)}
+                    {d.slice(8, 10)}
+                  </span>
+                  <DayCell
+                    large
+                    pointage={empDays?.get(d) ?? null}
+                    isRepos={emp.jour_de_repos === i + 1}
+                    isFuture={d > today}
+                    onClick={() =>
+                      onSelect({ employee: emp, site, date: d, pointage: empDays?.get(d) ?? null })
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </li>
+        )
+      })}
+      {employees.hasNextPage && (
+        <li className="pt-1 text-center">
+          <button
+            onClick={() => employees.fetchNextPage()}
+            disabled={employees.isFetchingNextPage}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+          >
+            {employees.isFetchingNextPage ? 'Chargement…' : 'Afficher plus'}
+          </button>
+        </li>
+      )}
+    </ul>
+
+    <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="border-b border-slate-100 text-xs text-slate-500">
@@ -227,6 +279,7 @@ function SiteWeekGrid({
         </tbody>
       </table>
     </div>
+    </>
   )
 }
 
@@ -235,11 +288,14 @@ function DayCell({
   isRepos,
   isFuture,
   onClick,
+  large = false,
 }: {
   pointage: DayPointage | null
   isRepos: boolean
   isFuture: boolean
   onClick: () => void
+  /** Dans une carte de téléphone, la case prend toute sa colonne. */
+  large?: boolean
 }) {
   let cls = 'bg-slate-100 text-slate-400'
   let label = '–'
@@ -269,7 +325,9 @@ function DayCell({
     <button
       onClick={onClick}
       title={title}
-      className={`inline-flex h-7 w-8 items-center justify-center rounded-lg text-xs font-bold transition hover:scale-110 ${cls}`}
+      className={`inline-flex items-center justify-center rounded-lg font-bold transition hover:scale-110 ${
+        large ? 'h-10 w-full text-sm' : 'h-7 w-8 text-xs'
+      } ${cls}`}
     >
       {label}
     </button>
@@ -387,7 +445,7 @@ function CellModal({ selection, onClose }: { selection: CellSelection; onClose: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}

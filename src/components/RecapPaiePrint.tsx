@@ -1,3 +1,4 @@
+import type React from 'react'
 import { enteteDe } from '../lib/entetes'
 import { MOIS_FR } from '../lib/paie'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
@@ -103,8 +104,9 @@ export default function RecapPaiePrint({
         <article
           className="document-imprimable mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
           style={{
+            '--zoom-apercu': 0.34,
             width: '273mm', padding: '10mm 12mm', color: '#111', fontSize: '8pt',
-          }}
+          } as React.CSSProperties}
         >
           <header
             className="flex items-start justify-between gap-4 pb-2"

@@ -41,7 +41,7 @@ export default function SaisieBulletin({
   const champ = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form
         className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
