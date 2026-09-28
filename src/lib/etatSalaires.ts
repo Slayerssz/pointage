@@ -6,10 +6,10 @@ import type { LignePaie } from './types'
  * précédé de son effectif et suivi de ses totaux, puis le total de la
  * société.
  *
- * Deux formes. La simple porte ce qu'on lit en réunion : qui, combien
- * brut, combien net — et le R.I.B. quand l'argent part en banque. La
- * détaillée ouvre les colonnes intermédiaires : prime, indemnités,
- * dette, autres retenues.
+ * C'est la liste de travail du bureau : qui, combien brut, combien net
+ * — et le R.I.B. quand l'argent part en banque. Les pièces qui sortent
+ * de la maison (ordre de virement, liste des versements, reçus
+ * d'espèces) ont chacune leur propre modèle, ailleurs.
  *
  * Les colonnes sont décrites ici, et nulle part ailleurs : l'aperçu à
  * l'écran et le PDF s'en servent tous deux, et ne peuvent donc pas
@@ -43,11 +43,11 @@ const argent = (
   montant: lire,
 })
 
-export function colonnesEtat(o: { detaillee: boolean; avecRib: boolean }): ColonneEtat[] {
+export function colonnesEtat(o: { avecRib: boolean }): ColonneEtat[] {
   const colonnes: ColonneEtat[] = [
     { cle: 'mat', titre: 'Mat.', largeur: 14, aligne: 'left',
       texte: (l) => (l.matricule != null ? String(l.matricule) : '') },
-    { cle: 'nom', titre: 'Nom & Prénom', largeur: o.detaillee ? 42 : 56, aligne: 'left',
+    { cle: 'nom', titre: 'Nom & Prénom', largeur: 56, aligne: 'left',
       texte: (l) => l.nom_prenom.toUpperCase() },
   ]
   if (o.avecRib) {
@@ -56,20 +56,10 @@ export function colonnesEtat(o: { detaillee: boolean; avecRib: boolean }): Colon
       texte: (l) => (l.rib ?? '').replace(/\s/g, ''),
     })
   }
-  if (o.detaillee) {
-    colonnes.push(
-      argent('base', 'Salaire base', (l) => Number(l.salaire_base), 20),
-      argent('brut', 'Salaire', (l) => Number(l.salaire_brut), 20),
-      argent('prime', 'Prime', (l) => Number(l.prime), 18),
-      argent('transport', 'Transport', (l) => Number(l.frais_transport), 18),
-      argent('panier', 'Panier', (l) => Number(l.frais_panier), 18),
-      argent('dette', 'Crédit', (l) => Number(l.retenue_dette), 18),
-      argent('autres', 'Autres', (l) => Number(l.autres_retenues), 18),
-    )
-  } else {
-    colonnes.push(argent('brut', 'Salaire', (l) => Number(l.salaire_brut), 26))
-  }
-  colonnes.push(argent('net', 'Salaire Net', (l) => Number(l.net_a_payer), 26))
+  colonnes.push(
+    argent('brut', 'Salaire', (l) => Number(l.salaire_brut), 26),
+    argent('net', 'Salaire Net', (l) => Number(l.net_a_payer), 26),
+  )
   return colonnes
 }
 

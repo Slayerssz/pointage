@@ -369,10 +369,11 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   }
   const imprimerLaSelection = () => imprimerPour(filtreReglement, filtrees)
 
-  // L'état des salaires : la liste de paie du mois, rangée par site.
-  // Comme le reste des impressions, il porte sur ce que la paie affiche.
-  const [etatAChoisir, setEtatAChoisir] = useState(false)
-  const [etat, setEtat] = useState<{ detaillee: boolean } | null>(null)
+  // Imprimer demande d'abord laquelle des deux : la liste de travail du
+  // bureau, ou la pièce officielle du mode affiché. Les deux portent sur
+  // ce que la paie affiche.
+  const [aImprimerChoisir, setAImprimerChoisir] = useState(false)
+  const [etat, setEtat] = useState(false)
 
   const aImprimer = (
     lignes: LignePaie[],
@@ -486,24 +487,12 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
                 virement, la liste des versements, les reçus d'espèces —
                 dans le modèle papier qui lui revient. */}
             <button
-              onClick={imprimerLaSelection}
-              disabled={!filtreReglement || filtrees.length === 0}
-              title={
-                filtreReglement
-                  ? `Imprimer : ${filtreReglement.toLowerCase()}`
-                  : 'Choisissez d’abord Espèces, Virement ou Versement'
-              }
+              onClick={() => setAImprimerChoisir(true)}
+              disabled={filtrees.length === 0}
+              title="La liste du bureau, ou la pièce officielle du mode affiché"
               className="rounded-lg border border-slate-800 bg-slate-800 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
             >
               Imprimer
-            </button>
-            <button
-              onClick={() => setEtatAChoisir(true)}
-              disabled={filtrees.length === 0}
-              title="La liste de paie du mois, rangée par site"
-              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              État des salaires
             </button>
             {modifiable && (
               <button
@@ -906,14 +895,14 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         />
       )}
 
-      {etatAChoisir && (
+      {aImprimerChoisir && (
         <ChoixEtatSalaires
           periode={moisLabel(periode.annee, periode.mois)}
           nombre={filtrees.length}
           mode={filtreReglement || null}
-          onSimple={() => { setEtat({ detaillee: false }); setEtatAChoisir(false) }}
-          onDetaillee={() => { setEtat({ detaillee: true }); setEtatAChoisir(false) }}
-          onClose={() => setEtatAChoisir(false)}
+          onSimple={() => { setEtat(true); setAImprimerChoisir(false) }}
+          onDetaillee={() => { imprimerLaSelection(); setAImprimerChoisir(false) }}
+          onClose={() => setAImprimerChoisir(false)}
         />
       )}
 
@@ -923,9 +912,8 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           entreprise={company?.name ?? ''}
           annee={periode.annee}
           mois={periode.mois}
-          detaillee={etat.detaillee}
           mode={filtreReglement || null}
-          onClose={() => setEtat(null)}
+          onClose={() => setEtat(false)}
         />
       )}
 

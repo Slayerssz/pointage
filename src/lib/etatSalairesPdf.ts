@@ -15,7 +15,6 @@ export async function dessinerEtatSalaires(opts: {
   entreprise: string
   annee: number
   mois: number
-  detaillee: boolean
   avecRib: boolean
   /** Le mode de règlement affiché, rappelé en sous-titre. */
   mode?: string | null
@@ -24,14 +23,12 @@ export async function dessinerEtatSalaires(opts: {
     import('jspdf'), import('jspdf-autotable'),
   ])
   const autoTable = autoTableMod.default
-  const { lignes, entreprise, annee, mois, detaillee, avecRib } = opts
+  const { lignes, entreprise, annee, mois, avecRib } = opts
 
-  const colonnes = colonnesEtat({ detaillee, avecRib })
+  const colonnes = colonnesEtat({ avecRib })
   const groupes = grouperParSite(lignes)
 
-  const doc = new jsPDF({
-    orientation: detaillee ? 'landscape' : 'portrait', unit: 'mm', format: 'a4',
-  })
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const largeur = doc.internal.pageSize.getWidth()
 
   doc.setFontSize(14).setFont('helvetica', 'bold')
@@ -111,7 +108,6 @@ export async function enregistrerEtatSalairesPdf(opts: {
   entreprise: string
   annee: number
   mois: number
-  detaillee: boolean
   avecRib: boolean
   mode?: string | null
   nomFichier: string

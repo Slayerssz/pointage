@@ -70,20 +70,23 @@ export default function ChoixImpression({
 }
 
 export function Choix({
-  titre, pour, detail, avertissement, recommande, onClick,
+  titre, pour, detail, avertissement, recommande, indisponible, onClick,
 }: {
   titre: string
   pour: string
   detail: string
   avertissement?: string
   recommande?: boolean
+  /** Pourquoi ce choix n'est pas possible ici ; il se montre grisé. */
+  indisponible?: string
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col rounded-xl border p-4 text-left transition hover:bg-slate-50 ${
-        recommande ? 'border-slate-900' : 'border-slate-300'
+      disabled={Boolean(indisponible)}
+      className={`flex flex-col rounded-xl border p-4 text-left transition enabled:hover:bg-slate-50 disabled:opacity-50 ${
+        recommande && !indisponible ? 'border-slate-900' : 'border-slate-300'
       }`}
     >
       <span className="block text-sm font-semibold text-slate-900">{titre}</span>
@@ -91,8 +94,11 @@ export function Choix({
         {pour}
       </span>
       <span className="mt-2 block text-sm text-slate-600">{detail}</span>
-      {avertissement && (
+      {avertissement && !indisponible && (
         <span className="mt-2 block text-xs font-medium text-amber-700">{avertissement}</span>
+      )}
+      {indisponible && (
+        <span className="mt-2 block text-xs font-medium text-slate-500">{indisponible}</span>
       )}
     </button>
   )

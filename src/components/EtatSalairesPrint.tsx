@@ -14,6 +14,10 @@ import type { LignePaie } from '../lib/types'
  * salariés rangés par site, chaque site précédé de son effectif et suivi
  * de ses totaux, puis le total de la société.
  *
+ * C'est la liste de travail du bureau. Les pièces qui sortent de la
+ * maison — ordre de virement, liste des versements, reçus d'espèces —
+ * ont chacune leur propre modèle et se demandent ailleurs.
+ *
  * La liste est continue : elle coule de page en page, et l'en-tête des
  * colonnes se répète en haut de chacune. Ce qui s'imprime est ce que la
  * paie affiche — le mode de règlement choisi, le site choisi, ou tout.
@@ -26,7 +30,6 @@ export default function EtatSalairesPrint({
   entreprise,
   annee,
   mois,
-  detaillee,
   mode,
   onClose,
 }: {
@@ -34,8 +37,6 @@ export default function EtatSalairesPrint({
   entreprise: string
   annee: number
   mois: number
-  /** La forme détaillée ouvre prime, indemnités, dette et retenues. */
-  detaillee: boolean
   /** Le mode de règlement affiché, s'il y en a un. */
   mode?: string | null
   onClose: () => void
@@ -45,7 +46,7 @@ export default function EtatSalairesPrint({
   const { pret, imprimer } = useImpression(0)
 
   const avecRib = !(mode ?? '').toLowerCase().startsWith('esp')
-  const colonnes = colonnesEtat({ detaillee, avecRib })
+  const colonnes = colonnesEtat({ avecRib })
   const groupes = grouperParSite(lignes)
   const periode = `${MOIS_FR[mois - 1]} ${annee}`
   const nomFichier =
@@ -53,7 +54,7 @@ export default function EtatSalairesPrint({
 
   const bordure = '1px solid #555'
   const cellule: React.CSSProperties = {
-    border: bordure, padding: '1.1mm 1.6mm', fontSize: detaillee ? '7.5pt' : '8.5pt',
+    border: bordure, padding: '1.1mm 1.6mm', fontSize: '8.5pt',
   }
 
   /** Une rangée de sous-total : effectif, intitulé, puis les sommes. */
@@ -86,11 +87,10 @@ export default function EtatSalairesPrint({
           titre={`État des salaires — ${entreprise} · ${periode} · ${lignes.length} salarié(s)`}
           pret={pret}
           imprimer={imprimer}
-          orientation={detaillee ? 'landscape' : 'portrait'}
           nomFichier={nomFichier}
           genererPdf={() =>
             enregistrerEtatSalairesPdf({
-              lignes, entreprise, annee, mois, detaillee, avecRib, mode, nomFichier,
+              lignes, entreprise, annee, mois, avecRib, mode, nomFichier,
             })
           }
           onClose={onClose}
@@ -102,7 +102,7 @@ export default function EtatSalairesPrint({
           </div>
         ) : (
           <div
-            style={{ '--zoom-apercu': detaillee ? 0.34 : 0.46 } as React.CSSProperties}
+            style={{ '--zoom-apercu': 0.46 } as React.CSSProperties}
             className="document-imprimable mx-auto my-6 bg-white p-[10mm] text-black shadow-xl print:my-0 print:p-0 print:shadow-none"
           >
             <header className="text-center">
@@ -162,7 +162,7 @@ export default function EtatSalairesPrint({
           </div>
         )}
 
-        <style>{`@media print { @page { size: A4 ${detaillee ? 'landscape' : 'portrait'}; margin: 10mm; } }`}</style>
+        <style>{`@media print { @page { size: A4 portrait; margin: 10mm; } }`}</style>
       </div>
     </PortailImpression>
   )

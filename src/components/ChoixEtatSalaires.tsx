@@ -2,11 +2,24 @@ import { useFermerSurEchap } from '../lib/impression'
 import { Choix } from './ChoixImpression'
 
 /**
- * Deux états pour la même paie. Le simple est celui qu'on lit et qu'on
- * fait circuler : qui, combien brut, combien net — et le R.I.B. quand
- * l'argent part en banque. Le détaillé ouvre les colonnes
- * intermédiaires, et reste au bureau.
+ * Deux façons d'imprimer la même paie, et elles ne servent pas à la
+ * même chose.
+ *
+ * La liste simple reste à la maison : le bureau la lit, la vérifie, la
+ * classe. Le document détaillé est la pièce qui sort — l'ordre de
+ * virement que la banque exécute, la liste des versements qu'on lui
+ * porte, les reçus d'espèces qu'on fait signer. Chacun suit le modèle
+ * papier de la société, et dépend donc du mode de règlement affiché.
  */
+
+/** Le nom du document officiel qui correspond au mode affiché. */
+function documentDu(mode: string | null | undefined): string | null {
+  const m = (mode ?? '').toLowerCase()
+  if (m.startsWith('vir')) return 'L’ordre de virement'
+  if (m.startsWith('vers')) return 'La liste des versements'
+  if (m.startsWith('esp')) return 'Les reçus d’espèces'
+  return null
+}
 export default function ChoixEtatSalaires({
   periode,
   nombre,
@@ -25,6 +38,7 @@ export default function ChoixEtatSalaires({
 }) {
   useFermerSurEchap(onClose)
   const especes = (mode ?? '').toLowerCase().startsWith('esp')
+  const officiel = documentDu(mode)
 
   return (
     <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -32,29 +46,38 @@ export default function ChoixEtatSalaires({
         className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-slate-900">État des salaires</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Imprimer la paie</h2>
         <p className="mt-1 text-sm text-slate-500">
           <strong className="text-slate-700">{periode}</strong> · {nombre} salarié(s)
-          {mode ? ` payés par ${mode.toLowerCase()}` : ''}. Les salariés sont rangés par
-          site, avec l’effectif et les totaux de chacun.
+          {mode ? ` payés par ${mode.toLowerCase()}` : ''}.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Choix
-            titre="État simple"
-            pour="À lire et à faire circuler"
+            titre="Liste simple"
+            pour="Pour le bureau"
             detail={
-              especes
+              (especes
                 ? 'Matricule, nom, salaire et salaire net. Sans R.I.B. : l’argent se remet en main propre.'
-                : 'Matricule, nom, R.I.B., salaire et salaire net.'
+                : 'Matricule, nom, R.I.B., salaire et salaire net.') +
+              ' Les salariés sont rangés par site, avec l’effectif et les totaux de chacun.'
             }
             recommande
             onClick={onSimple}
           />
           <Choix
-            titre="État détaillé"
-            pour="Usage interne, bureau"
-            detail="Ajoute le salaire de base, la prime, le transport, le panier, le crédit et les autres retenues. A4 paysage."
+            titre="Document détaillé"
+            pour={officiel ? 'La pièce qui sort' : 'Selon le mode de règlement'}
+            detail={
+              officiel
+                ? `${officiel}, dans le modèle papier de la société.`
+                : 'L’ordre de virement, la liste des versements ou les reçus d’espèces, selon le mode choisi.'
+            }
+            indisponible={
+              officiel
+                ? undefined
+                : 'Choisissez d’abord Espèces, Virement ou Versement : chaque mode a son propre modèle.'
+            }
             onClick={onDetaillee}
           />
         </div>
