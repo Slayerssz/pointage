@@ -1,5 +1,11 @@
 /** Aide au calcul d'âge, de retraite et de jour de repos. */
 
+/** Les mois, tels qu'ils s'écrivent sur les documents. */
+export const MOIS_FR = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+] as const
+
 export const RETIREMENT_AGE = 65
 export const RETIREMENT_WARNING_DAYS = 30
 

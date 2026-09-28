@@ -22,6 +22,8 @@ import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVire
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
 import ListeVersementsPrint from '../../components/ListeVersementsPrint'
 import RecusEspecePrint from '../../components/RecusEspecePrint'
+import EtatSalairesPrint from '../../components/EtatSalairesPrint'
+import ChoixEtatSalaires from '../../components/ChoixEtatSalaires'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useModeleSociete } from '../../lib/modeleSociete'
@@ -367,6 +369,11 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   }
   const imprimerLaSelection = () => imprimerPour(filtreReglement, filtrees)
 
+  // L'état des salaires : la liste de paie du mois, rangée par site.
+  // Comme le reste des impressions, il porte sur ce que la paie affiche.
+  const [etatAChoisir, setEtatAChoisir] = useState(false)
+  const [etat, setEtat] = useState<{ detaillee: boolean } | null>(null)
+
   const aImprimer = (
     lignes: LignePaie[],
     cle: (l: LignePaie) => string,
@@ -489,6 +496,14 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
               className="rounded-lg border border-slate-800 bg-slate-800 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
             >
               Imprimer
+            </button>
+            <button
+              onClick={() => setEtatAChoisir(true)}
+              disabled={filtrees.length === 0}
+              title="La liste de paie du mois, rangée par site"
+              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+            >
+              État des salaires
             </button>
             {modifiable && (
               <button
@@ -888,6 +903,29 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           nGeneral={etapes.nDuMode}
           onChoisir={choisirSeconde}
           onClose={() => setChoixOuvert(null)}
+        />
+      )}
+
+      {etatAChoisir && (
+        <ChoixEtatSalaires
+          periode={moisLabel(periode.annee, periode.mois)}
+          nombre={filtrees.length}
+          mode={filtreReglement || null}
+          onSimple={() => { setEtat({ detaillee: false }); setEtatAChoisir(false) }}
+          onDetaillee={() => { setEtat({ detaillee: true }); setEtatAChoisir(false) }}
+          onClose={() => setEtatAChoisir(false)}
+        />
+      )}
+
+      {etat && (
+        <EtatSalairesPrint
+          lignes={filtrees}
+          entreprise={company?.name ?? ''}
+          annee={periode.annee}
+          mois={periode.mois}
+          detaillee={etat.detaillee}
+          mode={filtreReglement || null}
+          onClose={() => setEtat(null)}
         />
       )}
 

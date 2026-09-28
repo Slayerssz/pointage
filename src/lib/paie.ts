@@ -11,10 +11,11 @@ import type {
   TotauxPeriode,
 } from './types'
 
-export const MOIS_FR = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-] as const
+// Les mois vivent avec les autres aides de date : un générateur de PDF
+// n'a pas à tirer tout Supabase pour écrire « Août ». Réexporté ici,
+// parce que c'est de la paie que tout le monde les lit.
+export { MOIS_FR } from './dates'
+import { MOIS_FR } from './dates'
 
 export function moisLabel(annee: number, mois: number): string {
   return `${MOIS_FR[mois - 1]} ${annee}`
