@@ -19,6 +19,7 @@ import { HORAIRES, SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
 import ChoixFiche from '../../components/ChoixFiche'
+import type { Piece } from '../../lib/pieces'
 import ApercuEmploye from '../../components/ApercuEmploye'
 import ListeSimplifieeDialogue from '../../components/ListeSimplifieeDialogue'
 import ChoixImpression from '../../components/ChoixImpression'
@@ -103,7 +104,9 @@ export default function EmployesPage() {
   // Fiche individuelle (une personne) et liste du personnel (la sélection)
   // Cliquer « Fiche » ouvre d'abord le choix simple / détaillée.
   const [ficheAChoisir, setFicheAChoisir] = useState<Employee | null>(null)
-  const [fiche, setFiche] = useState<{ employe: Employee; variante: 'simple' | 'detaillee' } | null>(null)
+  const [fiche, setFiche] = useState<
+    { employe: Employee; variante: 'simple' | 'detaillee'; pieces?: Piece[] } | null
+  >(null)
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
@@ -712,7 +715,10 @@ export default function EmployesPage() {
       {ficheAChoisir && (
         <ChoixFiche
           nom={ficheAChoisir.nom_prenom}
-          onSimple={() => { setFiche({ employe: ficheAChoisir, variante: 'simple' }); setFicheAChoisir(null) }}
+          onSimple={(pieces) => {
+            setFiche({ employe: ficheAChoisir, variante: 'simple', pieces })
+            setFicheAChoisir(null)
+          }}
           onDetaillee={() => { setFiche({ employe: ficheAChoisir, variante: 'detaillee' }); setFicheAChoisir(null) }}
           onClose={() => setFicheAChoisir(null)}
         />
@@ -724,6 +730,7 @@ export default function EmployesPage() {
           entreprise={entrepriseDe(fiche.employe)}
           sites={sitesImpression}
           variante={fiche.variante}
+          pieces={fiche.pieces}
           sitePrincipalNom={(e) => {
             const sp = sitesImpression.find((s) => s.id === e.site_id)?.site_principal_id
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { formatDateFr, jourDeReposLabel } from '../lib/dates'
@@ -8,6 +9,7 @@ import { genererFichePdf } from '../lib/fichePdf'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
 import { HORAIRES, type Employee } from '../lib/types'
+import { PIECES, type Piece } from '../lib/pieces'
 
 /**
  * FICHE D'INFORMATIONS PERSONNELLES
@@ -24,11 +26,64 @@ import { HORAIRES, type Employee } from '../lib/types'
  * page dans les deux cas.
  */
 
-const PIECES = [
-  'COPIE DE LA CIN',
-  'CERTIFICAT DE BONNE CONDUITE',
-  'CERTIFICAT MÉDICAL D’APTITUDE AU TRAVAIL',
-]
+/**
+ * Une fiche, une page — jamais deux.
+ *
+ * La fiche tient normalement sur sa page. Mais une adresse longue, un
+ * nom de site qui passe à la ligne, et elle déborde d'un centimètre sur
+ * une seconde feuille presque vide. Plutôt que de couper — on ne tronque
+ * pas l'adresse de quelqu'un sur un document officiel — on réduit
+ * légèrement l'ensemble, le temps que ça rentre.
+ *
+ * La mesure se prend sur le contenu, que `transform` ne touche pas :
+ * sa hauteur naturelle reste lisible quelle que soit la réduction déjà
+ * appliquée, et le calcul ne tourne donc pas en rond.
+ */
+const ZONE_IMPRIMABLE = 273 // mm : A4 moins les 12 mm de marge de @page
+const LARGEUR = 186
+
+function UnePage({ children }: { children: React.ReactNode }) {
+  const contenu = useRef<HTMLDivElement>(null)
+  const [echelle, setEchelle] = useState(1)
+
+  useLayoutEffect(() => {
+    const el = contenu.current
+    if (!el) return
+    const mesurer = () => {
+      const pxParMm = el.getBoundingClientRect().width / LARGEUR
+      if (!pxParMm) return
+      const max = ZONE_IMPRIMABLE * pxParMm
+      const haut = el.scrollHeight
+      setEchelle(haut > max ? Math.max(0.6, max / haut) : 1)
+    }
+    mesurer()
+    // Les photos arrivent après coup et peuvent changer la hauteur.
+    const o = new ResizeObserver(mesurer)
+    o.observe(el)
+    return () => o.disconnect()
+  }, [])
+
+  return (
+    <article
+      className="fiche mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
+      style={{
+        width: `${LARGEUR}mm`, height: `${ZONE_IMPRIMABLE}mm`,
+        overflow: 'hidden', color: '#1a1a1a',
+      }}
+    >
+      <div
+        ref={contenu}
+        style={{
+          width: `${LARGEUR}mm`, padding: '10mm 12mm',
+          transform: echelle < 1 ? `scale(${echelle})` : undefined,
+          transformOrigin: 'top left',
+        }}
+      >
+        {children}
+      </div>
+    </article>
+  )
+}
 
 /** Le département : saisi, sinon déduit de la qualification. */
 function departementDe(e: Employee): string {
@@ -42,6 +97,7 @@ export default function FichePrint({
   entreprise,
   sites,
   variante = 'simple',
+  pieces = PIECES,
   sitePrincipalNom,
   onClose,
 }: {
@@ -49,6 +105,8 @@ export default function FichePrint({
   entreprise: string
   sites: { id: string; name: string }[]
   variante?: 'simple' | 'detaillee'
+  /** Les pièces à faire figurer ; aucune, et le pavé disparaît. */
+  pieces?: readonly Piece[]
   /** Le site principal de l'annexe, quand la page le connaît. */
   sitePrincipalNom?: (e: Employee) => string | null
   onClose: () => void
@@ -110,6 +168,7 @@ export default function FichePrint({
             employees,
             entreprise,
             sites,
+            pieces,
             photos,
             nomFichier:
               employees.length === 1
@@ -137,11 +196,7 @@ export default function FichePrint({
           ]
 
           return (
-            <article
-              key={e.id}
-              className="fiche mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
-              style={{ width: '186mm', padding: '10mm 12mm', color: '#1a1a1a' }}
-            >
+            <UnePage key={e.id}>
               {/* En-tête de l'entreprise */}
               <header className="text-center">
                 {entete.logo ? (
@@ -177,7 +232,7 @@ export default function FichePrint({
               </div>
 
               {/* Photo à gauche, matricule au centre */}
-              <div className="flex items-start" style={{ gap: '10mm', marginBottom: '9mm' }}>
+              <div className="flex items-start" style={{ gap: '10mm', marginBottom: '7mm' }}>
                 <div
                   className="flex shrink-0 flex-col items-center justify-center"
                   style={{
@@ -227,7 +282,7 @@ export default function FichePrint({
                   {/* Les dix champs */}
                   <dl>
                     {champs.map(([label, valeur]) => (
-                      <div key={label} className="flex items-baseline" style={{ marginBottom: '4.6mm' }}>
+                      <div key={label} className="flex items-baseline" style={{ marginBottom: '4mm' }}>
                         <dt style={{ width: '52mm', color: entete.accent, fontWeight: 600, fontSize: '10.5pt' }}>
                           {label}
                         </dt>
@@ -239,21 +294,23 @@ export default function FichePrint({
                     ))}
                   </dl>
 
-                  {/* Pièces administratives */}
+                  {/* Pièces administratives — seulement celles demandées */}
+                  {pieces.length > 0 && (
+                  <>
                   <p
                     className="text-center uppercase"
                     style={{
                       color: entete.accent, fontWeight: 600, fontSize: '12pt',
                       letterSpacing: '.03em', textDecoration: 'underline',
-                      textUnderlineOffset: '2mm', margin: '10mm 0 6mm',
+                      textUnderlineOffset: '2mm', margin: '8mm 0 5mm',
                     }}
                   >
                     Pièces administratives
                   </p>
                   {/* La liste des pièces reste en noir chez toutes les sociétés */}
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {PIECES.map((piece) => (
-                      <li key={piece} className="flex items-baseline" style={{ marginBottom: '3.5mm' }}>
+                    {pieces.map((piece) => (
+                      <li key={piece} className="flex items-baseline" style={{ marginBottom: '3mm' }}>
                         <span style={{ color: '#1a1a1a', marginRight: '4mm', fontSize: '11pt' }}>•</span>
                         <span className="uppercase" style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '10pt' }}>
                           {piece}
@@ -261,9 +318,11 @@ export default function FichePrint({
                       </li>
                     ))}
                   </ul>
+                  </>
+                  )}
                 </>
               )}
-            </article>
+            </UnePage>
           )
         })}
       </div>

@@ -1,12 +1,18 @@
+import { useState } from 'react'
 import { useFermerSurEchap } from '../lib/impression'
+import { PIECES, type Piece } from '../lib/pieces'
 import { Choix } from './ChoixImpression'
 
 /**
  * Deux fiches pour la même personne, et le choix n'est pas cosmétique :
- * la fiche simple est le modèle officiel — photo, neuf champs, pièces à
- * fournir — qu'on remet ou qu'on classe ; la fiche détaillée porte tout
+ * la fiche simple est le modèle officiel — photo, les champs d'identité,
+ * les pièces demandées — qu'on remet ou qu'on classe ; la fiche détaillée porte tout
  * ce que le registre sait, salaire et R.I.B. compris. Celle-là reste au
  * bureau.
+ *
+ * Les pièces administratives se cochent avant d'imprimer : on ne réclame
+ * pas toujours les trois, et une ligne imprimée est une pièce qu'on
+ * finira par redemander à quelqu'un.
  */
 export default function ChoixFiche({
   nom,
@@ -15,11 +21,16 @@ export default function ChoixFiche({
   onClose,
 }: {
   nom: string
-  onSimple: () => void
+  onSimple: (pieces: Piece[]) => void
   onDetaillee: () => void
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
+  const [choisies, setChoisies] = useState<Piece[]>([...PIECES])
+
+  const basculer = (p: Piece) =>
+    setChoisies((liste) =>
+      liste.includes(p) ? liste.filter((x) => x !== p) : [...PIECES].filter((x) => x === p || liste.includes(x)))
 
   return (
     <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -36,9 +47,9 @@ export default function ChoixFiche({
           <Choix
             titre="Fiche simple"
             pour="Le modèle officiel"
-            detail="Photo, matricule, identité, adresse, site, date d’embauche, et les pièces à fournir."
+            detail="Photo, matricule, identité, adresse, site, date d’embauche, et les pièces demandées."
             recommande
-            onClick={onSimple}
+            onClick={() => onSimple(choisies)}
           />
           <Choix
             titre="Fiche détaillée"
@@ -48,6 +59,29 @@ export default function ChoixFiche({
             onClick={onDetaillee}
           />
         </div>
+
+        <fieldset className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <legend className="px-1 text-sm font-medium text-slate-700">
+            Pièces à réclamer
+          </legend>
+          <p className="text-xs text-slate-500">
+            Elles ne figurent que sur la fiche simple. Décochez celles dont vous
+            n’avez pas besoin ; sans aucune, le pavé ne s’imprime pas.
+          </p>
+          <div className="mt-2 space-y-1.5">
+            {PIECES.map((p) => (
+              <label key={p} className="flex items-center gap-2.5 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={choisies.includes(p)}
+                  onChange={() => basculer(p)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <span>{p}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <div className="mt-4 flex justify-end">
           <button

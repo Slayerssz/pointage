@@ -11,12 +11,7 @@
 import { formatDateFr } from './dates'
 import { enteteDe } from './entetes'
 import type { Employee } from './types'
-
-const PIECES = [
-  'COPIE DE LA CIN',
-  'CERTIFICAT DE BONNE CONDUITE',
-  "CERTIFICAT MÉDICAL D'APTITUDE AU TRAVAIL",
-]
+import { PIECES, type Piece } from './pieces'
 
 /** Page A4 et marges, en millimètres. */
 const P = { l: 210, h: 297, marge: 18 }
@@ -62,10 +57,13 @@ export async function genererFichePdf(opts: {
   sites: { id: string; name: string }[]
   /** chemin de stockage → image en données locales */
   photos?: Map<string, string>
+  /** Les pièces à faire figurer ; aucune, et le pavé disparaît. */
+  pieces?: readonly Piece[]
   nomFichier: string
 }): Promise<void> {
   const { jsPDF } = await import('jspdf')
   const { employees, entreprise, sites, photos, nomFichier } = opts
+  const pieces = opts.pieces ?? PIECES
   const entete = enteteDe(entreprise)
   const accent = hexVersRgb(entete.accent)
 
@@ -180,25 +178,30 @@ export async function genererFichePdf(opts: {
     })
 
     // ── Pièces administratives ────────────────────────────────────────
-    y += 6
-    const sousTitre = 'PIÈCES ADMINISTRATIVES'
-    doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...accent)
-    doc.text(sousTitre, P.l / 2, y, { align: 'center' })
-    const lSous = doc.getTextWidth(sousTitre)
-    doc.setDrawColor(...accent).setLineWidth(0.4)
-    doc.line((P.l - lSous) / 2, y + 1.8, (P.l + lSous) / 2, y + 1.8)
-    y += 11
+    // Sans pièce demandée, le pavé entier disparaît : un titre seul
+    // au-dessus du vide donnerait l'impression d'un défaut d'impression.
+    if (pieces.length > 0) {
+      y += 6
+      const sousTitre = 'PIÈCES ADMINISTRATIVES'
+      doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...accent)
+      doc.text(sousTitre, P.l / 2, y, { align: 'center' })
+      const lSous = doc.getTextWidth(sousTitre)
+      doc.setDrawColor(...accent).setLineWidth(0.4)
+      doc.line((P.l - lSous) / 2, y + 1.8, (P.l + lSous) / 2, y + 1.8)
+      y += 11
 
-    // La liste des pièces reste en noir, quelle que soit la société :
-    // c'est une liste à cocher, pas un élément d'identité visuelle.
-    doc.setFontSize(9.5)
-    PIECES.forEach((piece) => {
-      doc.setFillColor(20, 20, 20)
-      doc.circle(P.marge + 2, y - 1.2, 0.7, 'F')
-      doc.setFont('helvetica', 'bold').setTextColor(20, 20, 20)
-      doc.text(piece, P.marge + 7, y)
-      y += 7.5
-    })
+      // La liste des pièces reste en noir, quelle que soit la société :
+      // c'est une liste à cocher, pas un élément d'identité visuelle.
+      doc.setFontSize(9.5)
+      for (const piece of pieces) {
+        doc.setFillColor(20, 20, 20)
+        doc.circle(P.marge + 2, y - 1.2, 0.7, 'F')
+        doc.setFont('helvetica', 'bold').setTextColor(20, 20, 20)
+        // Les polices intégrées au PDF ignorent l'apostrophe courbe.
+        doc.text(piece.replace(/’/g, "'"), P.marge + 7, y)
+        y += 7.5
+      }
+    }
   })
 
   doc.save(nomFichier.endsWith('.pdf') ? nomFichier : `${nomFichier}.pdf`)
