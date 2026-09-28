@@ -195,7 +195,8 @@ export default function OrdreVirementPrint({
                       {page.map((l) => (
                         <tr key={l.id} style={{ height: '7.6mm' }}>
                           <td style={{ ...cell, textTransform: 'uppercase' }}>{l.nom_prenom}</td>
-                          <td style={{ ...cell, fontFamily: 'monospace', letterSpacing: '.03em', whiteSpace: 'nowrap' }}>
+                          <td style={{ ...cell, fontFamily: 'monospace', fontWeight: 700,
+                                       letterSpacing: '.03em', whiteSpace: 'nowrap' }}>
                             {rib(l.rib) || <span style={{ color: '#b00', fontFamily: 'inherit' }}>R.I.B. MANQUANT</span>}
                           </td>
                           <td style={{ ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>

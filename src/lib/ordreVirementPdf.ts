@@ -325,7 +325,12 @@ export async function dessinerOrdreVirement(opts: {
           case_(x + COL.nom, y, COL.rib, LIGNE, 'R.I.B. MANQUANT', { taille: 8, gras: true })
           doc.setTextColor(0, 0, 0)
         } else {
-          case_(x + COL.nom, y, COL.rib, LIGNE, rib, { mono: true, taille: 8 })
+          // Courier maigre en 8 points sortait délavé à l'impression, à
+          // côté des noms en 9. Le R.I.B. est ce qu'on recopie à la
+          // banque : il doit être le plus lisible de la ligne. En gras et
+          // à la même taille, les vingt-quatre chiffres tiennent toujours
+          // largement dans la colonne (46 mm sur les 66 disponibles).
+          case_(x + COL.nom, y, COL.rib, LIGNE, rib, { mono: true, taille: 9, gras: true })
         }
         case_(x + COL.nom + COL.rib, y, COL.montant, LIGNE, n2(l.net_a_payer), {
           aligne: 'right', taille: 9,
