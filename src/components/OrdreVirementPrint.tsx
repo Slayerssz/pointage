@@ -57,8 +57,13 @@ export default function OrdreVirementPrint({
 
   const n2 = (v: number | null | undefined) =>
     v == null ? '' : Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  // Le modèle écrit les R.I.B. d'un seul tenant, sans séparateur.
-  const rib = (v: string | null) => (v ? v.replace(/\s/g, '') : '')
+  // Le modèle écrit les R.I.B. d'un seul tenant. Une société qui en a
+  // deux les annonce avec le nom de chaque banque : dès qu'il y a autre
+  // chose que des chiffres, on respecte ce qui a été saisi.
+  const rib = (v: string | null) => {
+    const t = (v ?? '').trim()
+    return /[^0-9\s]/.test(t) ? t.replace(/\s+/g, ' ') : t.replace(/\s/g, '')
+  }
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
   const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
   const nbTotal = ordres.reduce((s, o) => s + o.lignes.length, 0)
@@ -110,8 +115,13 @@ export default function OrdreVirementPrint({
               haut, bas, avecFormule: veutLaFormule(entreprise),
             })
 
+            // Le site principal dont relèvent ces virements.
+            const principaux = [...new Set(
+              o.lignes.map((l) => (l.site_principal_nom ?? '').trim()).filter(Boolean),
+            )]
+            const sitePrincipal = (principaux.join(' / ') || o.intitule).toUpperCase()
+
             return pages.map((page, p) => {
-              const derniere = p === pages.length - 1
               // Chaque feuille ne totalise que ses propres virements.
               const total = page.reduce((s, l) => s + Number(l.net_a_payer), 0)
 
@@ -169,6 +179,10 @@ export default function OrdreVirementPrint({
                         <td style={gras}>LIBELLE OPERATIONS</td>
                         <td style={{ ...cell, fontWeight: 700 }}>{libelle}</td>
                       </tr>
+                      <tr>
+                        <td style={gras}>SITE</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>{sitePrincipal}</td>
+                      </tr>
                     </tbody>
                   </table>
 
@@ -207,15 +221,9 @@ export default function OrdreVirementPrint({
                     </tbody>
                   </table>
 
-                  {pages.length > 1 && (
-                    <p style={{ fontSize: '8pt', textAlign: 'right', marginTop: '1.5mm' }}>
-                      {o.intitule} — page {p + 1} / {pages.length}
-                      {!derniere && ' — suite au verso ou page suivante'}
-                    </p>
-                  )}
-
-                  {/* Signatures : ferment l'ordre, sur sa dernière page */}
-                  {derniere && (
+                  {/* Signatures : elles ferment chaque feuille — une page
+                      présentée à la banque sans signature n'est pas un ordre. */}
+                  {(
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '5mm' }}>
                       <tbody>
                         <tr style={{ background: '#d9d9d9', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>

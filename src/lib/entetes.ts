@@ -118,14 +118,37 @@ const ENTETES: Record<string, Entete> = {
 /** En-tête neutre, pour une entreprise dont le logo n'a pas encore été fourni. */
 const NEUTRE: Entete = { logo: null, accent: '#3f4a55' }
 
-/** Comparaison insensible à la casse, aux accents et à la ponctuation. */
+/**
+ * Les formes juridiques et les préfixes d'usage : ils changent d'un
+ * document à l'autre sans changer la société. « B.O NETTOYAGE S.A.R.L »
+ * et « BO » sont la même maison.
+ */
+const FORMES = ['SARL AU', 'SARLAU', 'SARL', 'S A R L', 'SNC', 'SAS', 'SA',
+                'NV', 'EURL', 'COOPERATIVE', 'SOCIETE', 'STE']
+
+/**
+ * Comparaison insensible à la casse, aux accents et à la ponctuation.
+ *
+ * Deux précautions de plus, apprises à nos dépens : les initiales
+ * pointées se recollent — « B.O » devient « BO », sinon le nom ne
+ * ressemble plus à rien — et la forme juridique tombe, où qu'elle soit
+ * dans le nom. Sans cela, une société enregistrée sous sa raison sociale
+ * complète perdait silencieusement son papier à en-tête.
+ */
 function cle(nom: string): string {
-  return nom
+  let n = nom
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, ' ')
     .trim()
+  // Les lettres isolées se recollent : « B O » → « BO », « S A R L » → « SARL ».
+  n = n.replace(/\b(?:[A-Z] )+[A-Z]\b/g, (m) => m.replace(/ /g, ''))
+  for (const forme of FORMES) {
+    const f = forme.replace(/ /g, '')
+    n = n.replace(new RegExp(`(^|\\s)${f}(\\s|$)`, 'g'), ' ')
+  }
+  return n.replace(/\s+/g, ' ').trim()
 }
 
 /** Les autres façons dont une société s'écrit selon la pièce qu'on lit. */
@@ -153,16 +176,37 @@ for (const [autre, officiel] of Object.entries(ALIAS)) {
  * L'en-tête d'une entreprise. La clé de modèle prime sur le nom : une
  * société renommée garde son en-tête.
  */
+/**
+ * Le plus long nom connu que celui-ci contient. Dernier recours, quand
+ * ni le nom ni ses variantes ne tombent juste : « BO NETTOYAGE TANGER »
+ * reste du BO. On prend le plus long pour éviter qu'un nom court
+ * n'attrape à tort une société dont il n'est qu'un morceau.
+ */
+function parRessemblance(k: string): Entete | undefined {
+  let meilleur: { taille: number; entete: Entete } | undefined
+  for (const [connu, entete] of PAR_CLE) {
+    if (connu.length < 3) continue
+    const contenu = k === connu
+      || k.startsWith(connu + ' ') || k.endsWith(' ' + connu)
+      || k.includes(' ' + connu + ' ')
+    if (contenu && (!meilleur || connu.length > meilleur.taille)) {
+      meilleur = { taille: connu.length, entete }
+    }
+  }
+  return meilleur?.entete
+}
+
 export function enteteDe(
   nomEntreprise: string | undefined | null,
   modeleDocument?: string | null,
 ): Entete {
-  if (modeleDocument) {
-    const e = PAR_CLE.get(cle(modeleDocument))
+  for (const candidat of [modeleDocument, nomEntreprise]) {
+    if (!candidat) continue
+    const k = cle(candidat)
+    const e = PAR_CLE.get(k) ?? parRessemblance(k)
     if (e) return e
   }
-  if (!nomEntreprise) return NEUTRE
-  return PAR_CLE.get(cle(nomEntreprise)) ?? NEUTRE
+  return NEUTRE
 }
 
 /** Les entreprises qui disposent d'un en-tête officiel. */

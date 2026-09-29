@@ -1,4 +1,7 @@
 // Vérifie la logique de filtrage/totaux de PaiePage sur des données réalistes
+import fs from 'node:fs'
+import { transformWithOxc } from 'vite'
+
 const lignes = [
   { nom_prenom:'A', matricule:1, site_nom:'HAY RIAD', site_principal_nom:'LA COMMUNE', mode_reglement:'Virement', banque:'CIH',  salaire_brut:5200, prime:0,   retenue_dette:500, autres_retenues:0, net_a_payer:4700 },
   { nom_prenom:'B', matricule:2, site_nom:'HAY RIAD', site_principal_nom:'LA COMMUNE', mode_reglement:'Espece',   banque:null,   salaire_brut:3000, prime:200, retenue_dette:0,   autres_retenues:0, net_a_payer:3200 },
@@ -95,36 +98,67 @@ ok(decalage ? 'la méthode par toISOString aurait bien été fautive ici'
 
 
 // ── En-têtes : chaque société doit retrouver le sien ─────────────────────
-const cle = (n) => (n ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim()
-const ENTETES = {
-  'EDEN VERT SERVICE': '#366d81', 'AL SAFAE EL MAGHREB': '#0f2155',
-  'GROUPE TRIPLE A': '#94040d', 'BO': '#0c6aa4', 'TRIMAX': '#171b32',
-  'VIGILMA GARD MAROC': '#63656a', 'DUO MULTI SERVICE': '#a8070c',
-  'NORD PLANET': '#006f9d', 'SERCLEAN NEGOCE': '#2c2667',
-  'MEGANTER SERVICE MAROC': '#616364',
-}
-const parCle = new Map(Object.entries(ENTETES).map(([k, v]) => [cle(k), v]))
-const enteteDe = (n) => parCle.get(cle(n)) ?? null
+// On charge le vrai module, pas une copie : une copie aurait continué à
+// passer pendant que la vraie recherche perdait des sociétés en route.
+const { code: codeEntetes } = await transformWithOxc(
+  fs.readFileSync('src/lib/entetes.ts', 'utf8'), 'e.ts', { lang: 'ts' })
+const { enteteDe, entreprisesAvecEntete } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeEntetes).toString('base64'))
 
-const SOCIETES = Object.keys(ENTETES)
-ok('les dix sociétés ont un en-tête', SOCIETES.every((s) => enteteDe(s) !== null))
-ok('les dix accents sont distincts', new Set(Object.values(ENTETES)).size === 10)
+const SOCIETES = entreprisesAvecEntete()
+ok('les dix sociétés ont un en-tête',
+   SOCIETES.length === 10 && SOCIETES.every((s) => enteteDe(s).logo !== null),
+   `${SOCIETES.length} société(s)`)
+ok('les dix accents sont distincts',
+   new Set(SOCIETES.map((s) => enteteDe(s).accent)).size === 10)
 ok('la casse et les accents n’empêchent pas la correspondance',
-   enteteDe('groupe triple a') === '#94040d' && enteteDe('Éden Vert Service') === '#366d81')
-ok('une société inconnue retombe sur l’en-tête neutre', enteteDe('SOCIETE INEXISTANTE') === null)
+   enteteDe('groupe triple a').accent === '#94040d'
+   && enteteDe('Éden Vert Service').accent === '#366d81')
+ok('une société inconnue retombe sur l’en-tête neutre',
+   enteteDe('SOCIETE INEXISTANTE').logo === null)
 
-// Le point qui posait problème : imprimer un employé d'une AUTRE société
-const employes = [
-  { nom: 'A', company_id: 'c1' },
-  { nom: 'B', company_id: 'c2' },
+// La raison sociale complète ne doit pas faire perdre son papier à une
+// société : c'est ce qui arrivait, en silence, avant qu'on ne recolle
+// les initiales pointées et qu'on ne laisse tomber la forme juridique.
+const MEME_MAISON = [
+  ['B.O NETTOYAGE S.A.R.L', 'BO'],
+  ['TRIMAX SURVEILLANCE SARL', 'TRIMAX'],
+  ['DUO MULTI SERVICE NV', 'DUO MULTI SERVICE'],
+  ['SOCIETE SERCLEAN NEGOCE SARL', 'SERCLEAN NEGOCE'],
+  ['COOPERATIVE EDEN VERT SERVICE', 'EDEN VERT SERVICE'],
+  ['GROUPE TRIPLE AAA', 'GROUPE TRIPLE A'],
 ]
+for (const [ecrit, officiel] of MEME_MAISON) {
+  ok(`« ${ecrit} » retrouve ${officiel}`,
+     enteteDe(ecrit).logo === enteteDe(officiel).logo
+     && enteteDe(ecrit).logo !== null,
+     enteteDe(ecrit).logo ?? 'aucun logo')
+}
+
+// Sept sociétés ont fourni leur papier à en-tête ; les trois autres
+// s'impriment sur feuille blanche, et cela doit rester volontaire.
+const AVEC_PAPIER = SOCIETES.filter((s) => enteteDe(s).papier)
+ok('sept sociétés ont leur papier à en-tête', AVEC_PAPIER.length === 7,
+   `${AVEC_PAPIER.length} : ${AVEC_PAPIER.join(', ')}`)
+ok('… et la raison sociale complète le retrouve aussi',
+   Boolean(enteteDe('B.O NETTOYAGE S.A.R.L').papier)
+   && Boolean(enteteDe('TRIMAX SURVEILLANCE SARL').papier))
+
+// Le relâchement ne doit pas rapprocher deux maisons différentes.
+for (const nom of ['SERVICE SARL', 'SOCIETE GENERALE', 'MAROC TELECOM', 'NETTOYAGE SA']) {
+  ok(`« ${nom} » reste sans en-tête`, enteteDe(nom).logo === null,
+     enteteDe(nom).logo ?? '')
+}
+
+// Le point qui posait problème : imprimer un employé d'une AUTRE société.
+const employes = [{ nom: 'A', company_id: 'c1' }, { nom: 'B', company_id: 'c2' }]
 const societes = [{ id: 'c1', name: 'GROUPE TRIPLE A' }, { id: 'c2', name: 'EDEN VERT SERVICE' }]
 const entrepriseDe = (e) => societes.find((c) => c.id === e.company_id)?.name ?? ''
 ok('la fiche prend l’en-tête de la société de l’employé, pas celle affichée',
-   enteteDe(entrepriseDe(employes[1])) === '#366d81',
-   enteteDe(entrepriseDe(employes[1])))
-ok('… et non celle du premier employé', enteteDe(entrepriseDe(employes[0])) !== enteteDe(entrepriseDe(employes[1])))
+   enteteDe(entrepriseDe(employes[1])).accent === '#366d81',
+   enteteDe(entrepriseDe(employes[1])).accent)
+ok('… et non celle du premier employé',
+   enteteDe(entrepriseDe(employes[0])).accent !== enteteDe(entrepriseDe(employes[1])).accent)
 
 console.log(`\n=== ${P} réussis, ${F} échoués ===`)
 process.exit(F ? 1 : 0)

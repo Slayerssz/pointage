@@ -28,7 +28,7 @@ const CARTOUCHE = { label: 74, valeur: LARGEUR - 74, hauteur: 7 }
 const LIGNE = 7.5
 
 /** Les hauteurs fixes de la feuille, en millimètres. */
-const H_CARTOUCHE = CARTOUCHE.hauteur * 6 // la case date, puis cinq intitulés
+const H_CARTOUCHE = CARTOUCHE.hauteur * 7 // la case date, puis six intitulés
 const H_ENTETE_TABLEAU = 9
 /** Deux lignes d'adresse, et trois réservées à la somme en toutes lettres. */
 const H_FORMULE = 1.5 + 4.6 * 5 + 1.4
@@ -50,38 +50,25 @@ export function paginerOrdre(
   o: { haut: number; bas: number; avecFormule: boolean },
 ): number[] {
   const tete = H_CARTOUCHE + (o.avecFormule ? H_FORMULE : H_SANS_FORMULE) + H_ENTETE_TABLEAU
-  const dispo = o.bas - o.haut - tete
-  const plein = Math.max(1, Math.floor(dispo / LIGNE))
-  // Sur la dernière feuille, les signatures prennent leur place. Si rien
-  // ne tient plus, elles passent sur une feuille à elles.
-  const dernier = Math.floor((dispo - H_SIGNATURES) / LIGNE)
+  // Le pavé des signatures ferme chaque feuille, pas seulement la
+  // dernière : une feuille qu'on présente à la banque sans signature
+  // n'est pas un ordre. Toutes réservent donc la même place, et tiennent
+  // le même nombre de bénéficiaires.
+  const parPage = Math.max(1, Math.floor((o.bas - o.haut - tete - H_SIGNATURES) / LIGNE))
 
   if (nbLignes <= 0) return [0]
-  // Sans place pour les signatures, elles prennent une feuille à elles.
-  if (dernier < 1) {
-    const pages: number[] = []
-    for (let r = nbLignes; r > 0; r -= plein) pages.push(Math.min(plein, r))
-    pages.push(0)
-    return pages
-  }
-  if (nbLignes <= dernier) return [nbLignes]
-
-  // Combien de feuilles au minimum ? La dernière porte les signatures et
-  // tient donc moins de monde que les autres.
-  let k = 1
-  while ((k - 1) * plein + dernier < nbLignes) k++
+  if (nbLignes <= parPage) return [nbLignes]
 
   // Réparti au plus juste : mieux vaut trois feuilles de onze qu'une
   // pleine et une presque vide.
+  const k = Math.ceil(nbLignes / parPage)
   const pages: number[] = []
-  const fin = Math.min(dernier, Math.ceil(nbLignes / k))
-  let reste = nbLignes - fin
-  for (let i = k - 1; i > 0; i--) {
-    const t = Math.min(plein, Math.ceil(reste / i))
+  let reste = nbLignes
+  for (let i = k; i > 0; i--) {
+    const t = Math.min(parPage, Math.ceil(reste / i))
     pages.push(t)
     reste -= t
   }
-  pages.push(fin)
   return pages
 }
 
@@ -167,8 +154,16 @@ const n2 = (v: number | string | null | undefined) =>
     .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     .replace(/[\u202f\u00a0\s]/g, ' ')
 
-/** Le modèle écrit les R.I.B. d'un seul tenant, sans séparateur. */
-const formaterRib = (v: string | null | undefined) => (v ? v.replace(/\s/g, '') : '')
+/**
+ * Le modèle écrit les R.I.B. d'un seul tenant, sans séparateur. Mais
+ * une société peut en avoir deux, et les annonce alors avec le nom de
+ * chaque banque — « BMCE: … / CHI: … ». Dès qu'il y a autre chose que
+ * des chiffres, on respecte ce qui a été saisi.
+ */
+const formaterRib = (v: string | null | undefined) => {
+  const t = (v ?? '').trim()
+  return /[^0-9\s]/.test(t) ? t.replace(/\s+/g, ' ') : t.replace(/\s/g, '')
+}
 
 /**
  * Dessine les ordres et renvoie le document. Séparé de l'enregistrement
@@ -229,9 +224,17 @@ export async function dessinerOrdreVirement(opts: {
     }
     if (!texte) return
     doc.setFont(o.mono ? 'courier' : 'times', o.gras ? 'bold' : 'normal')
-    doc.setFontSize(o.taille ?? 10)
     const pad = 2
-    const yTexte = y + h / 2 + (o.taille ?? 10) * 0.35 / 2.83
+    // Une société peut avoir deux R.I.B., et la ligne devient longue.
+    // Plutôt que de la laisser déborder sur la case voisine, on réduit
+    // le corps juste ce qu'il faut — jusqu'à 6 points, pas en dessous.
+    let taille = o.taille ?? 10
+    doc.setFontSize(taille)
+    while (taille > 6 && doc.getTextWidth(texte) > l - 2 * pad) {
+      taille -= 0.5
+      doc.setFontSize(taille)
+    }
+    const yTexte = y + h / 2 + taille * 0.35 / 2.83
     if (o.aligne === 'right') doc.text(texte, x + l - pad, yTexte, { align: 'right' })
     else if (o.aligne === 'center') doc.text(texte, x + l / 2, yTexte, { align: 'center' })
     else doc.text(texte, x + pad, yTexte)
@@ -242,7 +245,15 @@ export async function dessinerOrdreVirement(opts: {
   for (const ordre of ordres) {
     const pages = decouperOrdre(ordre.lignes, { haut, bas, avecFormule })
 
-    pages.forEach((page, p) => {
+    // Le site principal dont relèvent ces virements. Une feuille couvre
+    // normalement un seul site ; si elle en mêle plusieurs, on les nomme
+    // tous plutôt que d'en choisir un au hasard.
+    const principaux = [...new Set(
+      ordre.lignes.map((l) => (l.site_principal_nom ?? '').trim()).filter(Boolean),
+    )]
+    const sitePrincipal = principaux.join(' / ') || ordre.intitule
+
+    pages.forEach((page) => {
       // Chaque feuille est un ordre à elle seule : elle ne compte et ne
       // totalise que les virements qu'elle porte. Reprendre le total de
       // l'ordre entier ferait annoncer à la banque, sur chaque feuille,
@@ -276,6 +287,7 @@ export async function dessinerOrdreVirement(opts: {
       ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(page.length), { valeurGrasse: true })
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
+      ligneCartouche('SITE', sitePrincipal.toUpperCase(), { valeurGrasse: true })
 
       // La formule adressée à la banque : Vigilma et Serclean seulement.
       if (avecFormule) {
@@ -338,14 +350,8 @@ export async function dessinerOrdreVirement(opts: {
         y += LIGNE
       }
 
-      if (pages.length > 1) {
-        doc.setFont('times', 'normal').setFontSize(8)
-        doc.text(`${ordre.intitule} — page ${p + 1} / ${pages.length}`,
-                 x + LARGEUR, y + 4, { align: 'right' })
-      }
-
-      // ── Les signatures, sur la dernière page de l'ordre ───────────
-      if (p === pages.length - 1) {
+      // ── Les signatures, au bas de chaque feuille ──────────────────
+      {
         y += 6
         case_(x, y, LARGEUR, 7,
               'Partie réservée aux personnes habilitées à transmettre les ordres de virements',
