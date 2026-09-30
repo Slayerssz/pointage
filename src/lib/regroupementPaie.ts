@@ -8,8 +8,10 @@ import type { LignePaie } from './types'
  * qui l'affiche et dans celle qui l'imprime.
  *
  *   · Versement → par banque. C'est au guichet qu'on porte l'argent.
- *   · Virement  → par site principal. Un ordre part pour un site et
- *     toutes ses annexes à la fois, jamais annexe par annexe.
+ *   · Virement  → par rattachement : le site principal, qui emporte
+ *     toutes ses annexes d'un coup. Une annexe qui n'est rattachée à
+ *     rien ne disparaît pas pour autant — elle paraît sous son propre
+ *     nom, à côté des sites principaux.
  *   · le reste  → par annexe, faute de mieux.
  */
 export type ClePaie = (l: LignePaie) => string
@@ -17,14 +19,19 @@ export type ClePaie = (l: LignePaie) => string
 export const banqueDe: ClePaie = (l) =>
   (l.banque ?? '').trim().replace(/\s+/g, ' ').toUpperCase() || '(BANQUE NON RENSEIGNÉE)'
 
-export const sitePrincipalDe: ClePaie = (l) =>
-  l.site_principal_nom?.trim() || '(sans site principal)'
+/**
+ * Le site principal d'une ligne — ou, à défaut, son annexe. Une annexe
+ * sans rattachement doit rester visible et payable : la ranger sous un
+ * « (sans site principal) » commun l'aurait mêlée à toutes les autres.
+ */
+export const rattachementDe: ClePaie = (l) =>
+  l.site_principal_nom?.trim() || l.site_nom?.trim() || '(sans site)'
 
 export const annexeDe: ClePaie = (l) => l.site_nom?.trim() || '(sans site)'
 
 export function cleDuMode(mode: string): ClePaie {
   if (mode === 'Versement') return banqueDe
-  if (mode === 'Virement') return sitePrincipalDe
+  if (mode === 'Virement') return rattachementDe
   return annexeDe
 }
 

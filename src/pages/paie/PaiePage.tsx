@@ -20,7 +20,7 @@ import {
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
-import { banqueDe, cleDuMode, libelleDuMode } from '../../lib/regroupementPaie'
+import { banqueDe, cleDuMode, libelleDuMode, rattachementDe } from '../../lib/regroupementPaie'
 import ListeVersementsPrint from '../../components/ListeVersementsPrint'
 import RecusEspecePrint from '../../components/RecusEspecePrint'
 import EtatSalairesPrint from '../../components/EtatSalairesPrint'
@@ -231,7 +231,9 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
       if (filtreReglement && modeDe(l.mode_reglement) !== filtreReglement) return false
       if (filtreSite && (l.site_nom ?? '') !== filtreSite) return false
       if (filtreBanque && banqueDe(l) !== filtreBanque) return false
-      if (filtrePrincipal && (l.site_principal_nom ?? '') !== filtrePrincipal) return false
+      // Le rattachement, et non le seul site principal : sinon une annexe
+      // isolée, choisie sous son propre nom, ne ramènerait personne.
+      if (filtrePrincipal && rattachementDe(l) !== filtrePrincipal) return false
       if (!q) return true
       return (
         l.nom_prenom.toLowerCase().includes(q) ||

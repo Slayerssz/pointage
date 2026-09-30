@@ -125,11 +125,40 @@ ok('un virement par site principal rassemble ses annexes',
    parPrincipal.get('LA COMMUNE')?.length === 1 && parPrincipal.get('ZONE NORD')?.length === 1,
    [...parPrincipal.keys()].join(', '))
 
-// Sans rattachement, personne ne disparaît : il se range à part.
-ok('sans site principal, la ligne se range à part',
-   cleDuMode('Virement')({ site_principal_nom: null, site_nom: 'X' }) === '(sans site principal)')
+// Une annexe rattachée à rien ne se fond pas dans un tas commun : elle
+// paraît sous son propre nom, à côté des sites principaux.
+ok('une annexe sans site principal paraît sous son nom',
+   cleDuMode('Virement')({ site_principal_nom: null, site_nom: 'DEPOT NORD' }) === 'DEPOT NORD')
+ok('… et deux annexes isolées restent distinctes',
+   cleDuMode('Virement')({ site_principal_nom: null, site_nom: 'DEPOT NORD' })
+   !== cleDuMode('Virement')({ site_principal_nom: null, site_nom: 'DEPOT SUD' }))
+ok('sans rien du tout, la ligne se range à part',
+   cleDuMode('Virement')({ site_principal_nom: null, site_nom: null }) === '(sans site)')
 ok('sans banque non plus',
    cleDuMode('Versement')({ banque: '  ' }) === '(BANQUE NON RENSEIGNÉE)')
+
+// Le parcours complet, tel que la paie le propose : deux sites
+// principaux avec leurs annexes, et une annexe isolée.
+const POUR_VIREMENT = [
+  { nom_prenom: 'A', site_nom: 'HAY RIAD', site_principal_nom: 'LA COMMUNE', net_a_payer: 100 },
+  { nom_prenom: 'B', site_nom: 'AGDAL',    site_principal_nom: 'LA COMMUNE', net_a_payer: 200 },
+  { nom_prenom: 'C', site_nom: 'PORT',     site_principal_nom: 'ZONE NORD',  net_a_payer: 300 },
+  { nom_prenom: 'D', site_nom: 'DEPOT',    site_principal_nom: null,         net_a_payer: 400 },
+]
+const choix = new Map()
+for (const l of POUR_VIREMENT) {
+  const k = cleDuMode('Virement')(l)
+  choix.set(k, [...(choix.get(k) ?? []), l])
+}
+ok('trois choix proposés : deux sites principaux et l’annexe isolée',
+   [...choix.keys()].sort().join(' · ') === 'DEPOT · LA COMMUNE · ZONE NORD',
+   [...choix.keys()].join(' · '))
+ok('choisir LA COMMUNE prend ses deux annexes',
+   choix.get('LA COMMUNE').map((l) => l.nom_prenom).join('') === 'AB')
+ok('choisir l’annexe isolée prend son monde',
+   choix.get('DEPOT').length === 1 && choix.get('DEPOT')[0].nom_prenom === 'D')
+ok('personne ne se perd en route',
+   [...choix.values()].flat().length === POUR_VIREMENT.length)
 
 // ── En-têtes : chaque société doit retrouver le sien ─────────────────────
 // On charge le vrai module, pas une copie : une copie aurait continué à
