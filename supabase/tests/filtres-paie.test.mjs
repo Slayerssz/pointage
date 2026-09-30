@@ -97,6 +97,40 @@ ok(decalage ? 'la méthode par toISOString aurait bien été fautive ici'
    `toISOString donne ${fautif('2026-09-10')}`)
 
 
+// ── Par quoi se range chaque mode de règlement ───────────────────────────
+// La règle a déjà changé trois fois. On la vérifie sur le vrai module.
+const { code: codeRegroupement } = await transformWithOxc(
+  fs.readFileSync('src/lib/regroupementPaie.ts', 'utf8'), 'r.ts', { lang: 'ts' })
+const { cleDuMode, libelleDuMode } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeRegroupement).toString('base64'))
+
+const unVirement = lignes[0] // HAY RIAD, annexe de LA COMMUNE, banque CIH
+ok('le virement se range par site principal, pas par annexe',
+   cleDuMode('Virement')(unVirement) === 'LA COMMUNE',
+   cleDuMode('Virement')(unVirement))
+ok('le versement se range par banque',
+   cleDuMode('Versement')(unVirement) === 'CIH', cleDuMode('Versement')(unVirement))
+ok('les espèces se rangent par annexe',
+   cleDuMode('Espèces')(unVirement) === 'HAY RIAD', cleDuMode('Espèces')(unVirement))
+ok('… et le libellé suit', libelleDuMode('Virement') === 'Site principal'
+   && libelleDuMode('Versement') === 'Banque')
+
+// Choisir un site principal en virement doit ramener TOUTES ses annexes.
+const parPrincipal = new Map()
+for (const l of lignes.filter((x) => x.mode_reglement === 'Virement')) {
+  const k = cleDuMode('Virement')(l)
+  parPrincipal.set(k, [...(parPrincipal.get(k) ?? []), l])
+}
+ok('un virement par site principal rassemble ses annexes',
+   parPrincipal.get('LA COMMUNE')?.length === 1 && parPrincipal.get('ZONE NORD')?.length === 1,
+   [...parPrincipal.keys()].join(', '))
+
+// Sans rattachement, personne ne disparaît : il se range à part.
+ok('sans site principal, la ligne se range à part',
+   cleDuMode('Virement')({ site_principal_nom: null, site_nom: 'X' }) === '(sans site principal)')
+ok('sans banque non plus',
+   cleDuMode('Versement')({ banque: '  ' }) === '(BANQUE NON RENSEIGNÉE)')
+
 // ── En-têtes : chaque société doit retrouver le sien ─────────────────────
 // On charge le vrai module, pas une copie : une copie aurait continué à
 // passer pendant que la vraie recherche perdait des sociétés en route.

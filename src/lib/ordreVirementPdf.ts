@@ -28,7 +28,7 @@ const CARTOUCHE = { label: 74, valeur: LARGEUR - 74, hauteur: 7 }
 const LIGNE = 7.5
 
 /** Les hauteurs fixes de la feuille, en millimètres. */
-const H_CARTOUCHE = CARTOUCHE.hauteur * 7 // la case date, puis six intitulés
+const H_CARTOUCHE = CARTOUCHE.hauteur * 6 // la case date, puis cinq intitulés
 const H_ENTETE_TABLEAU = 9
 /** Deux lignes d'adresse, et trois réservées à la somme en toutes lettres. */
 const H_FORMULE = 1.5 + 4.6 * 5 + 1.4
@@ -245,14 +245,6 @@ export async function dessinerOrdreVirement(opts: {
   for (const ordre of ordres) {
     const pages = decouperOrdre(ordre.lignes, { haut, bas, avecFormule })
 
-    // Le site principal dont relèvent ces virements. Une feuille couvre
-    // normalement un seul site ; si elle en mêle plusieurs, on les nomme
-    // tous plutôt que d'en choisir un au hasard.
-    const principaux = [...new Set(
-      ordre.lignes.map((l) => (l.site_principal_nom ?? '').trim()).filter(Boolean),
-    )]
-    const sitePrincipal = principaux.join(' / ') || ordre.intitule
-
     pages.forEach((page) => {
       // Chaque feuille est un ordre à elle seule : elle ne compte et ne
       // totalise que les virements qu'elle porte. Reprendre le total de
@@ -287,7 +279,6 @@ export async function dessinerOrdreVirement(opts: {
       ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(page.length), { valeurGrasse: true })
       ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
-      ligneCartouche('SITE', sitePrincipal.toUpperCase(), { valeurGrasse: true })
 
       // La formule adressée à la banque : Vigilma et Serclean seulement.
       if (avecFormule) {

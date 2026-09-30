@@ -115,12 +115,6 @@ export default function OrdreVirementPrint({
               haut, bas, avecFormule: veutLaFormule(entreprise),
             })
 
-            // Le site principal dont relèvent ces virements.
-            const principaux = [...new Set(
-              o.lignes.map((l) => (l.site_principal_nom ?? '').trim()).filter(Boolean),
-            )]
-            const sitePrincipal = (principaux.join(' / ') || o.intitule).toUpperCase()
-
             return pages.map((page, p) => {
               // Chaque feuille ne totalise que ses propres virements.
               const total = page.reduce((s, l) => s + Number(l.net_a_payer), 0)
@@ -178,10 +172,6 @@ export default function OrdreVirementPrint({
                       <tr>
                         <td style={gras}>LIBELLE OPERATIONS</td>
                         <td style={{ ...cell, fontWeight: 700 }}>{libelle}</td>
-                      </tr>
-                      <tr>
-                        <td style={gras}>SITE</td>
-                        <td style={{ ...cell, fontWeight: 700 }}>{sitePrincipal}</td>
                       </tr>
                     </tbody>
                   </table>

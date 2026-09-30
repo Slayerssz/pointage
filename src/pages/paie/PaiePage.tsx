@@ -20,6 +20,7 @@ import {
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
+import { banqueDe, cleDuMode, libelleDuMode } from '../../lib/regroupementPaie'
 import ListeVersementsPrint from '../../components/ListeVersementsPrint'
 import RecusEspecePrint from '../../components/RecusEspecePrint'
 import EtatSalairesPrint from '../../components/EtatSalairesPrint'
@@ -117,9 +118,6 @@ function modeDe(m: string | null | undefined): string {
   if (v.startsWith('esp')) return 'Espèces'
   return m?.trim() || 'Sans mode de règlement'
 }
-const banqueDe = (l: LignePaie) =>
-  (l.banque ?? '').trim().replace(/\s+/g, ' ').toUpperCase() || '(BANQUE NON RENSEIGNÉE)'
-
 function couleurStatut(p: PeriodePaie): string {
   switch (p.statut) {
     case 'paie_validee': return '#10b981'
@@ -275,10 +273,10 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
     return {
       modes: listeModes,
       // Le versement se range par banque — c'est au guichet qu'on porte
-      // l'argent ; le virement par site, comme l'ordre qui part à la banque.
-      secondes: filtreReglement === 'Versement'
-        ? par(banqueDe)
-        : par((l) => l.site_nom?.trim() || '(sans site)'),
+      // l'argent. Le virement se range par site principal : un ordre part
+      // pour un site et toutes ses annexes à la fois, et non annexe par
+      // annexe. Le reste, s'il se range, se range par annexe.
+      secondes: par(cleDuMode(filtreReglement)),
       totalDuMode: somme(duMode),
       nDuMode: duMode.length,
     }
@@ -286,13 +284,17 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
   const choisirMode = (m: string) => {
     setFiltreReglement(m === filtreReglement ? '' : m)
-    setFiltreSite(''); setFiltreBanque('')
+    setFiltreSite(''); setFiltreBanque(''); setFiltrePrincipal('')
   }
   const choisirSeconde = (v: string) => {
     if (filtreReglement === 'Versement') setFiltreBanque(v)
+    else if (filtreReglement === 'Virement') setFiltrePrincipal(v)
     else setFiltreSite(v)
   }
-  const secondeActive = filtreReglement === 'Versement' ? filtreBanque : filtreSite
+  const secondeActive =
+    filtreReglement === 'Versement' ? filtreBanque
+    : filtreReglement === 'Virement' ? filtrePrincipal
+    : filtreSite
 
   // Cliquer sur Virement ou Versement ouvre la fenêtre du second choix :
   // on y lit les montants avant de décider, ce qu'un menu ne montre pas.
@@ -358,9 +360,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   /** Le document du mode affiché, dans son modèle. */
   const imprimerPour = (mode: string, liste: LignePaie[]) => {
     if (mode === 'Virement') {
-      setOrdres(aImprimer(
-        liste, (l) => l.site_nom?.trim() || '(sans site)', filtreSite, 'TOUS LES VIREMENTS',
-      ))
+      setOrdres(aImprimer(liste, cleDuMode('Virement'), filtrePrincipal, 'TOUS LES VIREMENTS'))
     } else if (mode === 'Versement') {
       setVersements({ lignes: liste, precision: filtreBanque || null })
     } else if (mode === 'Espèces') {
@@ -651,7 +651,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
             onClick={() => setChoixOuvert(filtreReglement)}
             className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-800 hover:border-slate-400"
           >
-            {filtreReglement === 'Versement' ? 'Banque' : 'Site'} :{' '}
+            {libelleDuMode(filtreReglement)} :{' '}
             <span className="font-semibold">
               {secondeActive || `Tout (${etapes.secondes.length})`}
             </span>
@@ -884,7 +884,7 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           question={
             choixOuvert === 'Versement'
               ? 'Quelle banque voulez-vous voir ?'
-              : 'Quel site voulez-vous voir ?'
+              : 'Quel site principal voulez-vous voir ? Ses annexes suivent.'
           }
           options={etapes.secondes}
           choisi={secondeActive}

@@ -951,9 +951,25 @@ const gardes = async () => num((await q1(
     where periode_id=$1 and employee_id=$2`, [pOuverte, ePaie]))?.g ?? -1)
 ok('la journée pointée apparaît dans la paie', (await gardes()) === 1, String(await gardes()))
 
-// Tant que le mois n'est pas fini, on ne demande pas la validation.
-await refuse('pas de validation avant la fin du mois',
-  `select public.demander_validation_paie($1)`, [pOuverte], /pas terminé/i)
+// Tant que le mois n'est pas fini, on ne demande pas la validation —
+// sauf le dernier jour, où elle s'ouvre justement. Le registre tombait
+// donc en échec chaque fin de mois : il regarde maintenant la date.
+const dernierJourDuMois = (await q1(
+  `select ((date_trunc('month', (now() at time zone 'Africa/Casablanca'))
+             + interval '1 month - 1 day')::date
+           = (now() at time zone 'Africa/Casablanca')::date) as d`)).d
+
+if (dernierJourDuMois) {
+  // On vérifie sans rien laisser derrière : la suite du registre compte
+  // sur un mois encore ouvert.
+  await db.exec('begin')
+  ok('dernier jour du mois : la validation s’ouvre justement',
+     await reussit(`select public.demander_validation_paie($1)`, [pOuverte]))
+  await db.exec('rollback')
+} else {
+  await refuse('pas de validation avant la fin du mois',
+    `select public.demander_validation_paie($1)`, [pOuverte], /pas terminé/i)
+}
 
 // Un mois révolu, lui, peut être proposé. Août 2026 fera l'affaire.
 const pAout = (await q1(`select public.periode_du_mois($1, 2026, 8) as id`, [co])).id
