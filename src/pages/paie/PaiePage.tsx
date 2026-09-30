@@ -20,6 +20,8 @@ import {
 import { exporterPaieExcel, exporterPaiePdf } from '../../lib/exports'
 import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVirementPrint'
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
+import ChoixCompte from '../../components/ChoixCompte'
+import { comptesDe, type CompteBancaire } from '../../lib/comptesSociete'
 import { banqueDe, cleDuMode, libelleDuMode, rattachementDe } from '../../lib/regroupementPaie'
 import ListeVersementsPrint from '../../components/ListeVersementsPrint'
 import RecusEspecePrint from '../../components/RecusEspecePrint'
@@ -350,6 +352,12 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   // lit et s'imprime seul — l'espèce se compte en caisse, le virement
   // part à la banque, ce ne sont pas les mêmes gens qui les traitent.
   const [ordres, setOrdres] = useState<OrdreDeSite[] | null>(null)
+  // Une société peut avoir deux banques. L'ordre ne part que d'un
+  // compte : on demande lequel, et on retient la réponse le temps de
+  // l'impression.
+  const comptes = useMemo(() => comptesDe(company?.rib_ordinateur), [company?.rib_ordinateur])
+  const [compte, setCompte] = useState<CompteBancaire | null>(null)
+  const [ordresEnAttente, setOrdresEnAttente] = useState<OrdreDeSite[] | null>(null)
   // Ce qui part à l'impression : les lignes affichées, et le site choisi.
   const [versements, setVersements] = useState<{ lignes: LignePaie[]; precision: string | null } | null>(null)
   const [recus, setRecus] = useState<LignePaie[] | null>(null)
@@ -362,7 +370,10 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
   /** Le document du mode affiché, dans son modèle. */
   const imprimerPour = (mode: string, liste: LignePaie[]) => {
     if (mode === 'Virement') {
-      setOrdres(aImprimer(liste, cleDuMode('Virement'), filtrePrincipal, 'TOUS LES VIREMENTS'))
+      const prets = aImprimer(liste, cleDuMode('Virement'), filtrePrincipal, 'TOUS LES VIREMENTS')
+      // Deux comptes et aucun choisi : la question passe d'abord.
+      if (comptes.length > 1 && !compte) setOrdresEnAttente(prets)
+      else setOrdres(prets)
     } else if (mode === 'Versement') {
       setVersements({ lignes: liste, precision: filtreBanque || null })
     } else if (mode === 'Espèces') {
@@ -880,6 +891,15 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         />
       )}
 
+      {ordresEnAttente && (
+        <ChoixCompte
+          entreprise={company?.name ?? ''}
+          comptes={comptes}
+          onChoisir={(c) => { setCompte(c); setOrdres(ordresEnAttente); setOrdresEnAttente(null) }}
+          onClose={() => setOrdresEnAttente(null)}
+        />
+      )}
+
       {choixOuvert && (
         <ChoixDansLaPaie
           titre={choixOuvert === 'Virement' ? 'Virements' : 'Versements'}
@@ -935,10 +955,10 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
           ordres={ordres}
           entreprise={company?.name ?? ''}
           modeleDocument={cleModele}
-          ribOrdinateur={company?.rib_ordinateur ?? null}
+          ribOrdinateur={compte?.rib ?? comptes[0]?.rib ?? null}
           annee={periode.annee}
           mois={periode.mois}
-          onClose={() => setOrdres(null)}
+          onClose={() => { setOrdres(null); setCompte(null) }}
         />
       )}
 

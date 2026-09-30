@@ -198,7 +198,9 @@ ok('… et il n’y a toujours qu’un pointage ce jour-là',
    num((await q1(`select count(*) as c from public.pointages
                    where employee_id=$1 and pointed_on='2026-02-02'`, [eGardes])).c) === 1)
 await refuse('pointer un jour à venir est refusé',
-  `select public.marquer_present($1,(current_date + 1),'X')`, [eGardes], /futur/i)
+  `select public.marquer_present(
+     $1, ((now() at time zone 'Africa/Casablanca')::date + 1), 'X')`,
+  [eGardes], /futur/i)
 
 // ═══════════ 3. LE CONGÉ SIGNÉ MET-IL DES « C » AUX BONS JOURS ? ═══
 
@@ -939,10 +941,10 @@ await refuse('un mois à venir n’a pas de paie',
 
 // Le pointage reste possible tant que le mois est ouvert.
 const ePaie = await employe('PAIE OUVERTE', { cin: 'PO1', cnss: '930000001' })
-const hier = (await q1(
-  `select ((now() at time zone 'Africa/Casablanca')::date - 1)::text d`)).d
+const aujourdhui = (await q1(
+  `select (now() at time zone 'Africa/Casablanca')::date::text d`)).d
 ok('on pointe encore sur un mois ouvert',
-   await reussit(`select public.marquer_present($1,$2::date,'X')`, [ePaie, hier]))
+   await reussit(`select public.marquer_present($1,$2::date,'X')`, [ePaie, aujourdhui]))
 
 // Et la paie s'en aperçoit sans qu'on lui demande rien d'autre.
 await q1(`select public.periode_du_mois($1,$2,$3)`, [co, AN, MS])

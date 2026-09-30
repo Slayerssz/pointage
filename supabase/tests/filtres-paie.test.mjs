@@ -160,6 +160,30 @@ ok('choisir l’annexe isolée prend son monde',
 ok('personne ne se perd en route',
    [...choix.values()].flat().length === POUR_VIREMENT.length)
 
+// ── Les comptes d'une société ────────────────────────────────────────────
+// Une société peut avoir deux banques ; l'ordre ne part que d'un compte.
+const { code: codeComptes } = await transformWithOxc(
+  fs.readFileSync('src/lib/comptesSociete.ts', 'utf8'), 'c.ts', { lang: 'ts' })
+const { comptesDe } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeComptes).toString('base64'))
+
+const deux = comptesDe('BMCE: 011640000017210001250197 / CIH: 230640396300722101680001')
+ok('deux comptes se lisent séparément', deux.length === 2, JSON.stringify(deux))
+ok('… la banque de chacun est nommée',
+   deux[0].banque === 'BMCE' && deux[1].banque === 'CIH')
+ok('… et leurs numéros sont intacts',
+   deux[0].rib === '011640000017210001250197'
+   && deux[1].rib === '230640396300722101680001')
+
+const seul = comptesDe('007640000601200000078590')
+ok('un compte sans étiquette reste un compte', seul.length === 1 && seul[0].banque === null)
+ok('… et son numéro se nettoie', comptesDe('0076 4000 0601')[0].rib === '007640000601')
+
+ok('un champ vide ne donne aucun compte',
+   comptesDe('').length === 0 && comptesDe(null).length === 0
+   && comptesDe(undefined).length === 0)
+ok('une étiquette sans numéro est écartée', comptesDe('BMCE: / CIH: 2306').length === 1)
+
 // ── En-têtes : chaque société doit retrouver le sien ─────────────────────
 // On charge le vrai module, pas une copie : une copie aurait continué à
 // passer pendant que la vraie recherche perdait des sociétés en route.
@@ -198,11 +222,15 @@ for (const [ecrit, officiel] of MEME_MAISON) {
      enteteDe(ecrit).logo ?? 'aucun logo')
 }
 
-// Sept sociétés ont fourni leur papier à en-tête ; les trois autres
+// Huit sociétés ont fourni leur papier à en-tête ; les deux autres
 // s'impriment sur feuille blanche, et cela doit rester volontaire.
 const AVEC_PAPIER = SOCIETES.filter((s) => enteteDe(s).papier)
-ok('sept sociétés ont leur papier à en-tête', AVEC_PAPIER.length === 7,
+ok('huit sociétés ont leur papier à en-tête', AVEC_PAPIER.length === 8,
    `${AVEC_PAPIER.length} : ${AVEC_PAPIER.join(', ')}`)
+ok('… et les deux qui manquent sont bien celles qu’on attend',
+   SOCIETES.filter((s) => !enteteDe(s).papier).sort().join(' · ')
+   === 'AL SAFAE EL MAGHREB · VIGILMA GARD MAROC',
+   SOCIETES.filter((s) => !enteteDe(s).papier).join(' · '))
 ok('… et la raison sociale complète le retrouve aussi',
    Boolean(enteteDe('B.O NETTOYAGE S.A.R.L').papier)
    && Boolean(enteteDe('TRIMAX SURVEILLANCE SARL').papier))

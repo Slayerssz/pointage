@@ -59,7 +59,11 @@ export interface PiedDePage {
 }
 
 const ENTETES: Record<string, Entete> = {
-  'EDEN VERT SERVICE': { logo: '/entetes/eden-vert-service.png', accent: '#366d81' },
+  'EDEN VERT SERVICE': {
+    papier: { image: '/lettres/eden-vert-service.jpg', haut: 56, bas: 271 },
+    logo: '/entetes/eden-vert-service.png',
+    accent: '#366d81',
+  },
   'AL SAFAE EL MAGHREB': { logo: '/entetes/al-safae-el-maghreb.png', accent: '#0f2155' },
   'GROUPE TRIPLE A': {
     papier: { image: '/lettres/groupe-triple-a.jpg', haut: 44, bas: 268 },
