@@ -99,6 +99,7 @@ export default function FichePrint({
   variante = 'simple',
   pieces = PIECES,
   sitePrincipalNom,
+  entrepriseDe,
   onClose,
 }: {
   employees: Employee[]
@@ -109,10 +110,14 @@ export default function FichePrint({
   pieces?: readonly Piece[]
   /** Le site principal de l'annexe, quand la page le connaît. */
   sitePrincipalNom?: (e: Employee) => string | null
+  /** La société de chacun. Un lot peut en mêler plusieurs : chaque fiche
+   *  porte alors l'en-tête de la sienne, et non celle de la page. */
+  entrepriseDe?: (e: Employee) => string
   onClose: () => void
 }) {
   const detaillee = variante === 'detaillee'
-  const entete = enteteDe(entreprise)
+  const societeDe = (e: Employee) => entrepriseDe?.(e) || entreprise
+  const enteteDeLemploye = (e: Employee) => enteteDe(societeDe(e))
   useFermerSurEchap(onClose)
   useModeImpression()
 
@@ -139,8 +144,8 @@ export default function FichePrint({
     },
   })
 
-  // Le logo, plus une photo par fiche qui en possède une
-  const nbImages = (entete.logo ? employees.length : 0) +
+  // Un logo par fiche qui en a un, plus une photo par fiche qui en a une.
+  const nbImages = employees.filter((e) => enteteDeLemploye(e).logo).length +
     (photosEnCours ? 0 : employees.filter((e) => e.photo_path && photos?.get(e.photo_path)).length)
   const { pret, imprimer } = useImpression(photosEnCours ? 0 : nbImages)
 
@@ -167,6 +172,7 @@ export default function FichePrint({
           genererFichePdf({
             employees,
             entreprise,
+            entrepriseDe,
             sites,
             pieces,
             photos,
@@ -182,6 +188,7 @@ export default function FichePrint({
       <div className="document-imprimable">
         {employees.map((e) => {
           const photo = e.photo_path ? photos?.get(e.photo_path) : undefined
+          const enteteFiche = enteteDeLemploye(e)
           const champs: [string, string][] = [
             ['Nom et Prénom', e.nom_prenom],
             ['N° Carte Nationale', e.cin ?? ''],
@@ -199,16 +206,16 @@ export default function FichePrint({
             <UnePage key={e.id}>
               {/* En-tête de l'entreprise */}
               <header className="text-center">
-                {entete.logo ? (
+                {enteteFiche.logo ? (
                   <img
-                    src={entete.logo}
+                    src={enteteFiche.logo}
                     alt={entreprise}
                     style={{ height: '26mm', margin: '0 auto', objectFit: 'contain' }}
                   />
                 ) : (
                   <p
                     className="font-bold uppercase tracking-wide"
-                    style={{ color: entete.accent, fontSize: '15pt' }}
+                    style={{ color: enteteFiche.accent, fontSize: '15pt' }}
                   >
                     {entreprise}
                   </p>
@@ -217,18 +224,18 @@ export default function FichePrint({
 
               {/* Bandeau du titre, encadré de deux filets */}
               <div className="flex items-center" style={{ margin: '7mm 0 6mm' }}>
-                <span style={{ flex: 1, height: 1, background: entete.accent, opacity: 0.45 }} />
+                <span style={{ flex: 1, height: 1, background: enteteFiche.accent, opacity: 0.45 }} />
                 <span
                   className="font-bold uppercase"
                   style={{
-                    background: entete.accent, color: '#fff',
+                    background: enteteFiche.accent, color: '#fff',
                     padding: '2.6mm 7mm', fontSize: '12.5pt', letterSpacing: '.02em',
                     margin: '0 4mm', whiteSpace: 'nowrap',
                   }}
                 >
                   {detaillee ? 'Fiche détaillée du salarié' : 'Fiche d’informations personnelles'}
                 </span>
-                <span style={{ flex: 1, height: 1, background: entete.accent, opacity: 0.45 }} />
+                <span style={{ flex: 1, height: 1, background: enteteFiche.accent, opacity: 0.45 }} />
               </div>
 
               {/* Photo à gauche, matricule au centre */}
@@ -249,7 +256,7 @@ export default function FichePrint({
                         <path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" />
                         <circle cx="12" cy="12.5" r="3.2" />
                       </svg>
-                      <span style={{ color: entete.accent, fontSize: '8pt', letterSpacing: '.08em',
+                      <span style={{ color: enteteFiche.accent, fontSize: '8pt', letterSpacing: '.08em',
                                      marginTop: '3mm', fontWeight: 600 }}>
                         PHOTO
                       </span>
@@ -258,14 +265,14 @@ export default function FichePrint({
                 </div>
 
                 <div className="flex-1 text-center" style={{ paddingTop: '6mm' }}>
-                  <p className="uppercase" style={{ color: entete.accent, fontSize: '13pt',
+                  <p className="uppercase" style={{ color: enteteFiche.accent, fontSize: '13pt',
                                                     letterSpacing: '.05em', fontWeight: 600 }}>
                     Matricule N°{' '}
                     <span style={{ fontWeight: 700 }}>
                       {e.matricule != null ? String(e.matricule).padStart(3, '0') : '—'}
                     </span>
                   </p>
-                  <span style={{ display: 'block', height: 2, background: entete.accent,
+                  <span style={{ display: 'block', height: 2, background: enteteFiche.accent,
                                  opacity: 0.75, margin: '2mm auto 0', width: '58mm' }} />
                 </div>
               </div>
@@ -273,7 +280,7 @@ export default function FichePrint({
               {detaillee ? (
                 <FicheDetaillee
                   e={e}
-                  accent={entete.accent}
+                  accent={enteteFiche.accent}
                   siteNom={siteName(e.site_id)}
                   sitePrincipal={sitePrincipalNom?.(e) ?? null}
                 />
@@ -283,10 +290,10 @@ export default function FichePrint({
                   <dl>
                     {champs.map(([label, valeur]) => (
                       <div key={label} className="flex items-baseline" style={{ marginBottom: '4mm' }}>
-                        <dt style={{ width: '52mm', color: entete.accent, fontWeight: 600, fontSize: '10.5pt' }}>
+                        <dt style={{ width: '52mm', color: enteteFiche.accent, fontWeight: 600, fontSize: '10.5pt' }}>
                           {label}
                         </dt>
-                        <dd style={{ width: '6mm', color: entete.accent }}>:</dd>
+                        <dd style={{ width: '6mm', color: enteteFiche.accent }}>:</dd>
                         <dd className="uppercase" style={{ fontWeight: 700, fontSize: '10.5pt', flex: 1 }}>
                           {valeur || ' '}
                         </dd>
@@ -300,7 +307,7 @@ export default function FichePrint({
                   <p
                     className="text-center uppercase"
                     style={{
-                      color: entete.accent, fontWeight: 600, fontSize: '12pt',
+                      color: enteteFiche.accent, fontWeight: 600, fontSize: '12pt',
                       letterSpacing: '.03em', textDecoration: 'underline',
                       textUnderlineOffset: '2mm', margin: '8mm 0 5mm',
                     }}

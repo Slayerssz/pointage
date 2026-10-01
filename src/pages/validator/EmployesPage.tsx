@@ -103,15 +103,29 @@ export default function EmployesPage() {
   const [impression, setImpression] = useState<{ contrat: Contrat; employee: Employee } | null>(null)
   // Fiche individuelle (une personne) et liste du personnel (la sélection)
   // Cliquer « Fiche » ouvre d'abord le choix simple / détaillée.
-  const [ficheAChoisir, setFicheAChoisir] = useState<Employee | null>(null)
+  // Une personne ou tout un lot : c'est la même question qu'on pose.
+  const [ficheAChoisir, setFicheAChoisir] = useState<Employee[] | null>(null)
   const [fiche, setFiche] = useState<
-    { employe: Employee; variante: 'simple' | 'detaillee'; pieces?: Piece[] } | null
+    { employes: Employee[]; variante: 'simple' | 'detaillee'; pieces?: Piece[] } | null
   >(null)
   // Cliquer la ligne (hors boutons) ouvre l'aperçu en lecture seule.
   const [apercu, setApercu] = useState<Employee | null>(null)
   const [liste, setListe] = useState<Employee[] | null>(null)
   // La sélection chargée, en attente du choix « complète ou simplifiée ».
   const [aImprimer, setAImprimer] = useState<Employee[] | null>(null)
+  /**
+   * Les employés cochés. On garde la fiche entière, et non le seul
+   * identifiant : la sélection traverse les pages de la liste, et on ne
+   * retrouverait plus les gens restés sur une page qu'on a quittée.
+   */
+  const [choisis, setChoisis] = useState<Map<string, Employee>>(new Map())
+  const cocher = (emp: Employee) =>
+    setChoisis((m) => {
+      const n = new Map(m)
+      if (n.has(emp.id)) n.delete(emp.id)
+      else n.set(emp.id, emp)
+      return n
+    })
   // La liste courte remise au client : nom, C.I.N., n° C.N.S.S., rien d'autre.
   const [listeSimple, setListeSimple] = useState<Employee[] | null>(null)
   const [chargementListe, setChargementListe] = useState(false)
@@ -419,6 +433,30 @@ export default function EmployesPage() {
         </div>
       )}
 
+      {choisis.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3">
+          <span className="text-sm font-semibold text-emerald-900">
+            {choisis.size} employé{choisis.size > 1 ? 's' : ''} choisi
+            {choisis.size > 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={() => setAImprimer([...choisis.values()])}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            Imprimer
+          </button>
+          <button
+            onClick={() => setChoisis(new Map())}
+            className="text-sm font-medium text-emerald-800 underline hover:text-emerald-900"
+          >
+            Tout décocher
+          </button>
+          <span className="text-xs text-emerald-700">
+            La sélection vous suit d’une page à l’autre.
+          </span>
+        </div>
+      )}
+
       {isLoading && <Spinner label="Chargement des employés…" />}
       {error && <ErrorNote>Erreur : {error.message}</ErrorNote>}
       {data && lignes.length === 0 && <EmptyState>Aucun employé trouvé.</EmptyState>}
@@ -439,12 +477,21 @@ export default function EmployesPage() {
               contrats?.get(emp.id)?.jours_restants ?? null,
             )
             return (
-              <li key={emp.id} className={
+              <li key={emp.id} className={`flex items-center ${
                 isGone ? 'bg-slate-50' : isRetired ? 'bg-red-50' : (aff?.ligne || '')
-              }>
+              }`}>
+                <label className="flex shrink-0 items-center py-3 pl-3 pr-1">
+                  <input
+                    type="checkbox"
+                    aria-label={`Choisir ${emp.nom_prenom}`}
+                    className="h-5 w-5 rounded border-slate-300"
+                    checked={choisis.has(emp.id)}
+                    onChange={() => cocher(emp)}
+                  />
+                </label>
                 <button
                   onClick={() => setApercu(emp)}
-                  className="flex w-full items-center gap-2.5 px-3 py-3 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-2.5 py-3 pr-3 pl-1 text-left"
                 >
                   <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-slate-600">
                     {emp.matricule ?? '—'}
@@ -471,7 +518,26 @@ export default function EmployesPage() {
           <table className="w-full min-w-[1500px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                <th className="fige-gauche px-4 py-3.5 font-medium">Employé</th>
+                <th className="fige-gauche px-3 py-3.5 font-medium">
+                  <input
+                    type="checkbox"
+                    aria-label="Tout cocher sur cette page"
+                    title="Tout cocher sur cette page"
+                    className="h-4 w-4 rounded border-slate-300"
+                    checked={lignes.length > 0 && lignes.every((e) => choisis.has(e.id))}
+                    onChange={(ev) =>
+                      setChoisis((m) => {
+                        const n = new Map(m)
+                        for (const e of lignes) {
+                          if (ev.target.checked) n.set(e.id, e)
+                          else n.delete(e.id)
+                        }
+                        return n
+                      })
+                    }
+                  />
+                </th>
+                <th className="px-4 py-3.5 font-medium">Employé</th>
                 {estAdmin && toutesEntreprises && (
                   <th className="px-4 py-3.5 font-medium">Entreprise</th>
                 )}
@@ -512,7 +578,19 @@ export default function EmployesPage() {
                           : fondContrat || 'bg-white'
                     }`}
                   >
-                    <td className="fige-gauche px-4 py-3.5">
+                    <td
+                      className="fige-gauche px-3 py-3.5"
+                      onClick={(ev) => ev.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Choisir ${emp.nom_prenom}`}
+                        className="h-4 w-4 rounded border-slate-300"
+                        checked={choisis.has(emp.id)}
+                        onChange={() => cocher(emp)}
+                      />
+                    </td>
+                    <td className="px-4 py-3.5">
                       <div className="flex items-start gap-3">
                         <span className="mt-0.5 shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-slate-600">
                           {emp.matricule ?? '—'}
@@ -658,7 +736,7 @@ export default function EmployesPage() {
                     >
                       <div className="flex justify-end gap-1.5">
                         <button
-                          onClick={() => setFicheAChoisir(emp)}
+                          onClick={() => setFicheAChoisir([emp])}
                           title="Imprimer la fiche de cet employé"
                           className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
                         >
@@ -706,7 +784,7 @@ export default function EmployesPage() {
             const sp = sitesImpression.find((s) => s.id === apercu.site_id)?.site_principal_id
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
           })()}
-          onFiche={() => { setFicheAChoisir(apercu); setApercu(null) }}
+          onFiche={() => { setFicheAChoisir([apercu]); setApercu(null) }}
           onModifier={() => { setEditing(apercu); setApercu(null) }}
           onClose={() => setApercu(null)}
         />
@@ -714,20 +792,28 @@ export default function EmployesPage() {
 
       {ficheAChoisir && (
         <ChoixFiche
-          nom={ficheAChoisir.nom_prenom}
+          nom={
+            ficheAChoisir.length === 1
+              ? ficheAChoisir[0].nom_prenom
+              : `${ficheAChoisir.length} employés`
+          }
           onSimple={(pieces) => {
-            setFiche({ employe: ficheAChoisir, variante: 'simple', pieces })
+            setFiche({ employes: ficheAChoisir, variante: 'simple', pieces })
             setFicheAChoisir(null)
           }}
-          onDetaillee={() => { setFiche({ employe: ficheAChoisir, variante: 'detaillee' }); setFicheAChoisir(null) }}
+          onDetaillee={() => {
+            setFiche({ employes: ficheAChoisir, variante: 'detaillee' })
+            setFicheAChoisir(null)
+          }}
           onClose={() => setFicheAChoisir(null)}
         />
       )}
 
       {fiche && (
         <FichePrint
-          employees={[fiche.employe]}
-          entreprise={entrepriseDe(fiche.employe)}
+          employees={fiche.employes}
+          entreprise={entrepriseDe(fiche.employes[0])}
+          entrepriseDe={entrepriseDe}
           sites={sitesImpression}
           variante={fiche.variante}
           pieces={fiche.pieces}
@@ -745,6 +831,7 @@ export default function EmployesPage() {
           siteNom={siteFilter ? (sites?.find((s) => s.id === siteFilter)?.name ?? null) : null}
           onComplete={() => { setListe(aImprimer); setAImprimer(null) }}
           onSimplifiee={() => { setListeSimple(aImprimer); setAImprimer(null) }}
+          onFiches={() => { setFicheAChoisir(aImprimer); setAImprimer(null) }}
           onClose={() => setAImprimer(null)}
         />
       )}

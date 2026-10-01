@@ -59,15 +59,22 @@ export async function genererFichePdf(opts: {
   photos?: Map<string, string>
   /** Les pièces à faire figurer ; aucune, et le pavé disparaît. */
   pieces?: readonly Piece[]
+  /** La société de chacun : un lot peut en mêler plusieurs. */
+  entrepriseDe?: (e: Employee) => string
   nomFichier: string
 }): Promise<void> {
   const { jsPDF } = await import('jspdf')
   const { employees, entreprise, sites, photos, nomFichier } = opts
   const pieces = opts.pieces ?? PIECES
-  const entete = enteteDe(entreprise)
-  const accent = hexVersRgb(entete.accent)
+  const societeDe = (e: Employee) => opts.entrepriseDe?.(e) || entreprise
 
-  const logo = entete.logo ? await versDataUrl(entete.logo) : null
+  // Un logo par société représentée, chargé une seule fois.
+  type Logo = Awaited<ReturnType<typeof versDataUrl>>
+  const logos = new Map<string, Logo>()
+  for (const e of employees) {
+    const chemin = enteteDe(societeDe(e)).logo
+    if (chemin && !logos.has(chemin)) logos.set(chemin, await versDataUrl(chemin))
+  }
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const nomSite = (id: string) => sites.find((s) => s.id === id)?.name ?? ''
@@ -75,6 +82,13 @@ export async function genererFichePdf(opts: {
   employees.forEach((e, index) => {
     if (index > 0) doc.addPage('a4', 'portrait')
     let y = P.marge
+
+    // Chaque fiche porte l'en-tête de SA société : un lot peut en mêler
+    // plusieurs quand l'administrateur imprime toutes entreprises.
+    const societe = societeDe(e)
+    const entete = enteteDe(societe)
+    const accent = hexVersRgb(entete.accent)
+    const logo = entete.logo ? logos.get(entete.logo) ?? null : null
 
     // ── En-tête : logo centré, ou nom de la société ────────────────────
     if (logo) {
@@ -85,7 +99,7 @@ export async function genererFichePdf(opts: {
       y += h + 8
     } else {
       doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...accent)
-      doc.text(entreprise.toUpperCase(), P.l / 2, y + 6, { align: 'center' })
+      doc.text(societe.toUpperCase(), P.l / 2, y + 6, { align: 'center' })
       y += 16
     }
 

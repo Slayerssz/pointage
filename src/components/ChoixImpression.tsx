@@ -1,16 +1,20 @@
 import { useFermerSurEchap } from '../lib/impression'
 
 /**
- * Deux façons d'imprimer la même sélection, et le choix n'est pas
+ * Trois façons d'imprimer la même sélection, et le choix n'est pas
  * cosmétique : la liste complète porte les salaires, les adresses et les
  * téléphones, la liste simplifiée s'arrête au nom, au C.I.N. et au numéro
  * C.N.S.S. C'est celle qu'on remet au client — d'où le rappel explicite.
+ *
+ * La troisième ne fait pas une liste du tout : une fiche par personne,
+ * une page chacune, pour n'avoir plus à les demander une par une.
  */
 export default function ChoixImpression({
   nombre,
   siteNom,
   onComplete,
   onSimplifiee,
+  onFiches,
   onClose,
 }: {
   nombre: number
@@ -18,6 +22,8 @@ export default function ChoixImpression({
   siteNom: string | null
   onComplete: () => void
   onSimplifiee: () => void
+  /** Une fiche par personne, au lieu d'une liste. */
+  onFiches?: () => void
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
@@ -54,6 +60,14 @@ export default function ChoixImpression({
             recommande
             onClick={onSimplifiee}
           />
+          {onFiches && (
+            <Choix
+              titre="Une fiche par personne"
+              pour="Le modèle officiel"
+              detail={`${nombre} page${nombre > 1 ? 's' : ''} A4, une par personne, avec sa photo et ses pièces. Le détail des fiches se choisit juste après.`}
+              onClick={onFiches}
+            />
+          )}
         </div>
 
         <div className="mt-4 flex justify-end">
