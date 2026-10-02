@@ -137,6 +137,10 @@ export function papierDe(entreprise: string, modeleDocument?: string | null) {
   }
 }
 
+/** Le libellé que la banque lit sur l'ordre, et que l'Excel reprend. */
+export const libelleOperations = (annee: number, mois: number) =>
+  `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
+
 export interface OrdreDeVirement {
   /** Ce qui identifie la feuille : le site, la banque… */
   intitule: string
@@ -160,7 +164,7 @@ const n2 = (v: number | string | null | undefined) =>
  * chaque banque — « BMCE: … / CHI: … ». Dès qu'il y a autre chose que
  * des chiffres, on respecte ce qui a été saisi.
  */
-const formaterRib = (v: string | null | undefined) => {
+export const formaterRib = (v: string | null | undefined) => {
   const t = (v ?? '').trim()
   return /[^0-9\s]/.test(t) ? t.replace(/\s+/g, ' ') : t.replace(/\s/g, '')
 }
@@ -207,7 +211,7 @@ export async function dessinerOrdreVirement(opts: {
   }
 
   const aujourdhui = new Date().toLocaleDateString('fr-FR')
-  const libelle = `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
+  const libelle = libelleOperations(annee, mois)
   const ribPropre = formaterRib(ribOrdinateur)
 
   /** Une case : cadre, fond éventuel, puis le texte à l'intérieur. */

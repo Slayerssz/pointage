@@ -160,6 +160,31 @@ ok('choisir l’annexe isolée prend son monde',
 ok('personne ne se perd en route',
    [...choix.values()].flat().length === POUR_VIREMENT.length)
 
+// ── Le nom des onglets du classeur ───────────────────────────────────────
+// Excel refuse « : \\ / ? * [ ] » et s'arrête à 31 caractères ; un nom
+// fautif fait refuser le classeur entier à l'ouverture.
+const { code: codeXlsx } = await transformWithOxc(
+  fs.readFileSync('src/lib/nomFeuilleExcel.ts', 'utf8'), 'x.ts', { lang: 'ts' })
+const { nomDeFeuille } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeXlsx).toString('base64'))
+
+const vus = new Set()
+ok('un nom simple passe tel quel', nomDeFeuille('LA COMMUNE', vus) === 'LA COMMUNE')
+ok('les caractères interdits tombent',
+   nomDeFeuille('SITE A/B [nord] : 2*', new Set()) === 'SITE A B nord 2',
+   nomDeFeuille('SITE A/B [nord] : 2*', new Set()))
+const long = nomDeFeuille('FONDATION NATIONALE DES MUSEES DU ROYAUME', new Set())
+ok('un nom trop long est coupé à 31', long.length === 31, `${long.length} : ${long}`)
+
+// Deux sites qui se confondent une fois tronqués doivent rester distincts.
+const memes = new Set()
+const a = nomDeFeuille('FONDATION NATIONALE DES MUSEES DU NORD', memes)
+const b = nomDeFeuille('FONDATION NATIONALE DES MUSEES DU SUD', memes)
+ok('deux noms tronqués identiques sont numérotés', a !== b, `${a} / ${b}`)
+ok('… et restent dans la limite', b.length <= 31, `${b.length}`)
+ok('un intitulé vide ne donne pas un onglet sans nom',
+   nomDeFeuille('   ', new Set()) === 'Virements')
+
 // ── Les comptes d'une société ────────────────────────────────────────────
 // Une société peut avoir deux banques ; l'ordre ne part que d'un compte.
 const { code: codeComptes } = await transformWithOxc(

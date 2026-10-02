@@ -22,6 +22,7 @@ import OrdreVirementPrint, { type OrdreDeSite } from '../../components/OrdreVire
 import ChoixDansLaPaie from '../../components/ChoixDansLaPaie'
 import ChoixCompte from '../../components/ChoixCompte'
 import { comptesDe, type CompteBancaire } from '../../lib/comptesSociete'
+import { exporterOrdreVirementExcel } from '../../lib/ordreVirementExcel'
 import { banqueDe, cleDuMode, libelleDuMode, rattachementDe } from '../../lib/regroupementPaie'
 import ListeVersementsPrint from '../../components/ListeVersementsPrint'
 import RecusEspecePrint from '../../components/RecusEspecePrint'
@@ -449,7 +450,20 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
         totaux: sousEnsemble ? totauxDe(selection) : filtreActif ? totauxFiltres : totaux,
         filtre: libelleFiltre || undefined,
       }
-      if (format === 'excel') await exporterPaieExcel(opts)
+      // Un virement ne s'exporte pas comme une paie : la banque attend
+      // son ordre — cartouche et trois colonnes — pas vingt colonnes de
+      // salaires. Le tableur reprend donc la forme du PDF.
+      const versLaBanque = (sousEnsemble?.libelle ?? filtreReglement) === 'Virement'
+      if (format === 'excel' && versLaBanque) {
+        await exporterOrdreVirementExcel({
+          ordres: aImprimer(selection, cleDuMode('Virement'), filtrePrincipal, 'TOUS LES VIREMENTS'),
+          entreprise: opts.entreprise,
+          modeleDocument: cleModele,
+          ribOrdinateur: compte?.rib ?? comptes[0]?.rib ?? null,
+          annee: periode.annee,
+          mois: periode.mois,
+        })
+      } else if (format === 'excel') await exporterPaieExcel(opts)
       else await exporterPaiePdf(opts)
     } catch (e) {
       setErreurExport(e instanceof Error ? e.message : String(e))
