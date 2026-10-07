@@ -53,6 +53,27 @@ export default function SortiesPage() {
     },
   })
 
+  /**
+   * Qui est sorti, et depuis quand. On part des fiches, et non des
+   * dossiers de départ : quelqu'un qu'on a simplement passé à « Sorti »
+   * dans sa fiche n'a pas de dossier, et devait pourtant paraître ici.
+   */
+  const { data: partis } = useQuery({
+    queryKey: ['employees-sortis', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async (): Promise<Employee[]> => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId!)
+        .not('date_sortie', 'is', null)
+        .is('archive_le', null)
+        .order('date_sortie', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as Employee[]
+    },
+  })
+
   const { data: sorties } = useSorties(companyId)
   const [choisi, setChoisi] = useState<string>('')
 
@@ -105,6 +126,41 @@ export default function SortiesPage() {
           )}
         </>
       )}
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
+          Les personnes sorties
+        </h2>
+        <p className="mt-1 mb-2 text-sm text-slate-500">
+          Tous ceux qui ont quitté le registre, quelle que soit la façon dont on
+          les a sortis. Ils ne sont plus pointés ; leur fiche reste consultable.
+        </p>
+        {(partis ?? []).length === 0 ? (
+          <EmptyState>Personne n’est sorti pour le moment.</EmptyState>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+            {(partis ?? []).map((e) => (
+              <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-slate-800">
+                    {e.matricule != null && (
+                      <span className="mr-2 text-slate-400 tabular-nums">{e.matricule}</span>
+                    )}
+                    {e.nom_prenom}
+                  </span>
+                  <span className="block text-xs text-slate-500">{e.qualification ?? '—'}</span>
+                </span>
+                <span className="text-sm text-slate-600">
+                  Sorti le{' '}
+                  <strong className="font-semibold text-slate-900">
+                    {e.date_sortie ? formatDateFr(e.date_sortie) : '—'}
+                  </strong>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {profile?.role === 'admin' && <ClotureDuMois companyId={companyId} />}
 
