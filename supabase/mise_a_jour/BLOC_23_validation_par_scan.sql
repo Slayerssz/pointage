@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 23 sur 39 — Rien n'est validé tant que le scan signé n'est pas là
+--  BLOC 23 sur 41 — Rien n'est validé tant que le scan signé n'est pas là
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 22.
 --

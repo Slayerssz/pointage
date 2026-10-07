@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { formatDateFr } from '../../lib/dates'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 
-type Role = 'agent' | 'validator' | 'admin' | 'paie' | 'rh'
+type Role = 'agent' | 'validator' | 'admin' | 'paie' | 'rh' | 'dev' | 'owner'
 
 interface AdminUser {
   user_id: string
@@ -25,6 +25,8 @@ const ROLE_LABEL: Record<Role, string> = {
   paie: 'Responsable de paie',
   rh: 'Personnel (RH)',
   admin: 'Administrateur',
+  dev: 'Développeur',
+  owner: 'Propriétaire',
 }
 const ROLE_TONE: Record<Role, 'blue' | 'green' | 'amber' | 'slate'> = {
   agent: 'blue',
@@ -32,6 +34,8 @@ const ROLE_TONE: Record<Role, 'blue' | 'green' | 'amber' | 'slate'> = {
   paie: 'slate',
   rh: 'blue',
   admin: 'amber',
+  dev: 'amber',
+  owner: 'amber',
 }
 
 const inputCls =
@@ -150,6 +154,8 @@ function ListeComptes({
 function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { profile } = useAuth()
+  // Seuls le propriétaire et le développeur nomment à leur niveau.
+  const auDessus = profile?.role === 'owner' || profile?.role === 'dev'
   const [username, setUsername] = useState(user?.username ?? '')
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [role, setRole] = useState<Role>(user?.role ?? 'agent')
@@ -292,6 +298,11 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
         <option value="paie">Paie (calcule et valide la paie, bulletins de présence)</option>
         <option value="rh">Personnel (consulte, ajoute, modifie et imprime les employés)</option>
         <option value="admin">Administrateur (tout + entreprises + utilisateurs)</option>
+        {/* Au-dessus de l'administrateur. « Propriétaire » n'est proposé
+            qu'à ceux qui ont déjà le droit de le donner : les autres
+            n'ont pas à savoir qu'il existe. */}
+        {auDessus && <option value="dev">Développeur (tout + journal)</option>}
+        {auDessus && <option value="owner">Propriétaire (tout + journal)</option>}
       </select>
 
       {!user && (

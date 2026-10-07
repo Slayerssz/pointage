@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 6 sur 39 — Supprimer un employé (avec garde-fous)
+--  BLOC 6 sur 41 — Supprimer un employé (avec garde-fous)
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 5.
 --

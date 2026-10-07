@@ -1355,6 +1355,96 @@ await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
   /Action réservée/i)
 
+// ══════ DEUX RÔLES AU-DESSUS, ET LE JOURNAL DES GESTES ══════
+
+section('Le propriétaire, le développeur et le journal')
+
+// Le bloc fait passer l'administrateur en place en développeur. Dans ce
+// registre les comptes naissent APRÈS l'installation : on vérifie donc
+// la consigne elle-même, puis on travaille avec un vrai développeur.
+ok('le bloc fait passer l’administrateur en développeur',
+   fs.readFileSync(path.join(BLOCS, 'BLOC_41_journal_roles.sql'), 'utf8')
+     .includes("update public.profiles set role = 'dev' where role = 'admin'"))
+
+const dev = await compte('developpeur', 'dev')
+
+// Le développeur garde tous les droits de l'administrateur : c'est tout
+// l'intérêt de les présenter comme administrateurs aux contrôles.
+await connecte(dev)
+ok('le développeur passe partout où passe l’administrateur',
+   await reussit(`select public.admin_creer_entreprise('ESSAI DEV')`))
+ok('… tout en restant « dev » à l’affichage',
+   (await q1(`select public.role_reel()::text r`)).r === 'dev')
+ok('… que les contrôles voient comme « admin »',
+   (await q1(`select public.current_user_role()::text r`)).r === 'admin')
+
+// Le développeur crée un propriétaire ; personne d'autre ne le peut.
+await q1(`select public.admin_creer_utilisateur('patron','motdepasse','Le Patron','owner')`)
+const idOwner = (await q1(
+  `select user_id from public.profiles where username='patron'`))?.user_id
+ok('le développeur nomme un propriétaire', Boolean(idOwner))
+
+await connecte(admin)   // un administrateur ordinaire
+await refuse('un administrateur ne nomme pas de propriétaire',
+  `select public.admin_creer_utilisateur('x','motdepasse','X','owner')`, [], /Rôle invalide/i)
+await refuse('… ni de développeur',
+  `select public.admin_creer_utilisateur('y','motdepasse','Y','dev')`, [], /développeur/i)
+
+// Le propriétaire ne figure pas dans la liste des autres.
+const voitLePatron = async () =>
+  (await rows(`select username from public.admin_liste_utilisateurs()`))
+    .some((r) => r.username === 'patron')
+ok('l’administrateur ne voit pas le propriétaire', (await voitLePatron()) === false)
+await connecte(dev)
+ok('… le développeur, si', (await voitLePatron()) === true)
+await connecte(idOwner)
+ok('… et le propriétaire se voit lui-même', (await voitLePatron()) === true)
+
+// Le journal : réservé à ces deux-là.
+ok('le propriétaire voit le journal', (await q1(`select public.voit_le_journal() v`)).v === true)
+await connecte(dev)
+ok('… le développeur aussi', (await q1(`select public.voit_le_journal() v`)).v === true)
+await connecte(admin)
+ok('… l’administrateur, non', (await q1(`select public.voit_le_journal() v`)).v === false)
+await connecte(bureau)
+ok('… le bureau non plus', (await q1(`select public.voit_le_journal() v`)).v === false)
+
+// Et ce qu'il raconte.
+await connecte(bureau)
+const eJournal = await employe('SUIVI AU JOURNAL', { cin: 'JR1', cnss: '970000001' })
+const dernier = async () => (await q1(
+  `select action, objet, resume, lien from public.journal order by id desc limit 1`))
+ok('l’ajout d’un employé s’inscrit',
+   (await dernier()).resume === 'a ajouté SUIVI AU JOURNAL au registre',
+   (await dernier()).resume)
+ok('… avec l’onglet où le retrouver', (await dernier()).lien === 'employes')
+
+const avantHier = (await q1(
+  `select ((now() at time zone 'Africa/Casablanca')::date - 1)::text d`)).d
+await q1(`select public.marquer_present($1,$2::date,'X')`, [eJournal, avantHier])
+ok('le pointage s’inscrit aussi',
+   (await dernier()).resume.startsWith('a pointé SUIVI AU JOURNAL'), (await dernier()).resume)
+
+await db.query(`update public.employees set date_sortie=$2 where id=$1`, [eJournal, avantHier])
+ok('la sortie se lit comme une sortie', (await dernier()).action === 'sortie',
+   (await dernier()).action)
+ok('… et le dit en toutes lettres',
+   (await dernier()).resume.startsWith('a sorti SUIVI AU JOURNAL le'), (await dernier()).resume)
+
+// L'auteur est nommé, et il reste nommé.
+ok('le journal nomme son auteur',
+   (await q1(`select auteur from public.journal order by id desc limit 1`)).auteur === 'bureau',
+   (await q1(`select auteur from public.journal order by id desc limit 1`)).auteur)
+
+// Les grands remplissages, eux, n'inondent pas le journal.
+await connecte(null)
+const avantRemplissage = num((await q1(`select count(*) n from public.journal`)).n)
+await db.query(
+  `insert into public.employees (company_id, site_id, nom_prenom) values ($1,$2,'SANS SESSION')`,
+  [co, site])
+ok('un geste sans session ne s’inscrit pas',
+   num((await q1(`select count(*) n from public.journal`)).n) === avantRemplissage)
+
 section('La photo suit-elle la fiche ?')
 
 const listeUnique = (await db.query(

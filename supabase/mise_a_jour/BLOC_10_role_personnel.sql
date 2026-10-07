@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 10 sur 39 — Rôle « personnel » (RH) et champ Département
+--  BLOC 10 sur 41 — Rôle « personnel » (RH) et champ Département
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 9.
 --

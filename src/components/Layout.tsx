@@ -12,7 +12,9 @@ import { usePeutPointer, useSociete } from '../lib/queries'
 const AU_PLUS_EN_BAS = 4
 
 function roleLisible(role: string | null | undefined) {
-  return role === 'admin' ? 'admin'
+  return role === 'owner' ? 'propriétaire'
+    : role === 'dev' ? 'développeur'
+    : role === 'admin' ? 'admin'
     : role === 'validator' ? 'validateur'
     : role === 'paie' ? 'paie'
     : role === 'rh' ? 'personnel'
@@ -82,6 +84,12 @@ const ICONS = {
       <path d="m9 16 2 2 4-4" />
     </svg>
   ),
+  journal: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+      <path d="M8 7h8M8 11h6" />
+    </svg>
+  ),
   entreprises: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
       <path d="M3 21h18M5 21V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14M9 9h2m2 0h2M9 13h2m2 0h2M9 17h2m2 0h2" />
@@ -100,8 +108,11 @@ export default function Layout() {
   // ailleurs, l'onglet ne lui est pas montré du tout.
   const { data: peutPointer } = usePeutPointer(companyId)
 
+  // Le propriétaire et le développeur ont tout de l'administrateur, et
+  // le journal en plus.
+  const auDessus = profile?.role === 'owner' || profile?.role === 'dev'
   const tabs: Onglet[] =
-    profile?.role === 'admin'
+    profile?.role === 'admin' || auDessus
       ? [
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes, principal: true },
           { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
@@ -115,6 +126,9 @@ export default function Layout() {
           { to: `/c/${companyId}/utilisateurs`, label: 'Utilisateurs', icon: ICONS.users },
           // Analytics en dernier : c'est l'écran le plus sensible
           { to: `/c/${companyId}/analytics`, label: 'Analytics', icon: ICONS.analytics },
+          ...(auDessus
+            ? [{ to: `/c/${companyId}/journal`, label: 'Journal', icon: ICONS.journal }]
+            : []),
         ]
       : profile?.role === 'validator'
         ? [

@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 17 sur 39 — Les sorties et le reçu pour solde de tout compte
+--  BLOC 17 sur 41 — Les sorties et le reçu pour solde de tout compte
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 16.
 --

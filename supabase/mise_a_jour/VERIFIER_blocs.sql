@@ -119,7 +119,13 @@ with attendu (numero, bloc, objet, present) as (
                   and pg_get_function_identity_arguments(p.oid) like '%text%')),
   (39, 'Accès du personnel',      'table acces_societes',
        exists (select 1 from information_schema.tables
-                where table_schema = 'public' and table_name = 'acces_societes'))
+                where table_schema = 'public' and table_name = 'acces_societes')),
+  (40, 'Rôles owner et dev',       'valeurs d''énumération',
+       (select count(*) from pg_enum e join pg_type t on t.oid = e.enumtypid
+         where t.typname = 'user_role' and e.enumlabel in ('dev', 'owner')) = 2),
+  (41, 'Journal des gestes',       'table journal',
+       exists (select 1 from information_schema.tables
+                where table_schema = 'public' and table_name = 'journal'))
 )
 select numero,
        bloc,

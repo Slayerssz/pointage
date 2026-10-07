@@ -10,6 +10,7 @@ import EmployesPage from './pages/validator/EmployesPage'
 import SortiesPage from './pages/validator/SortiesPage'
 import AnalyticsPage from './pages/admin/AnalyticsPage'
 import UsersPage from './pages/admin/UsersPage'
+import JournalPage from './pages/admin/JournalPage'
 import OrganisationsPage from './pages/admin/OrganisationsPage'
 import FeriesPage from './pages/admin/FeriesPage'
 import SitesPage from './pages/validator/SitesPage'
@@ -114,6 +115,14 @@ export default function App() {
                 element={
                   <RequireRole roles={['validator', 'admin', 'rh']}>
                     <ValidationPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="journal"
+                element={
+                  <RequireRole roles={['owner', 'dev']}>
+                    <JournalPage />
                   </RequireRole>
                 }
               />
