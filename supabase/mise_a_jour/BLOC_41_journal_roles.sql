@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 41 sur 41 — Propriétaire, développeur, et le journal des gestes
+--  BLOC 41 sur 42 — Propriétaire, développeur, et le journal des gestes
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 40.
 --

@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 20 sur 41 — Le bureau fait aussi la paie
+--  BLOC 20 sur 42 — Le bureau fait aussi la paie
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 19.
 --

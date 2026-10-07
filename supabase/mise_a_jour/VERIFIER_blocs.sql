@@ -125,7 +125,10 @@ with attendu (numero, bloc, objet, present) as (
          where t.typname = 'user_role' and e.enumlabel in ('dev', 'owner')) = 2),
   (41, 'Journal des gestes',       'table journal',
        exists (select 1 from information_schema.tables
-                where table_schema = 'public' and table_name = 'journal'))
+                where table_schema = 'public' and table_name = 'journal')),
+  (42, 'Propriétaire invisible',   'fonction profil_visible',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'profil_visible'))
 )
 select numero,
        bloc,

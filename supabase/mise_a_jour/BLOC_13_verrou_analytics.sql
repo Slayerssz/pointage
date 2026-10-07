@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 13 sur 41 — Verrou du tableau de bord
+--  BLOC 13 sur 42 — Verrou du tableau de bord
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 12.
 --

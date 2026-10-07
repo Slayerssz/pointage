@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 18 sur 41 — Le départ se fait en deux temps
+--  BLOC 18 sur 42 — Le départ se fait en deux temps
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 17.
 --

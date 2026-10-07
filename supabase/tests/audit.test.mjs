@@ -1400,7 +1400,27 @@ ok('… le développeur, si', (await voitLePatron()) === true)
 await connecte(idOwner)
 ok('… et le propriétaire se voit lui-même', (await voitLePatron()) === true)
 
+// Le propriétaire n'est pas seulement absent de la liste : la table
+// elle-même le cache. Sans quoi il suffisait d'interroger `profiles`
+// hors de l'application pour apprendre qu'il existe.
+await connecte(admin)
+ok('un administrateur ne voit pas le profil d’un propriétaire',
+   (await q1(`select public.profil_visible('owner'::public.user_role) v`)).v === false)
+ok('… mais voit bien tous les autres',
+   (await q1(`select public.profil_visible('validator'::public.user_role) v`)).v === true
+   && (await q1(`select public.profil_visible('rh'::public.user_role) v`)).v === true)
+await connecte(dev)
+ok('le développeur, lui, voit le propriétaire',
+   (await q1(`select public.profil_visible('owner'::public.user_role) v`)).v === true)
+await connecte(idOwner)
+ok('… et le propriétaire aussi',
+   (await q1(`select public.profil_visible('owner'::public.user_role) v`)).v === true)
+await connecte(bureau)
+ok('le bureau non plus ne le voit pas',
+   (await q1(`select public.profil_visible('owner'::public.user_role) v`)).v === false)
+
 // Le journal : réservé à ces deux-là.
+await connecte(idOwner)
 ok('le propriétaire voit le journal', (await q1(`select public.voit_le_journal() v`)).v === true)
 await connecte(dev)
 ok('… le développeur aussi', (await q1(`select public.voit_le_journal() v`)).v === true)

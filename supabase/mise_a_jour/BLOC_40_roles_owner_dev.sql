@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 40 sur 41 — Deux rôles au-dessus de l'administrateur
+--  BLOC 40 sur 42 — Deux rôles au-dessus de l'administrateur
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 39.
 --

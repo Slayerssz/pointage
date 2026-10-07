@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 28 sur 41 — La photo refusée au personnel
+--  BLOC 28 sur 42 — La photo refusée au personnel
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 27.
 --
