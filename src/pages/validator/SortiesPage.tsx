@@ -88,8 +88,57 @@ export default function SortiesPage() {
       <div className="mb-6">
         <h1 className="mb-1 text-xl font-semibold text-slate-900">Sorties</h1>
         <p className="text-sm text-slate-500">
-          Préparer le reçu pour solde de tout compte d’un salarié qui part.
-          Il reste en poste et continue d’être pointé jusqu’à la validation.
+          Qui a quitté l’entreprise, et depuis quand.
+        </p>
+      </div>
+
+      <section>
+        <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
+          Les personnes sorties
+        </h2>
+        <p className="mt-1 mb-2 text-sm text-slate-500">
+          Tous ceux qui ont quitté le registre, quelle que soit la façon dont on
+          les a sortis. Ils ne sont plus pointés ; leur fiche reste consultable.
+        </p>
+        {(partis ?? []).length === 0 ? (
+          <EmptyState>Personne n’est sorti pour le moment.</EmptyState>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+            {(partis ?? []).map((e) => (
+              <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-slate-800">
+                    {e.matricule != null && (
+                      <span className="mr-2 text-slate-400 tabular-nums">{e.matricule}</span>
+                    )}
+                    {e.nom_prenom}
+                  </span>
+                  <span className="block text-xs text-slate-500">{e.qualification ?? '—'}</span>
+                </span>
+                <span className="text-sm text-slate-600">
+                  Sorti le{' '}
+                  <strong className="font-semibold text-slate-900">
+                    {e.date_sortie ? formatDateFr(e.date_sortie) : '—'}
+                  </strong>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+
+      <div className="mt-10 border-t border-slate-200 pt-6">
+        <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
+          Préparer un départ
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Pour établir un reçu pour solde de tout compte. La personne reste en
+          poste et continue d’être pointée jusqu’à la validation.{' '}
+          <span className="text-slate-400">
+            Sans reçu à faire signer, il suffit de passer son statut à « Sorti »
+            dans sa fiche.
+          </span>
         </p>
       </div>
 
@@ -127,41 +176,6 @@ export default function SortiesPage() {
           )}
         </>
       )}
-
-      <section className="mt-8">
-        <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
-          Les personnes sorties
-        </h2>
-        <p className="mt-1 mb-2 text-sm text-slate-500">
-          Tous ceux qui ont quitté le registre, quelle que soit la façon dont on
-          les a sortis. Ils ne sont plus pointés ; leur fiche reste consultable.
-        </p>
-        {(partis ?? []).length === 0 ? (
-          <EmptyState>Personne n’est sorti pour le moment.</EmptyState>
-        ) : (
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {(partis ?? []).map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-slate-800">
-                    {e.matricule != null && (
-                      <span className="mr-2 text-slate-400 tabular-nums">{e.matricule}</span>
-                    )}
-                    {e.nom_prenom}
-                  </span>
-                  <span className="block text-xs text-slate-500">{e.qualification ?? '—'}</span>
-                </span>
-                <span className="text-sm text-slate-600">
-                  Sorti le{' '}
-                  <strong className="font-semibold text-slate-900">
-                    {e.date_sortie ? formatDateFr(e.date_sortie) : '—'}
-                  </strong>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       {estAdministrateur(profile?.role) && <ClotureDuMois companyId={companyId} />}
 
