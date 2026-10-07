@@ -12,9 +12,13 @@ export default function CompanySelectPage() {
   const { data: companies, isLoading } = useQuery({
     queryKey: ['companies'],
     queryFn: async (): Promise<Company[]> => {
-      const { data, error } = await supabase.from('companies').select('id, name').order('name')
+      // `mes_societes` répond selon le rôle : toutes pour le bureau, la
+      // paie et l'administrateur ; pour le personnel, seulement celles
+      // qu'on lui a confiées. Proposer une société qu'il ne peut pas
+      // pointer ne lui rendrait pas service.
+      const { data, error } = await supabase.rpc('mes_societes')
       if (error) throw error
-      return data
+      return (data ?? []) as Company[]
     },
   })
 

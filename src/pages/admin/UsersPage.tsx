@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AccesSocietes from '../../components/AccesSocietes'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -357,6 +358,9 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
               </p>
             )}
           </div>
+
+          {/* Le personnel ne pointe que les sociétés qu'on lui confie. */}
+          {user.role === 'rh' && <AccesSocietes userId={user.user_id} />}
 
           {!soiMeme && (
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -46,6 +47,7 @@ interface CellSelection {
 
 export default function ValidationPage() {
   const { companyId } = useParams()
+  const { profile } = useAuth()
   const [monday, setMonday] = useState(() => mondayOf(new Date()))
   const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
   const { data: principaux } = useSitesPrincipaux(companyId)
@@ -86,7 +88,10 @@ export default function ValidationPage() {
       </div>
 
       {/* Clôture du mois → bascule vers La Paie */}
-      <ValidationMois companyId={companyId} />
+      {/* Valider le mois reste au bureau : le personnel pointe, il ne
+          clôture pas. Lui montrer le pavé serait lui promettre un geste
+          que la base refusera. */}
+      {profile?.role !== 'rh' && <ValidationMois companyId={companyId} />}
 
       {/* Légende */}
       <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">

@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 21 sur 38 — Deux types de contrat
+--  BLOC 21 sur 39 — Deux types de contrat
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 20.
 --

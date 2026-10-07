@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 19 sur 38 — Les jours travaillés du mois
+--  BLOC 19 sur 39 — Les jours travaillés du mois
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 18.
 --

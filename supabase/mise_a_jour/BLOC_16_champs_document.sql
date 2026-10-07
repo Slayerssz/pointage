@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 16 sur 38 — Garder ce qui a été saisi sur les documents
+--  BLOC 16 sur 39 — Garder ce qui a été saisi sur les documents
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 15.
 --

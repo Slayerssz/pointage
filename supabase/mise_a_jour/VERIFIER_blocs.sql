@@ -116,7 +116,10 @@ with attendu (numero, bloc, objet, present) as (
   (38, 'Gain saisi au bulletin',   'bulletin_paie prend un intitulé',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'bulletin_paie'
-                  and pg_get_function_identity_arguments(p.oid) like '%text%'))
+                  and pg_get_function_identity_arguments(p.oid) like '%text%')),
+  (39, 'Accès du personnel',      'table acces_societes',
+       exists (select 1 from information_schema.tables
+                where table_schema = 'public' and table_name = 'acces_societes'))
 )
 select numero,
        bloc,

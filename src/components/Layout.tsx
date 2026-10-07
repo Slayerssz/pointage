@@ -125,7 +125,14 @@ export default function Layout() {
             { to: `/c/${companyId}/sites`, label: 'Sites', icon: ICONS.sites },
           ]
         : profile?.role === 'rh'
-          ? [{ to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes }]
+          ? [
+              { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes,
+                principal: true },
+              // Le personnel ne pointe que les sociétés qu'on lui a
+              // confiées — la page de choix ne lui montre pas les autres.
+              { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation,
+                principal: true },
+            ]
           : profile?.role === 'paie'
             ? [
                 { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie, principal: true },

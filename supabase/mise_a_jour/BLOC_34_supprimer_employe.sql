@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 34 sur 38 — Supprimer un employé redevient possible
+--  BLOC 34 sur 39 — Supprimer un employé redevient possible
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 33.
 --

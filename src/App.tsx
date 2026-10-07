@@ -112,7 +112,7 @@ export default function App() {
               <Route
                 path="validation"
                 element={
-                  <RequireRole roles={['validator', 'admin']}>
+                  <RequireRole roles={['validator', 'admin', 'rh']}>
                     <ValidationPage />
                   </RequireRole>
                 }

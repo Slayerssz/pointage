@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 25 sur 38 — Renommer une société ne casse plus ses documents
+--  BLOC 25 sur 39 — Renommer une société ne casse plus ses documents
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 24.
 --

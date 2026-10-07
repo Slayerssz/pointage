@@ -1278,6 +1278,79 @@ ok('… et son montant', num(archGain.gain_montant) === 750)
 ok('… et le bulletin conservé le porte',
    archGain.document.lignes.some((l) => l.code === '013' && Number(l.gain) === 750))
 
+// ═════════ LE PERSONNEL POINTE-T-IL CE QU'ON LUI A CONFIÉ ? ═════════
+// Et rien d'autre. C'est tout l'objet du rattachement : ouvrir une
+// société nommément, pas le pointage en général.
+
+section('Les sociétés confiées au personnel')
+
+// Une deuxième société, pour vérifier qu'elle reste fermée.
+await connecte(admin)
+const coAutre = (await q1(`select public.admin_creer_entreprise('AUTRE SARL') as id`)).id
+await connecte(bureau)
+const siteAutre = (await q1(`select public.creer_site($1,'SITE AUTRE') as id`, [coAutre])).id
+const eAutre = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom) values ($1,$2,$3) returning id`,
+  [coAutre, siteAutre, 'CHEZ AUTRE'])).id
+const eIci = await employe('POINTE PAR LE PERSONNEL', { cin: 'RH1', cnss: '960000001' })
+
+const hier = (await q1(
+  `select ((now() at time zone 'Africa/Casablanca')::date - 1)::text d`)).d
+
+// Avant tout rattachement, le personnel ne pointe nulle part.
+await connecte(rh)
+await refuse('sans rattachement, le personnel ne pointe pas',
+  `select public.marquer_present($1,$2::date,'X')`, [eIci, hier], /réservé|autorisé/i)
+ok('… et il ne voit aucune société',
+   num((await q1(`select count(*) n from public.mes_societes()`)).n) === 0)
+
+// L'administrateur lui confie la première société.
+await connecte(admin)
+ok('l’administrateur confie une société',
+   await reussit(`select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co]))
+
+await connecte(rh)
+ok('le personnel pointe désormais cette société',
+   await reussit(`select public.marquer_present($1,$2::date,'X')`, [eIci, hier]))
+await refuse('… mais toujours pas l’autre',
+  `select public.marquer_present($1,$2::date,'X')`, [eAutre, hier], /autorisé/i)
+ok('… et il ne voit que celle-là',
+   (await rows(`select name from public.mes_societes()`)).map((r) => r.name).join() === 'AUDIT SARL',
+   (await rows(`select name from public.mes_societes()`)).map((r) => r.name).join())
+
+// Ce qu'il ne gagne pas au passage.
+await refuse('le personnel ne valide pas le mois',
+  `select public.valider_pointage_mois($1,2026,3)`, [co], /réservé|autoris/i)
+await refuse('… ne touche pas à la paie',
+  `select public.maj_ligne_paie(gen_random_uuid(),0,0,0,null,0,0)`, [], /réservé|autoris/i)
+await refuse('… et ne sort personne',
+  `select public.enregistrer_sortie($1,current_date,0,null,null,'{}'::jsonb)`,
+  [eIci], /réservé|autoris/i)
+
+// Un pointage qu'il a posé, il peut le retirer — sur sa société.
+const sien = (await q1(
+  `select id from public.pointages where employee_id=$1 and pointed_on=$2::date`,
+  [eIci, hier])).id
+ok('il retire un pointage de sa société',
+   await reussit(`select public.supprimer_pointage($1)`, [sien]))
+
+// Retirer le rattachement referme la porte.
+await connecte(admin)
+await reussit(`select public.admin_definir_acces_societes($1, array[]::uuid[])`, [rh])
+await connecte(rh)
+await refuse('le rattachement retiré, la porte se referme',
+  `select public.marquer_present($1,$2::date,'X')`, [eIci, hier], /autorisé/i)
+
+// Seul un compte « personnel » se rattache : les autres voient déjà tout.
+await connecte(admin)
+await refuse('on ne rattache pas un compte du bureau',
+  `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [bureau, co],
+  /personnel|voit déjà/i)
+await connecte(rh)
+await refuse('le personnel ne se rattache pas lui-même',
+  `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
+  /Action réservée/i)
+
 section('La photo suit-elle la fiche ?')
 
 const listeUnique = (await db.query(

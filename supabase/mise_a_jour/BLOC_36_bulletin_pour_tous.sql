@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 36 sur 38 — Le bulletin de paie pour tout le monde
+--  BLOC 36 sur 39 — Le bulletin de paie pour tout le monde
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 35.
 --
