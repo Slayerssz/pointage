@@ -9,8 +9,8 @@
  */
 export const PIECES = [
   'COPIE DE LA CIN',
-  'CERTIFICAT DE BONNE CONDUITE',
-  'CERTIFICAT MÉDICAL D’APTITUDE AU TRAVAIL',
+  'FICHE ANTHROPOMÉTRIQUE',
+  'CERTIFICAT MÉDICAL D’APTITUDE PHYSIQUE',
 ] as const
 
 export type Piece = (typeof PIECES)[number]
