@@ -185,6 +185,41 @@ ok('… et restent dans la limite', b.length <= 31, `${b.length}`)
 ok('un intitulé vide ne donne pas un onglet sans nom',
    nomDeFeuille('   ', new Set()) === 'Virements')
 
+// ── Qui passe où ─────────────────────────────────────────────────────────
+// Le développeur avait les onglets et se faisait refuser toutes les
+// pages : les gardes de route ne connaissaient pas son rôle.
+const { code: codeRoles } = await transformWithOxc(
+  fs.readFileSync('src/lib/roles.ts', 'utf8'), 'ro.ts', { lang: 'ts' })
+const { aLeDroit, estAdministrateur, estAuDessus } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeRoles).toString('base64'))
+
+ok('le développeur ouvre ce qui est réservé à l’administrateur',
+   aLeDroit('dev', ['validator', 'admin']) === true)
+ok('… le propriétaire aussi', aLeDroit('owner', ['validator', 'admin']) === true)
+ok('… et l’administrateur, évidemment', aLeDroit('admin', ['validator', 'admin']) === true)
+
+// Mais ils n'ouvrent pas ce qui ne passe pas par l'administrateur.
+ok('une page du seul pointeur leur reste fermée',
+   aLeDroit('dev', ['agent']) === false && aLeDroit('owner', ['agent']) === false)
+ok('le bureau n’ouvre pas une page d’administrateur',
+   aLeDroit('validator', ['admin']) === false)
+ok('le personnel non plus', aLeDroit('rh', ['admin']) === false)
+ok('sans rôle, rien ne s’ouvre',
+   aLeDroit(undefined, ['admin']) === false && aLeDroit(null, ['agent']) === false)
+
+// La page du journal se nomme explicitement : elle ne s'ouvre qu'à eux.
+ok('le journal ne s’ouvre qu’au propriétaire et au développeur',
+   aLeDroit('dev', ['owner', 'dev']) === true
+   && aLeDroit('owner', ['owner', 'dev']) === true
+   && aLeDroit('admin', ['owner', 'dev']) === false)
+
+ok('« au-dessus » ne vise que les deux nouveaux rôles',
+   estAuDessus('dev') && estAuDessus('owner')
+   && !estAuDessus('admin') && !estAuDessus('validator'))
+ok('« au moins administrateur » les comprend tous les trois',
+   estAdministrateur('admin') && estAdministrateur('dev') && estAdministrateur('owner')
+   && !estAdministrateur('validator') && !estAdministrateur('rh'))
+
 // ── Les comptes d'une société ────────────────────────────────────────────
 // Une société peut avoir deux banques ; l'ordre ne part que d'un compte.
 const { code: codeComptes } = await transformWithOxc(

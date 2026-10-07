@@ -28,6 +28,7 @@ import ListePrint from '../../components/ListePrint'
 import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
 import ContratRedaction from '../../components/ContratRedaction'
+import { estAdministrateur } from '../../lib/roles'
 
 const PAGE_SIZE = 50
 
@@ -58,7 +59,7 @@ function valeursDuContrat(c: Contrat): Record<string, string> {
 export default function EmployesPage() {
   const { companyId } = useParams()
   const { profile } = useAuth()
-  const estAdmin = profile?.role === 'admin'
+  const estAdmin = estAdministrateur(profile?.role)
   // Le rôle « personnel » se limite aux fiches : ni dossier, ni suppression.
   const estRH = profile?.role === 'rh'
   // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.

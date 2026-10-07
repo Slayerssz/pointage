@@ -32,6 +32,7 @@ import type { LignePaie, PeriodePaie } from '../../lib/types'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import { useSociete } from '../../lib/queries'
+import { estAdministrateur } from '../../lib/roles'
 
 export default function PaiePage() {
   const { companyId } = useParams()
@@ -153,8 +154,8 @@ function PeriodeDetail({ periode, companyId }: { periode: PeriodePaie; companyId
 
   // Le bureau couvre la paie : il modifie les lignes comme le service paie.
   const estPaie =
-    profile?.role === 'paie' || profile?.role === 'admin' || profile?.role === 'validator'
-  const estAdmin = profile?.role === 'admin'
+    profile?.role === 'paie' || estAdministrateur(profile?.role) || profile?.role === 'validator'
+  const estAdmin = estAdministrateur(profile?.role)
   const verrouille = periode.statut === 'paie_validee'
   const enDemande = periode.statut === 'reouverture_demandee'
   const attendAdmin = periode.statut === 'validation_demandee'

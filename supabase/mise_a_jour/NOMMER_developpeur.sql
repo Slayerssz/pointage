@@ -7,16 +7,16 @@
 --  La toute première nomination se fait donc ici, en SQL — l'éditeur
 --  n'est soumis à aucun contrôle de rôle.
 --
---  Remplacez 'VOTRE_NOM_UTILISATEUR' par le nom du compte, celui avec
+--  Remplacez 'admin' par le nom du compte, celui avec
 --  lequel on se connecte. Mettez 'dev' ou 'owner' selon ce que vous
 --  voulez accorder.
 -- ============================================================================
 
 update public.profiles
    set role = 'dev'            -- ou 'owner'
- where username = 'VOTRE_NOM_UTILISATEUR';
+ where username = 'admin';
 
 -- Vérification : le compte et son nouveau rôle.
 select username, full_name, role::text as role, actif
   from public.profiles
- where username = 'VOTRE_NOM_UTILISATEUR';
+ where username = 'admin';

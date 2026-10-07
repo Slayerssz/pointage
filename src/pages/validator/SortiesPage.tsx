@@ -20,6 +20,7 @@ import { useModeleSociete } from '../../lib/modeleSociete'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
 import { useSociete } from '../../lib/queries'
+import { estAdministrateur } from '../../lib/roles'
 
 /**
  * LES SORTIES.
@@ -162,7 +163,7 @@ export default function SortiesPage() {
         )}
       </section>
 
-      {profile?.role === 'admin' && <ClotureDuMois companyId={companyId} />}
+      {estAdministrateur(profile?.role) && <ClotureDuMois companyId={companyId} />}
 
       {enCours.length > 0 && (
         <ListeSorties

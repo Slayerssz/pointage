@@ -192,8 +192,10 @@ ok('la clôture du mois, elle, demande une confirmation',
    sortiesPage.includes('Confirmer le retrait de'))
 ok('le départ se fait en deux temps : valider, puis clôturer le mois',
    sortiesPage.includes('function ClotureDuMois'))
-ok('seul l’administrateur voit la clôture',
-   sortiesPage.includes("profile?.role === 'admin' && <ClotureDuMois"))
+// « Au moins administrateur » : l'administrateur, et les deux rôles
+// au-dessus de lui. Le bureau, lui, ne clôture pas.
+ok('seul l’administrateur — ou au-dessus — voit la clôture',
+   sortiesPage.includes('estAdministrateur(profile?.role) && <ClotureDuMois'))
 ok('une fiche archivée quitte la liste des employés',
    fs.readFileSync(new URL('../../src/pages/validator/EmployesPage.tsx', import.meta.url), 'utf8')
      .includes(".is('archive_le', null)"))

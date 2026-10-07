@@ -10,6 +10,7 @@ import BulletinPaiePrint from './BulletinPaiePrint'
 import { useModeleSociete } from '../lib/modeleSociete'
 import { EmptyState, ErrorNote, Spinner } from './ui'
 import { useFermerSurEchap } from '../lib/impression'
+import { estAdministrateur } from '../lib/roles'
 
 /**
  * TOUS LES BULLETINS DÉJÀ ÉTABLIS.
@@ -23,7 +24,7 @@ export default function ArchiveBulletins({
   companyId, entreprise,
 }: { companyId: string | undefined; entreprise: string }) {
   const { profile } = useAuth()
-  const estAdmin = profile?.role === 'admin'
+  const estAdmin = estAdministrateur(profile?.role)
   const { data, isLoading, error } = useBulletinsEmis(companyId)
   const { data: cleModele } = useModeleSociete(companyId)
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet, useParams, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { usePeutPointer, useSociete } from '../lib/queries'
+import { estAdministrateur, estAuDessus } from '../lib/roles'
 
 /**
  * La barre du bas d'un téléphone tient quatre entrées, pas dix. Les
@@ -110,9 +111,9 @@ export default function Layout() {
 
   // Le propriétaire et le développeur ont tout de l'administrateur, et
   // le journal en plus.
-  const auDessus = profile?.role === 'owner' || profile?.role === 'dev'
+  const auDessus = estAuDessus(profile?.role)
   const tabs: Onglet[] =
-    profile?.role === 'admin' || auDessus
+    estAdministrateur(profile?.role)
       ? [
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes, principal: true },
           { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },

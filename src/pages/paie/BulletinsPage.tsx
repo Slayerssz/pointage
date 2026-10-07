@@ -11,6 +11,7 @@ import RecapPaiePrint from '../../components/RecapPaiePrint'
 import { EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import { useSociete } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
+import { estAdministrateur } from '../../lib/roles'
 
 /**
  * LES BULLETINS DE PAIE.
@@ -36,7 +37,7 @@ export default function BulletinsPage() {
   // ne saurait pas qu'une demande de modification l'attend derrière.
   const { profile } = useAuth()
   const { data: emis } = useBulletinsEmis(companyId)
-  const aRepondre = profile?.role === 'admin'
+  const aRepondre = estAdministrateur(profile?.role)
     ? (emis ?? []).filter((b) => b.modification_demandee_le && !b.modification_autorisee).length
     : 0
 

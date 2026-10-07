@@ -10,6 +10,7 @@ import { formatDateFr } from '../lib/dates'
 import { useAuth } from '../contexts/AuthContext'
 import type { Document } from '../lib/types'
 import { ErrorNote } from './ui'
+import { estAdministrateur } from '../lib/roles'
 
 /**
  * Les pièces signées rattachées à un congé ou à un contrat.
@@ -44,7 +45,7 @@ export default function DocumentsSignes({
   aide?: string
 }) {
   const { profile } = useAuth()
-  const peutDeposer = profile?.role === 'validator' || profile?.role === 'admin'
+  const peutDeposer = profile?.role === 'validator' || estAdministrateur(profile?.role)
   const { data: docs, isLoading } = useDocuments({
     employeeId,
     congeId,

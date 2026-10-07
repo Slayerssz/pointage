@@ -5,6 +5,7 @@ import { formatDateFr } from '../lib/dates'
 import { MOIS_FR } from '../lib/paie'
 import { useAuth } from '../contexts/AuthContext'
 import { Chip, EmptyState, ErrorNote, Spinner } from './ui'
+import { estAdministrateur } from '../lib/roles'
 
 /**
  * L'ARCHIVE DES DÉPARTS.
@@ -191,7 +192,7 @@ export default function ArchiveSorties({ companyId }: { companyId: string | unde
                               </span>
                             )}
                           </span>
-                          {profile?.role === 'admin' && (
+                          {estAdministrateur(profile?.role) && (
                             <button
                               onClick={() => desarchiver.mutate(a.id)}
                               disabled={desarchiver.isPending}

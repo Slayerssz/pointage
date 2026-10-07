@@ -19,6 +19,7 @@ import BulletinsPage from './pages/paie/BulletinsPage'
 import VerrouMotDePasse from './components/VerrouMotDePasse'
 import { Spinner } from './components/ui'
 import type { UserRole } from './lib/types'
+import { aLeDroit, estAdministrateur } from './lib/roles'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,20 +60,18 @@ function CompanyIndexRedirect() {
   const { profile } = useAuth()
   const { companyId } = useParams()
   const target =
-    profile?.role === 'admin'
+    estAdministrateur(profile?.role) || profile?.role === 'validator' || profile?.role === 'rh'
       ? 'employes'
-      : profile?.role === 'validator' || profile?.role === 'rh'
-        ? 'employes'
-        : profile?.role === 'paie'
-          ? 'paie'
-          : 'pointage'
+      : profile?.role === 'paie'
+        ? 'paie'
+        : 'pointage'
   return <Navigate to={`/c/${companyId}/${target}`} replace />
 }
 
 function RequireRole({ roles, children }: { roles: UserRole[]; children: React.ReactNode }) {
   const { profile } = useAuth()
   const { companyId } = useParams()
-  if (!profile || !roles.includes(profile.role)) {
+  if (!aLeDroit(profile?.role, roles)) {
     return <Navigate to={`/c/${companyId}`} replace />
   }
   return <>{children}</>

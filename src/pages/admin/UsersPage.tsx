@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatDateFr } from '../../lib/dates'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import { estAuDessus } from '../../lib/roles'
 
 type Role = 'agent' | 'validator' | 'admin' | 'paie' | 'rh' | 'dev' | 'owner'
 
@@ -155,7 +156,7 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
   const queryClient = useQueryClient()
   const { profile } = useAuth()
   // Seuls le propriétaire et le développeur nomment à leur niveau.
-  const auDessus = profile?.role === 'owner' || profile?.role === 'dev'
+  const auDessus = estAuDessus(profile?.role)
   const [username, setUsername] = useState(user?.username ?? '')
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [role, setRole] = useState<Role>(user?.role ?? 'agent')
