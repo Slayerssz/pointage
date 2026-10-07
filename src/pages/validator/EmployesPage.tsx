@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import {
@@ -19,6 +19,7 @@ import { HORAIRES, SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
 import ChoixFiche from '../../components/ChoixFiche'
+import SortieRapide from '../../components/SortieRapide'
 import type { Piece } from '../../lib/pieces'
 import ApercuEmploye from '../../components/ApercuEmploye'
 import ListeSimplifieeDialogue from '../../components/ListeSimplifieeDialogue'
@@ -57,9 +58,13 @@ function valeursDuContrat(c: Contrat): Record<string, string> {
 export default function EmployesPage() {
   const { companyId } = useParams()
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const estAdmin = profile?.role === 'admin'
   // Le rôle « personnel » se limite aux fiches : ni dossier, ni suppression.
   const estRH = profile?.role === 'rh'
+  // Sortir quelqu'un du registre touche à la paie : le personnel ne le
+  // fait pas, comme il ne valide pas les départs dans l'onglet Sorties.
+  const peutSortir = profile?.role === 'admin' || profile?.role === 'validator'
   // L'admin peut voir le personnel de TOUTES les entreprises d'un coup.
   const [toutesEntreprises, setToutesEntreprises] = useState(false)
   const { data: sites } = useSites(companyId)
@@ -118,6 +123,9 @@ export default function EmployesPage() {
    * identifiant : la sélection traverse les pages de la liste, et on ne
    * retrouverait plus les gens restés sur une page qu'on a quittée.
    */
+  // Sortir quelqu'un sans passer par la préparation du départ : le
+  // registre et le pointage le laissent partir tout de suite.
+  const [aSortir, setASortir] = useState<Employee | null>(null)
   const [choisis, setChoisis] = useState<Map<string, Employee>>(new Map())
   const cocher = (emp: Employee) =>
     setChoisis((m) => {
@@ -748,6 +756,15 @@ export default function EmployesPage() {
                         >
                           Modifier
                         </button>
+                        {peutSortir && emp.actif && (
+                          <button
+                            onClick={() => setASortir(emp)}
+                            title="Retirer du registre et du pointage"
+                            className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 shadow-sm hover:bg-red-50"
+                          >
+                            Sortie
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -785,8 +802,29 @@ export default function EmployesPage() {
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
           })()}
           onFiche={() => { setFicheAChoisir([apercu]); setApercu(null) }}
+          onSortie={
+            peutSortir && apercu.actif
+              ? () => { setASortir(apercu); setApercu(null) }
+              : undefined
+          }
           onModifier={() => { setEditing(apercu); setApercu(null) }}
           onClose={() => setApercu(null)}
+        />
+      )}
+
+      {aSortir && (
+        <SortieRapide
+          employe={aSortir}
+          onSorti={() => {
+            setASortir(null)
+            setChoisis((m) => {
+              const n = new Map(m)
+              n.delete(aSortir.id)
+              return n
+            })
+            navigate(`/c/${companyId}/sorties`)
+          }}
+          onClose={() => setASortir(null)}
         />
       )}
 

@@ -117,69 +117,101 @@ const site = (await q1(`select public.creer_site($1,'SITE PRINCIPAL') as id`, [c
 
 console.log(`  société, sites et comptes prêts`)
 
-section('Remplir septembre')
-const emp = async (nom, o = {}) => (await q1(
-  `insert into public.employees (company_id, site_id, nom_prenom, jour_de_repos, date_embauche, date_sortie)
-   values ($1,$2,$3,$4,$5,$6) returning id`,
-  [co, site, nom, o.repos ?? 7, o.emb ?? null, o.sortie ?? null])).id
-const eNormal  = await emp('NORMAL')                                   // repos dimanche
-const eMercredi = await emp('REPOS MERCREDI', { repos: 3 })
-const eTard    = await emp('EMBAUCHE LE 15', { emb: '2026-09-15' })
-const ePart    = await emp('PARTI LE 10', { sortie: '2026-09-10' })
-const eConge   = await emp('EN CONGE')
+/**
+ * Le même scénario pour chaque mois rempli : ce sont les mêmes règles —
+ * le jour de repos épargné, les marques existantes intactes, rien avant
+ * l'embauche ni après la sortie — et une seule description vaut mieux
+ * que deux qui dérivent.
+ */
+async function verifierLeRemplissage(o) {
+  section(`Remplir ${o.nom}`)
+  const emp = async (nom, opts = {}) => (await q1(
+    `insert into public.employees (company_id, site_id, nom_prenom, jour_de_repos, date_embauche, date_sortie)
+     values ($1,$2,$3,$4,$5,$6) returning id`,
+    [co, site, `${nom} ${o.mois}`, opts.repos ?? 7, opts.emb ?? null, opts.sortie ?? null])).id
 
-// Un congé déjà posé du 7 au 9 : il doit rester C.
-await connecte(bureau)
-for (const j of ['2026-09-07', '2026-09-08', '2026-09-09'])
-  await q1(`select public.marquer_present($1,$2::date,'C')`, [eConge, j])
-// Un M déjà posé le 3 pour NORMAL : doit rester M.
-await q1(`select public.marquer_present($1,'2026-09-03'::date,'M')`, [eNormal])
+  const eNormal   = await emp('NORMAL')                      // repos dimanche
+  const eMercredi = await emp('REPOS MERCREDI', { repos: 3 })
+  const eTard     = await emp('EMBAUCHE LE 15', { emb: o.le15 })
+  const ePart     = await emp('PARTI LE 10', { sortie: o.le10 })
+  const eConge    = await emp('EN CONGE')
 
-const script = fs.readFileSync(path.join(BLOCS, 'REMPLIR_septembre_present.sql'), 'utf8')
-const bloc = script
-await connecte(null)   // l'éditeur SQL : pas de session
-await db.exec(bloc)
+  // Un congé déjà posé du 7 au 9 : il doit rester C.
+  await connecte(bureau)
+  for (const j of o.conge) await q1(`select public.marquer_present($1,$2::date,'C')`, [eConge, j])
+  // Un M déjà posé pour NORMAL : doit rester M.
+  await q1(`select public.marquer_present($1,$2::date,'M')`, [eNormal, o.leM])
 
-const types = async (id) => (await rows(
-  `select pointed_on::text d, type_garde t from public.pointages
-    where employee_id=$1 and pointed_on between '2026-09-01' and '2026-09-30' order by 1`, [id]))
-const jt = async (id) => num((await q1(`select jours_travailles j from public.employees where id=$1`, [id])).j)
+  const bloc = fs.readFileSync(path.join(BLOCS, o.remplir), 'utf8')
+  await connecte(null)   // l'éditeur SQL : pas de session
+  await db.exec(bloc)
 
-const n = await types(eNormal)
-ok('NORMAL : 30 jours − 4 dimanches = 26 journées', n.length === 26, String(n.length))
-ok('… son M du 3 est resté M', n.find((x) => x.d === '2026-09-03')?.t === 'M')
-ok('… tout le reste est X', n.filter((x) => x.t === 'X').length === 25)
-ok('… aucun dimanche', !n.some((x) => new Date(x.d + 'T12:00').getDay() === 0))
-ok('… compteur = 25 X + 1 M', (await jt(eNormal)) === 26, String(await jt(eNormal)))
+  const types = async (id) => (await rows(
+    `select pointed_on::text d, type_garde t from public.pointages
+      where employee_id=$1 and pointed_on between $2 and $3 order by 1`, [id, o.debut, o.fin]))
+  const jt = async (id) => num((await q1(
+    `select jours_travailles j from public.employees where id=$1`, [id])).j)
 
-const m = await types(eMercredi)
-ok('REPOS MERCREDI : aucun mercredi', !m.some((x) => new Date(x.d + 'T12:00').getDay() === 3))
-ok('… mais les dimanches, oui', m.some((x) => new Date(x.d + 'T12:00').getDay() === 0))
+  const n = await types(eNormal)
+  ok(`NORMAL : ${o.jours} jours − ${o.dimanches} dimanches = ${o.ouvres} journées`,
+     n.length === o.ouvres, String(n.length))
+  ok(`… son M du ${o.leM.slice(8)} est resté M`, n.find((x) => x.d === o.leM)?.t === 'M')
+  ok('… tout le reste est X', n.filter((x) => x.t === 'X').length === o.ouvres - 1)
+  ok('… aucun dimanche', !n.some((x) => new Date(x.d + 'T12:00').getDay() === 0))
+  ok('… compteur = les journées inscrites', (await jt(eNormal)) === o.ouvres,
+     String(await jt(eNormal)))
 
-const t = await types(eTard)
-ok('EMBAUCHÉ LE 15 : rien avant le 15', !t.some((x) => x.d < '2026-09-15'))
-ok('… et présent à partir du 15', t.some((x) => x.d === '2026-09-15'))
+  const m = await types(eMercredi)
+  ok('REPOS MERCREDI : aucun mercredi', !m.some((x) => new Date(x.d + 'T12:00').getDay() === 3))
+  ok('… mais les dimanches, oui', m.some((x) => new Date(x.d + 'T12:00').getDay() === 0))
 
-const p = await types(ePart)
-ok('PARTI LE 10 : rien après le 10', !p.some((x) => x.d > '2026-09-10'))
-ok('… présent jusqu’au 10 inclus', p.some((x) => x.d === '2026-09-10'))
+  const t = await types(eTard)
+  ok('EMBAUCHÉ LE 15 : rien avant le 15', !t.some((x) => x.d < o.le15))
+  ok('… et présent à partir du 15', t.some((x) => x.d === o.le15))
 
-const c = await types(eConge)
-ok('EN CONGÉ : ses trois C sont intacts', c.filter((x) => x.t === 'C').length === 3)
+  const p = await types(ePart)
+  ok('PARTI LE 10 : rien après le 10', !p.some((x) => x.d > o.le10))
+  ok('… présent jusqu’au 10 inclus', p.some((x) => x.d === o.le10))
 
-// Relancer ne double rien
-const avant = (await q1(`select count(*) n from public.pointages where pointed_at='2026-09-01 00:00:00+01'`)).n
-await db.exec(bloc)
-const apres = (await q1(`select count(*) n from public.pointages where pointed_at='2026-09-01 00:00:00+01'`)).n
-ok('relancer le script n’inscrit rien de plus', num(avant) === num(apres))
+  const c = await types(eConge)
+  ok('EN CONGÉ : ses trois C sont intacts', c.filter((x) => x.t === 'C').length === 3)
 
-// L'annulation retire tout et remet les compteurs
-const annule = fs.readFileSync(path.join(BLOCS, 'ANNULER_septembre_present.sql'), 'utf8')
-await db.exec(annule)
-ok('ANNULER retire les X posés', (await types(eNormal)).length === 1)
-ok('… garde le M', (await types(eNormal))[0].t === 'M')
-ok('… et remet le compteur', (await jt(eNormal)) === 1, String(await jt(eNormal)))
-ok('… sans toucher aux C', (await types(eConge)).length === 3)
+  // Relancer ne double rien
+  const compter = async () => num((await q1(
+    `select count(*) n from public.pointages where pointed_at=$1`, [o.marque])).n)
+  const avant = await compter()
+  await db.exec(bloc)
+  ok('relancer le script n’inscrit rien de plus', avant === (await compter()))
+
+  // L'annulation retire tout et remet les compteurs
+  await db.exec(fs.readFileSync(path.join(BLOCS, o.annuler), 'utf8'))
+  ok('ANNULER retire les X posés', (await types(eNormal)).length === 1)
+  ok('… garde le M', (await types(eNormal))[0].t === 'M')
+  ok('… et remet le compteur', (await jt(eNormal)) === 1, String(await jt(eNormal)))
+  ok('… sans toucher aux C', (await types(eConge)).length === 3)
+}
+
+await verifierLeRemplissage({
+  nom: 'septembre', mois: 9, debut: '2026-09-01', fin: '2026-09-30',
+  jours: 30, dimanches: 4, ouvres: 26,
+  leM: '2026-09-03', le10: '2026-09-10', le15: '2026-09-15',
+  conge: ['2026-09-07', '2026-09-08', '2026-09-09'],
+  marque: '2026-09-01 00:00:00+01',
+  remplir: 'REMPLIR_septembre_present.sql', annuler: 'ANNULER_septembre_present.sql',
+})
+
+// Octobre 2026 commence un jeudi : ses dimanches sont les 4, 11, 18 et 25.
+// Le mois est en cours : on ne peut poser à la main que des jours déjà
+// passés — `marquer_present` refuse l'avenir. Le script, lui, inscrit le
+// mois entier, et c'est bien ce qu'on lui demande.
+await verifierLeRemplissage({
+  nom: 'octobre', mois: 10, debut: '2026-10-01', fin: '2026-10-31',
+  jours: 31, dimanches: 4, ouvres: 27,
+  leM: '2026-10-02', le10: '2026-10-10', le15: '2026-10-15',
+  conge: ['2026-10-01', '2026-10-05', '2026-10-06'],
+  marque: '2026-10-01 00:00:00+01',
+  remplir: 'REMPLIR_octobre_present.sql', annuler: 'ANNULER_octobre_present.sql',
+})
 
 console.log(`\n  ${F === 0 ? '✅' : '❌'}  ${P + F} vérifications, ${F} échec(s)`)
 process.exit(F ? 1 : 0)

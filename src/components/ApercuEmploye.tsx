@@ -27,6 +27,7 @@ export default function ApercuEmploye({
   contratCourant,
   onModifier,
   onFiche,
+  onSortie,
   onClose,
 }: {
   employee: Employee
@@ -37,6 +38,8 @@ export default function ApercuEmploye({
   contratCourant?: ContratCourant | null
   onModifier?: () => void
   onFiche?: () => void
+  /** Retirer la personne du registre et du pointage, tout de suite. */
+  onSortie?: () => void
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
@@ -255,6 +258,14 @@ export default function ApercuEmploye({
               className="rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Imprimer la fiche
+            </button>
+          )}
+          {onSortie && (
+            <button
+              onClick={onSortie}
+              className="rounded-lg border border-red-200 px-3.5 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+            >
+              Sortie
             </button>
           )}
           {onModifier && (
