@@ -9,7 +9,9 @@
 --  Et un journal : qui a fait quoi, et quand. Une phrase par geste,
 --  lisible, avec de quoi retrouver la page. Réservé à ces deux rôles.
 --
---  ⚠ Ce bloc fait passer l'administrateur actuel en « dev ».
+--  Ce bloc ne change le rôle de personne : les administrateurs restent
+--  administrateurs. Pour nommer un premier développeur, voir le fichier
+--  NOMMER_developpeur.sql.
 -- ============================================================================
 
 -- ============================================================
@@ -297,10 +299,10 @@ begin
   end loop;
 end $bloc$;
 
--- 6. L'administrateur en place devient développeur ----------------------------
--- C'est le compte qui tient la maison : il passe au-dessus.
-
-update public.profiles set role = 'dev' where role = 'admin';
+-- 6. Aucun rôle n'est changé par ce bloc ---------------------------------------
+-- Les administrateurs restent administrateurs. Pour nommer un
+-- développeur, voir NOMMER_developpeur.sql : la première nomination se
+-- fait en SQL, puisque seul un développeur peut en nommer un autre.
 
 
 CREATE OR REPLACE FUNCTION public.admin_liste_utilisateurs()

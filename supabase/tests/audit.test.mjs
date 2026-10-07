@@ -1359,12 +1359,14 @@ await refuse('le personnel ne se rattache pas lui-même',
 
 section('Le propriétaire, le développeur et le journal')
 
-// Le bloc fait passer l'administrateur en place en développeur. Dans ce
-// registre les comptes naissent APRÈS l'installation : on vérifie donc
-// la consigne elle-même, puis on travaille avec un vrai développeur.
-ok('le bloc fait passer l’administrateur en développeur',
-   fs.readFileSync(path.join(BLOCS, 'BLOC_41_journal_roles.sql'), 'utf8')
-     .includes("update public.profiles set role = 'dev' where role = 'admin'"))
+// Le bloc ne touche au rôle de personne : un administrateur reste
+// administrateur. La première nomination d'un développeur se fait en
+// SQL, puisque seul un développeur peut en nommer un autre.
+ok('le bloc ne change le rôle de personne',
+   !fs.readFileSync(path.join(BLOCS, 'BLOC_41_journal_roles.sql'), 'utf8')
+      .includes("set role = 'dev'"))
+ok('… et un fichier à part sert à nommer le premier',
+   fs.existsSync(path.join(BLOCS, 'NOMMER_developpeur.sql')))
 
 const dev = await compte('developpeur', 'dev')
 
