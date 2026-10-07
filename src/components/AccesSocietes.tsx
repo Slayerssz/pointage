@@ -6,10 +6,10 @@ import { ErrorNote, Spinner } from './ui'
 /**
  * LES SOCIÉTÉS CONFIÉES À UN COMPTE DU PERSONNEL.
  *
- * Le personnel tient les dossiers partout, mais ne pointe que là où on
- * l'a nommément autorisé. L'administrateur coche ici les sociétés : ce
- * qui est coché, ce compte le voit et le pointe ; le reste lui reste
- * fermé, et il ne le voit même pas au moment de choisir une société.
+ * Le personnel voit toutes les sociétés et y tient les dossiers. Le
+ * pointage, lui, se confie : l'administrateur coche ici les sociétés où
+ * ce compte verra l'onglet Pointage et pourra saisir. Ailleurs, l'onglet
+ * n'apparaît pas, et la base refuserait la saisie de toute façon.
  */
 export default function AccesSocietes({ userId }: { userId: string }) {
   const qc = useQueryClient()
@@ -65,8 +65,9 @@ export default function AccesSocietes({ userId }: { userId: string }) {
     <div className="border-t border-slate-100 pt-4">
       <h4 className="text-sm font-semibold text-slate-800">Pointage : sociétés confiées</h4>
       <p className="mt-1 text-xs text-slate-500">
-        Ce compte verra le pointage des sociétés cochées, et pourra y pointer comme
-        le bureau. Décoché, il n’y a plus accès — et ne les voit plus du tout.
+        Ce compte voit déjà toutes les sociétés et leurs dossiers. Les cases
+        ci-dessous ne décident que du pointage : là où c’est coché, l’onglet
+        Pointage s’ouvre et la saisie est permise, comme pour le bureau.
       </p>
 
       <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
@@ -96,7 +97,7 @@ export default function AccesSocietes({ userId }: { userId: string }) {
         {inchange ? (
           <span className="text-xs text-slate-500">
             {choisies.length === 0
-              ? 'Aucune société confiée : ce compte ne pointe nulle part.'
+              ? 'Aucune société confiée : ce compte ne voit l’onglet Pointage nulle part.'
               : `${choisies.length} société(s) confiée(s).`}
           </span>
         ) : (

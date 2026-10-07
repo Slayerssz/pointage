@@ -4,9 +4,11 @@
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 38.
 --
 --  L'administrateur rattache des sociétés à un compte « personnel ».
---  Sur celles-là, et sur aucune autre, ce compte voit le pointage et le
---  saisit comme le bureau. Il ne valide toujours pas le mois, ne touche
---  pas à la paie et ne sort personne du registre.
+--  Sur celles-là, et sur aucune autre, l'onglet Pointage s'ouvre.
+--
+--  Le personnel continue de voir toutes les sociétés et tous les
+--  dossiers. Il ne valide toujours pas le mois, ne touche pas à la paie
+--  et ne sort personne du registre.
 -- ============================================================================
 
 -- ============================================================
@@ -17,10 +19,12 @@
 -- Le personnel tient les dossiers, mais ne pouvait pas pointer.
 --
 -- L'administrateur lui rattache désormais des sociétés, une par une.
--- Sur celles-là — et sur aucune autre — le personnel voit le pointage
--- et le saisit comme le bureau. Le reste de ses droits ne bouge pas :
--- il ne valide pas le mois, ne touche pas à la paie, et ne sort
--- personne du registre.
+-- Sur celles-là — et sur aucune autre — l'onglet Pointage s'ouvre, et
+-- le personnel y saisit comme le bureau.
+--
+-- Le reste ne bouge pas : il continue de voir toutes les sociétés et
+-- tous les dossiers, comme avant. Il ne valide pas le mois, ne touche
+-- pas à la paie, et ne sort personne du registre.
 --
 -- Les autres rôles ne sont pas concernés : le bureau et
 -- l'administrateur pointent partout, comme avant.
@@ -67,26 +71,7 @@ as $$
   end;
 $$;
 
--- 2. Les sociétés qu'un compte peut ouvrir ------------------------------------
--- Le bureau, la paie et l'administrateur les voient toutes ; le
--- personnel, celles qu'on lui a confiées. Sert à la page de choix.
-
-create or replace function public.mes_societes()
-returns table (id uuid, name text)
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select c.id, c.name
-    from public.companies c
-   where coalesce(public.current_user_role()::text, '') <> 'rh'
-      or exists (select 1 from public.acces_societes a
-                  where a.user_id = auth.uid() and a.company_id = c.id)
-   order by c.name;
-$$;
-
--- 3. L'administrateur confie, ou retire ---------------------------------------
+-- 2. L'administrateur confie, ou retire ---------------------------------------
 -- On pose la liste entière plutôt qu'une société à la fois : l'écran
 -- montre des cases à cocher, et ce qui est décoché doit disparaître.
 
@@ -126,7 +111,7 @@ begin
 end;
 $$;
 
--- 4. Les trois gestes du pointage s'ouvrent au personnel autorisé -------------
+-- 3. Les gestes du pointage s'ouvrent au personnel autorisé -------------
 -- Le refus immédiat reste en tête — un inconnu n'apprend pas au passage
 -- si tel employé existe. Mais pour le personnel, c'est la société qui
 -- décide, et elle ne se connaît qu'après l'avoir cherchée : d'où le
@@ -352,8 +337,6 @@ end;
 $function$;
 
 revoke all on function public.peut_pointer(uuid) from public;
-revoke all on function public.mes_societes() from public;
 revoke all on function public.admin_definir_acces_societes(uuid, uuid[]) from public;
 grant execute on function public.peut_pointer(uuid) to authenticated;
-grant execute on function public.mes_societes() to authenticated;
 grant execute on function public.admin_definir_acces_societes(uuid, uuid[]) to authenticated;

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import { usePeutPointer } from '../../lib/queries'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -48,6 +49,10 @@ interface CellSelection {
 export default function ValidationPage() {
   const { companyId } = useParams()
   const { profile } = useAuth()
+  // Le personnel peut arriver ici par l'adresse : l'écran se referme de
+  // lui-même sur une société qu'on ne lui a pas confiée. La base
+  // refuserait de toute façon les écritures ; autant le dire ici.
+  const { data: peutPointer, isLoading: droitEnCours } = usePeutPointer(companyId)
   const [monday, setMonday] = useState(() => mondayOf(new Date()))
   const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
   const { data: principaux } = useSitesPrincipaux(companyId)
@@ -56,6 +61,21 @@ export default function ValidationPage() {
   const mondayIso = dateToIso(monday)
   const sundayIso = dateToIso(addDays(monday, 6))
   const isCurrentWeek = mondayIso === dateToIso(mondayOf(new Date()))
+
+  if (droitEnCours) return <Spinner label="Ouverture du pointage…" />
+  if (peutPointer === false) {
+    return (
+      <div className="mx-auto max-w-xl py-16 text-center">
+        <p className="text-sm font-medium text-slate-700">
+          Le pointage de cette société ne vous a pas été confié.
+        </p>
+        <p className="mt-2 text-sm text-slate-500">
+          L’administrateur peut vous y donner accès depuis votre compte, dans
+          Utilisateurs.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-5xl">

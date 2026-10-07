@@ -196,3 +196,22 @@ export function useSociete(companyId: string | undefined) {
     },
   })
 }
+
+/**
+ * Ce compte a-t-il le droit de pointer cette société ?
+ *
+ * Vrai d'office pour le bureau et l'administrateur. Pour le personnel,
+ * cela dépend de ce que l'administrateur lui a confié — c'est la base
+ * qui tranche, la même réponse que celle qui gouverne les écritures.
+ */
+export function usePeutPointer(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['peut-pointer', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase.rpc('peut_pointer', { p_company: companyId })
+      if (error) throw error
+      return data === true
+    },
+  })
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useParams, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { useSociete } from '../lib/queries'
+import { usePeutPointer, useSociete } from '../lib/queries'
 
 /**
  * La barre du bas d'un téléphone tient quatre entrées, pas dix. Les
@@ -96,6 +96,9 @@ export default function Layout() {
   const [menu, setMenu] = useState(false)
 
   const { data: company } = useSociete(companyId)
+  // Le personnel ne pointe que les sociétés qu'on lui a confiées :
+  // ailleurs, l'onglet ne lui est pas montré du tout.
+  const { data: peutPointer } = usePeutPointer(companyId)
 
   const tabs: Onglet[] =
     profile?.role === 'admin'
@@ -128,10 +131,10 @@ export default function Layout() {
           ? [
               { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes,
                 principal: true },
-              // Le personnel ne pointe que les sociétés qu'on lui a
-              // confiées — la page de choix ne lui montre pas les autres.
-              { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation,
-                principal: true },
+              ...(peutPointer
+                ? [{ to: `/c/${companyId}/validation`, label: 'Pointage',
+                     icon: ICONS.validation, principal: true }]
+                : []),
             ]
           : profile?.role === 'paie'
             ? [

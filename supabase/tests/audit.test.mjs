@@ -1301,8 +1301,12 @@ const hier = (await q1(
 await connecte(rh)
 await refuse('sans rattachement, le personnel ne pointe pas',
   `select public.marquer_present($1,$2::date,'X')`, [eIci, hier], /réservé|autorisé/i)
-ok('… et il ne voit aucune société',
-   num((await q1(`select count(*) n from public.mes_societes()`)).n) === 0)
+// Mais il garde tout le reste : les sociétés et les dossiers, comme avant.
+ok('… alors qu’il voit toujours toutes les sociétés',
+   num((await q1(`select count(*) n from public.companies`)).n) >= 2)
+ok('… et il n’a le droit de pointer nulle part',
+   (await q1(`select public.peut_pointer($1) p`, [co])).p === false
+   && (await q1(`select public.peut_pointer($1) p`, [coAutre])).p === false)
 
 // L'administrateur lui confie la première société.
 await connecte(admin)
@@ -1314,9 +1318,9 @@ ok('le personnel pointe désormais cette société',
    await reussit(`select public.marquer_present($1,$2::date,'X')`, [eIci, hier]))
 await refuse('… mais toujours pas l’autre',
   `select public.marquer_present($1,$2::date,'X')`, [eAutre, hier], /autorisé/i)
-ok('… et il ne voit que celle-là',
-   (await rows(`select name from public.mes_societes()`)).map((r) => r.name).join() === 'AUDIT SARL',
-   (await rows(`select name from public.mes_societes()`)).map((r) => r.name).join())
+ok('… le droit porte sur cette société seule',
+   (await q1(`select public.peut_pointer($1) p`, [co])).p === true
+   && (await q1(`select public.peut_pointer($1) p`, [coAutre])).p === false)
 
 // Ce qu'il ne gagne pas au passage.
 await refuse('le personnel ne valide pas le mois',
