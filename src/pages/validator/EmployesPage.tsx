@@ -7,7 +7,6 @@ import {
   formatDateFr,
   jourDeReposLabel,
   retirementStatus,
-  todayIso,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites, useSitesPrincipaux, useSociete, useTousLesSites } from '../../lib/queries'
 import { BANQUES, normaliserBanque } from '../../lib/banques'
@@ -20,6 +19,7 @@ import { HORAIRES, SITUATIONS_AVEC_ENFANTS, SITUATIONS_FAMILIALES } from '../../
 import PhotoProfil from '../../components/PhotoProfil'
 import FichePrint from '../../components/FichePrint'
 import ChoixFiche from '../../components/ChoixFiche'
+import DemanderDateSortie from '../../components/DemanderDateSortie'
 import type { Piece } from '../../lib/pieces'
 import ApercuEmploye from '../../components/ApercuEmploye'
 import ListeSimplifieeDialogue from '../../components/ListeSimplifieeDialogue'
@@ -896,6 +896,8 @@ function EmployeeFormModal({
   // congés et dettes (uniquement pour un employé déjà enregistré).
   const [vue, setVue] = useState<'fiche' | 'dossier'>('fiche')
 
+  // La question posée quand on passe quelqu'un à « Sorti ».
+  const [dateSortieADemander, setDateSortieADemander] = useState(false)
   const [form, setForm] = useState({
     site_id: employee?.site_id ?? '',
     matricule: employee?.matricule?.toString() ?? '',
@@ -930,6 +932,9 @@ function EmployeeFormModal({
     mutationFn: async () => {
       if (!form.nom_prenom.trim()) throw new Error('Le nom est obligatoire.')
       if (!form.site_id) throw new Error('Choisissez un site.')
+      if (form.statut === 'sorti' && !form.date_sortie) {
+        throw new Error('Indiquez le dernier jour travaillé avant de marquer la sortie.')
+      }
       const payload = {
         site_id: form.site_id,
         // Vide à la création → matricule attribué automatiquement (dernier + 1)
@@ -958,8 +963,9 @@ function EmployeeFormModal({
           : 0,
         // Le statut se résume à une date : renseignée, la personne est
         // sortie ; vide, elle est en poste. Un déclencheur en déduit
-        // « actif », et le pointage cesse de la proposer.
-        date_sortie: form.statut === 'sorti' ? (form.date_sortie || todayIso()) : null,
+        // « actif », et le pointage cesse de la proposer. Pas de date
+        // supposée : c'est elle qui décide de la paie du mois.
+        date_sortie: form.statut === 'sorti' ? form.date_sortie : null,
       }
       if (employee) {
         const { error } = await supabase.from('employees').update(payload).eq('id', employee.id)
@@ -1083,22 +1089,21 @@ function EmployeeFormModal({
           {employee && !ficheSeule && field('Statut', (
             <select
               value={form.statut}
-              onChange={(e) => set('statut')(e.target.value)}
+              onChange={(e) => {
+                // La date décide de la paie : on la demande au moment du
+                // choix, plutôt que de la supposer dans un champ qu'on
+                // peut ne pas voir.
+                if (e.target.value === 'sorti') setDateSortieADemander(true)
+                else setForm((f) => ({ ...f, statut: 'en_poste', date_sortie: '' }))
+              }}
               className={inputCls}
             >
               <option value="en_poste">En poste</option>
               <option value="sorti">Sorti</option>
             </select>
-          ), form.statut === 'sorti'
-               ? 'La personne quitte le pointage et les listes. Sa fiche, ses pointages et ses bulletins restent.'
+          ), form.statut === 'sorti' && form.date_sortie
+               ? `Sorti le ${formatDateFr(form.date_sortie)} — cliquez de nouveau sur « Sorti » pour changer la date.`
                : undefined)}
-          {employee && !ficheSeule && form.statut === 'sorti' && field('Date de sortie', (
-            <DateInputFr
-              value={form.date_sortie || todayIso()}
-              onChange={set('date_sortie')}
-              className={inputCls}
-            />
-          ))}
           {field('Situation familiale', (
             <select
               value={form.situation_familiale}
@@ -1200,6 +1205,18 @@ function EmployeeFormModal({
           )}
         </div>
       </div>
+
+      {dateSortieADemander && (
+        <DemanderDateSortie
+          nom={form.nom_prenom || employee?.nom_prenom || 'Cette personne'}
+          dateInitiale={form.date_sortie || undefined}
+          onConfirmer={(date) => {
+            setForm((f) => ({ ...f, statut: 'sorti', date_sortie: date }))
+            setDateSortieADemander(false)
+          }}
+          onAnnuler={() => setDateSortieADemander(false)}
+        />
+      )}
     </div>
   )
 }
