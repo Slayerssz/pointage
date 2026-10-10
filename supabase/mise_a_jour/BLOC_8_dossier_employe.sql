@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 8 sur 42 — Dossier de l'employé : état civil, photo, documents signés
+--  BLOC 8 sur 43 — Dossier de l'employé : état civil, photo, documents signés
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 7.
 --

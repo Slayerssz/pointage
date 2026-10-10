@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 38 sur 42 — Un gain saisi, sous le nom qu'on lui donne
+--  BLOC 38 sur 43 — Un gain saisi, sous le nom qu'on lui donne
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 37.
 --

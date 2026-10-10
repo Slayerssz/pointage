@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 7 sur 42 — Sites principaux & annexes
+--  BLOC 7 sur 43 — Sites principaux & annexes
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 6.
 --

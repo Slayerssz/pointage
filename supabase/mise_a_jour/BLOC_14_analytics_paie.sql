@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 14 sur 42 — Les chiffres de la paie dans Analytics
+--  BLOC 14 sur 43 — Les chiffres de la paie dans Analytics
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 13.
 --

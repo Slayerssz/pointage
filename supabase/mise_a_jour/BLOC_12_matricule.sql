@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 12 sur 42 — Le matricule ne recule jamais
+--  BLOC 12 sur 43 — Le matricule ne recule jamais
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 11.
 --

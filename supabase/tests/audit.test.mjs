@@ -1453,6 +1453,39 @@ ok('la sortie se lit comme une sortie', (await dernier()).action === 'sortie',
 ok('… et le dit en toutes lettres',
    (await dernier()).resume.startsWith('a sorti SUIVI AU JOURNAL le'), (await dernier()).resume)
 
+// Et surtout : ce qui a changé, colonne par colonne.
+await connecte(bureau)
+await db.query(`update public.employees set salaire=4000, ville='TANGER' where id=$1`, [eJournal])
+const detail = (await q1(
+  `select details from public.journal order by id desc limit 1`)).details
+const champ = (nom) => detail.find((d) => d.champ === nom)
+ok('le journal relève les colonnes qui ont bougé',
+   Array.isArray(detail) && detail.length === 2, JSON.stringify(detail))
+ok('… avec la valeur d’avant', Number(champ('salaire')?.avant) === 5200,
+   JSON.stringify(champ('salaire')))
+ok('… et celle d’après', Number(champ('salaire')?.apres) === 4000)
+ok('… la seconde colonne aussi',
+   champ('ville')?.apres === 'TANGER' && champ('ville')?.avant === null)
+
+// Ce que la base tient à jour toute seule n'y figure pas. (Sur une
+// fiche neuve : eJournal est sorti, et son jour est déjà pointé.)
+const eCompteur = await employe('COMPTEUR', { cin: 'JR3', cnss: '970000003' })
+await q1(`select public.marquer_present($1,$2::date,'X')`, [eCompteur, avantHier])
+const dPointage = (await q1(`select details from public.journal order by id desc limit 1`)).details
+ok('le compteur de journées n’apparaît jamais',
+   !JSON.stringify(dPointage).includes('jours_travailles'))
+ok('… ni les clés techniques',
+   !JSON.stringify(dPointage).includes('"champ": "id"'))
+
+// Un ajout n'a pas d'avant : la liste dit ce qui est entré.
+const eNeuf = await employe('TOUT NEUF', { cin: 'JR2', cnss: '970000002' })
+void eNeuf
+const dAjout = (await q1(`select details from public.journal order by id desc limit 1`)).details
+ok('un ajout relève ce qui est entré',
+   dAjout.some((d) => d.champ === 'nom_prenom' && d.apres === 'TOUT NEUF'
+                      && d.avant === null),
+   JSON.stringify(dAjout.find((d) => d.champ === 'nom_prenom')))
+
 // L'auteur est nommé, et il reste nommé.
 ok('le journal nomme son auteur',
    (await q1(`select auteur from public.journal order by id desc limit 1`)).auteur === 'bureau',

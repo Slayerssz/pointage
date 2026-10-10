@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 37 sur 42 — Les bulletins établis sont conservés
+--  BLOC 37 sur 43 — Les bulletins établis sont conservés
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 36.
 --

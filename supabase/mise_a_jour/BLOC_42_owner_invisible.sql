@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 42 sur 42 — Le propriétaire n'existe pour personne
+--  BLOC 42 sur 43 — Le propriétaire n'existe pour personne
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 41.
 --
