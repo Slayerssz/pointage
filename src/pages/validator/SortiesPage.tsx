@@ -19,7 +19,8 @@ import { useDocuments } from '../../lib/documents'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
-import { useSociete } from '../../lib/queries'
+import { useSites, useSitesPrincipaux, useSociete } from '../../lib/queries'
+import ApercuEmploye from '../../components/ApercuEmploye'
 import { estAdministrateur } from '../../lib/roles'
 
 /**
@@ -75,6 +76,12 @@ export default function SortiesPage() {
     },
   })
 
+  // De quoi nommer l'annexe et son site principal dans la fiche qu'on
+  // ouvre : un départ se relit souvent pour savoir où la personne était.
+  const { data: tousLesSites } = useSites(companyId)
+  const { data: principaux } = useSitesPrincipaux(companyId)
+  const [apercu, setApercu] = useState<Employee | null>(null)
+
   const { data: sorties } = useSorties(companyId)
   const [choisi, setChoisi] = useState<string>('')
 
@@ -98,29 +105,43 @@ export default function SortiesPage() {
         </h2>
         <p className="mt-1 mb-2 text-sm text-slate-500">
           Tous ceux qui ont quitté le registre, quelle que soit la façon dont on
-          les a sortis. Ils ne sont plus pointés ; leur fiche reste consultable.
+          les a sortis. Ils ne sont plus pointés. Touchez un nom pour revoir sa
+          fiche : où il travaillait, son contrat, ses coordonnées.
         </p>
         {(partis ?? []).length === 0 ? (
           <EmptyState>Personne n’est sorti pour le moment.</EmptyState>
         ) : (
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
             {(partis ?? []).map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-slate-800">
-                    {e.matricule != null && (
-                      <span className="mr-2 text-slate-400 tabular-nums">{e.matricule}</span>
-                    )}
-                    {e.nom_prenom}
+              <li key={e.id}>
+                <button
+                  onClick={() => setApercu(e)}
+                  title="Voir sa fiche"
+                  className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-800">
+                      {e.matricule != null && (
+                        <span className="mr-2 text-slate-400 tabular-nums">{e.matricule}</span>
+                      )}
+                      {e.nom_prenom}
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      {e.qualification ?? '—'}
+                      {' · '}
+                      {tousLesSites?.find((s) => s.id === e.site_id)?.name ?? 'sans annexe'}
+                    </span>
                   </span>
-                  <span className="block text-xs text-slate-500">{e.qualification ?? '—'}</span>
-                </span>
-                <span className="text-sm text-slate-600">
-                  Sorti le{' '}
-                  <strong className="font-semibold text-slate-900">
-                    {e.date_sortie ? formatDateFr(e.date_sortie) : '—'}
-                  </strong>
-                </span>
+                  <span className="flex items-center gap-3 text-sm text-slate-600">
+                    <span>
+                      Sorti le{' '}
+                      <strong className="font-semibold text-slate-900">
+                        {e.date_sortie ? formatDateFr(e.date_sortie) : '—'}
+                      </strong>
+                    </span>
+                    <span className="text-slate-300">›</span>
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -175,6 +196,19 @@ export default function SortiesPage() {
             />
           )}
         </>
+      )}
+
+      {apercu && (
+        <ApercuEmploye
+          employee={apercu}
+          entreprise={company?.name ?? ''}
+          siteNom={tousLesSites?.find((s) => s.id === apercu.site_id)?.name ?? null}
+          sitePrincipalNom={(() => {
+            const sp = tousLesSites?.find((s) => s.id === apercu.site_id)?.site_principal_id
+            return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
+          })()}
+          onClose={() => setApercu(null)}
+        />
       )}
 
       {estAdministrateur(profile?.role) && <ClotureDuMois companyId={companyId} />}
