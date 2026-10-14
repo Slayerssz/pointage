@@ -65,19 +65,35 @@ export type SiteEmployee = Pick<
 >
 
 /** Employés d'un site, chargés par pages de 100 (à l'ouverture de l'accordéon). */
-export function useSiteEmployees(siteId: string, enabled: boolean) {
+/**
+ * Les employés d'un site, pour le pointage.
+ *
+ * `depuis` est le premier jour de la période affichée. Quelqu'un qui est
+ * parti depuis reste visible sur les semaines qu'il a travaillées : son
+ * pointage de l'époque ne doit pas disparaître avec lui. Sans date, on
+ * ne montre que ceux qui sont encore là.
+ */
+export function useSiteEmployees(
+  siteId: string,
+  enabled: boolean,
+  opts?: { depuis?: string },
+) {
+  const depuis = opts?.depuis ?? null
   return useInfiniteQuery({
-    queryKey: ['site-employees', siteId],
+    queryKey: ['site-employees', siteId, depuis],
     enabled,
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<SiteEmployee[]> => {
       const from = pageParam * SITE_EMPLOYEES_PAGE
-      const { data, error } = await supabase
+      let requete = supabase
         .from('employees')
         .select('id, nom_prenom, matricule, qualification, jour_de_repos')
         .eq('site_id', siteId)
-        .eq('actif', true)
         .is('archive_le', null)
+      requete = depuis
+        ? requete.or(`date_sortie.is.null,date_sortie.gte.${depuis}`)
+        : requete.eq('actif', true)
+      const { data, error } = await requete
         .order('matricule', { ascending: true, nullsFirst: false })
         .range(from, from + SITE_EMPLOYEES_PAGE - 1)
       if (error) throw error

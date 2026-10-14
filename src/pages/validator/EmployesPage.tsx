@@ -38,6 +38,7 @@ const QUALIFICATIONS = [
   'AGENT DE NETTOYAGE',
   'AGENT DE JARDINAGE',
   "AGENT D'ACCUEIL",
+  "AGENT D'ORIENTATION",
   'AGENT ADMINISTRATIF',
   'AGENT',
   'SUPERVISEUR',
@@ -935,6 +936,11 @@ function EmployeeFormModal({
       if (form.statut === 'sorti' && !form.date_sortie) {
         throw new Error('Indiquez le dernier jour travaillé avant de marquer la sortie.')
       }
+      // À l'inscription, le jour de repos décide des journées qu'on va
+      // poser : sans lui, on pointerait quelqu'un sept jours sur sept.
+      if (!employee && !form.jour_de_repos) {
+        throw new Error('Choisissez son jour de repos : ses journées du mois en dépendent.')
+      }
       const payload = {
         site_id: form.site_id,
         // Vide à la création → matricule attribué automatiquement (dernier + 1)
@@ -971,10 +977,19 @@ function EmployeeFormModal({
         const { error } = await supabase.from('employees').update(payload).eq('id', employee.id)
         if (error) throw error
       } else {
-        const { error } = await supabase
+        const { data: cree, error } = await supabase
           .from('employees')
           .insert({ ...payload, company_id: companyId })
+          .select('id')
+          .single()
         if (error) throw error
+        // Le mois est rempli d'avance pour tout le monde : l'arrivant ne
+        // doit pas rester à zéro. Si cela échoue — mois clôturé, par
+        // exemple — la fiche existe quand même, et c'est l'essentiel.
+        const { error: erreurPointage } = await supabase.rpc('pointer_depuis_embauche', {
+          p_employee: cree.id,
+        })
+        if (erreurPointage) console.warn('Journées non posées :', erreurPointage.message)
       }
     },
     onSuccess: () => {
@@ -1141,14 +1156,16 @@ function EmployeeFormModal({
               ))}
             </select>
           ))}
-          {field('Jour de repos', (
+          {field(employee ? 'Jour de repos' : 'Jour de repos *', (
             <select value={form.jour_de_repos} onChange={(e) => set('jour_de_repos')(e.target.value)} className={inputCls}>
-              <option value="">Aucun</option>
+              <option value="">{employee ? 'Aucun' : '— Choisir —'}</option>
               {JOURS_SEMAINE.map((jour, i) => (
                 <option key={jour} value={i + 1}>{jour}</option>
               ))}
             </select>
-          ))}
+          ), !employee
+               ? 'Obligatoire : ses journées du mois se posent toutes seules, et c’est ce jour-là qu’elles épargnent.'
+               : undefined)}
           {/* Un agent de nuit ne se planifie pas comme une agente du matin. */}
           {field('Horaire', (
             <select value={form.horaire} onChange={(e) => set('horaire')(e.target.value)} className={inputCls}>

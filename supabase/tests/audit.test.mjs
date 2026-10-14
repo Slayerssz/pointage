@@ -278,6 +278,9 @@ section('Un mois complet, calculé à la main puis vérifié')
 
 // Trois profils, salaire 5 200, base 26 jours → une garde vaut 200,00 DH.
 const ePlein   = await employe('MOIS COMPLET',  { cin: 'AU3', cnss: '333333333' })
+// Celui-là travaillera 27 journées : un mois de 31 jours en offre plus
+// que la base. Son salaire ne doit pas monter pour autant.
+const eTrop    = await employe('VINGT SEPT',    { cin: 'AU6', cnss: '666666666' })
 const ePartiel = await employe('VINGT JOURS',   { cin: 'AU4', mode: 'Espece' })
 const eDemi    = await employe('DEMI GARDES',   { cin: 'AU5', cnss: '555555555' })
 
@@ -297,6 +300,12 @@ for (const j of joursAvril.slice(0, 20)) {
 for (const j of joursAvril.slice(0, 12)) {
   await q1(`select public.marquer_present($1,$2::date,'X05')`, [eDemi, j])
 }
+// Vingt-sept journées : au-delà de la base de 26.
+const joursAvrilTous = []
+for (let d = 1; d <= 30; d++) joursAvrilTous.push(`2026-04-${String(d).padStart(2, '0')}`)
+for (const j of joursAvrilTous.slice(0, 27)) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [eTrop, j])
+}
 
 const periode = (await q1(`select public.valider_pointage_mois($1,2026,4) as id`, [co])).id
 ok('le mois bascule en paie', !!periode)
@@ -310,6 +319,15 @@ ok('26 gardes sur base 26 → salaire entier, 5 200,00 DH',
    num(lPlein.salaire_brut) === 5200, String(lPlein.salaire_brut))
 ok('… soit 26 × 8 h = 208 heures', num(lPlein.heures_effectuees) === 208,
    String(lPlein.heures_effectuees))
+
+// Un mois complet paie un mois complet, jamais davantage.
+const lTrop = await ligne(eTrop)
+ok('27 journées travaillées sont bien comptées',
+   num(lTrop.gardes_travaillees) === 27, String(lTrop.gardes_travaillees))
+ok('… mais les jours payés s’arrêtent à la base de 26',
+   num(lTrop.jours_payes) === 26, String(lTrop.jours_payes))
+ok('… et le salaire reste le salaire entier, 5 200,00 DH',
+   num(lTrop.salaire_brut) === 5200, String(lTrop.salaire_brut))
 
 const lPartiel = await ligne(ePartiel)
 // 5 200 ÷ 26 × 20 = 200 × 20 = 4 000,00
@@ -1354,6 +1372,63 @@ await connecte(rh)
 await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
   /Action réservée/i)
+
+// ════════ UN ARRIVANT EST POINTÉ DÈS SON INSCRIPTION ════════
+// Le mois est rempli d'avance pour tout le monde ; celui qui arrive en
+// cours de mois ne doit pas rester à zéro.
+
+section('Pointer un nouvel arrivant')
+
+await connecte(bureau)
+const leMois = (await q1(
+  `select to_char(date_trunc('month', (now() at time zone 'Africa/Casablanca')), 'YYYY-MM-DD') d`)).d
+const ceJour = (await q1(
+  `select (now() at time zone 'Africa/Casablanca')::date::text d`)).d
+// Combien de jours du mois écoulés, dimanches exclus (repos = 7).
+const ouvresDuMois = num((await q1(
+  `select count(*) n from generate_series($1::date, $2::date, interval '1 day') d
+    where extract(isodow from d)::int <> 7`, [leMois, ceJour])).n)
+
+// Embauché au premier du mois : ses journées remontent jusque-là.
+const eArrive = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, jour_de_repos, date_embauche)
+   values ($1,$2,'ARRIVE EN COURS',7,$3::date) returning id`, [co, site, leMois])).id
+const poses = num((await q1(
+  `select public.pointer_depuis_embauche($1) n`, [eArrive])).n)
+ok('ses journées du mois sont posées depuis l’embauche', poses === ouvresDuMois,
+   `${poses} posées / ${ouvresDuMois} ouvrées`)
+ok('… son jour de repos est épargné',
+   num((await q1(`select count(*) n from public.pointages
+                   where employee_id=$1 and extract(isodow from pointed_on)=7`, [eArrive])).n) === 0)
+ok('… et rien n’est pointé dans l’avenir',
+   num((await q1(`select count(*) n from public.pointages
+                   where employee_id=$1 and pointed_on > $2::date`, [eArrive, ceJour])).n) === 0)
+
+// Relancer n'ajoute rien : ce qui est marqué reste marqué.
+ok('relancer n’inscrit rien de plus',
+   num((await q1(`select public.pointer_depuis_embauche($1) n`, [eArrive])).n) === 0)
+
+// Sans date d'embauche, on ne remonte pas : la journée du jour suffit.
+const eSansDate = await employe('SANS EMBAUCHE', { cin: 'AR2', cnss: '980000002' })
+ok('sans date d’embauche, on ne pose que le jour même',
+   num((await q1(`select public.pointer_depuis_embauche($1) n`, [eSansDate])).n) <= 1)
+
+// Embauché il y a trois jours : on ne remonte pas avant.
+const ilYATrois = (await q1(
+  `select ((now() at time zone 'Africa/Casablanca')::date - 3)::text d`)).d
+const eRecent = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, jour_de_repos, date_embauche)
+   values ($1,$2,'EMBAUCHE RECENTE',7,$3::date) returning id`, [co, site, ilYATrois])).id
+await q1(`select public.pointer_depuis_embauche($1)`, [eRecent])
+ok('on ne pointe pas avant l’embauche',
+   num((await q1(`select count(*) n from public.pointages
+                   where employee_id=$1 and pointed_on < $2::date`, [eRecent, ilYATrois])).n) === 0)
+
+// Le personnel sans rattachement ne pointe personne, même un arrivant.
+await connecte(rh)
+await refuse('le personnel non autorisé ne peut pas le faire',
+  `select public.pointer_depuis_embauche($1)`, [eArrive], /autorisé|réservé/i)
+await connecte(bureau)
 
 // ══════ DEUX RÔLES AU-DESSUS, ET LE JOURNAL DES GESTES ══════
 

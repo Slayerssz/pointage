@@ -175,7 +175,9 @@ function SiteWeekGrid({
   enabled: boolean
   onSelect: (sel: CellSelection) => void
 }) {
-  const employees = useSiteEmployees(site.id, enabled)
+  // La semaine affichée décide de qui doit y figurer : quelqu'un parti
+  // depuis reste sur les semaines qu'il a travaillées.
+  const employees = useSiteEmployees(site.id, enabled, { depuis: mondayIso })
   const pointages = useSiteWeekPointages(site.id, mondayIso, sundayIso, enabled)
   const dates = weekDates(new Date(mondayIso + 'T00:00:00'))
   const today = todayIso()

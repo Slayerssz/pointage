@@ -132,7 +132,14 @@ with attendu (numero, bloc, objet, present) as (
   (43, 'Détail des changements',   'colonne journal.details',
        exists (select 1 from information_schema.columns
                 where table_schema = 'public' and table_name = 'journal'
-                  and column_name = 'details'))
+                  and column_name = 'details')),
+  (44, 'Jours payés bornés',       'generer_lignes_paie plafonne',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                  and pg_get_functiondef(p.oid) like '%v_p.jours_base%) as jours_payes%')),
+  (45, 'Pointer un arrivant',      'fonction pointer_depuis_embauche',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'pointer_depuis_embauche'))
 )
 select numero,
        bloc,
