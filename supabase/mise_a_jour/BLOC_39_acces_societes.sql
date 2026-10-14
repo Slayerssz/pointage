@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 39 sur 45 — Le personnel pointe les sociétés qu'on lui confie
+--  BLOC 39 sur 46 — Le personnel pointe les sociétés qu'on lui confie
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 38.
 --

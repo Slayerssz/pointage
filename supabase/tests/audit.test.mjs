@@ -1373,6 +1373,58 @@ await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
   /Action réservée/i)
 
+// ═══════ UN DÉPART N'EMPORTE QUE SES PROPRES JOURNÉES ═══════
+// Le mois d'avril a été rempli du 1er au 26 pour MOIS COMPLET. S'il part
+// le 10, il ne doit plus être payé que pour ce qu'il a fait.
+
+section('Partir en cours de mois')
+
+await connecte(bureau)
+const eDixAvril = await employe('PART LE DIX', { cin: 'PD1', cnss: '990000001' })
+for (const j of joursAvril.slice(0, 26)) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [eDixAvril, j])
+}
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const avantSortie = await q1(
+  `select gardes_travaillees g, jours_payes jp from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eDixAvril])
+ok('avant son départ, il a ses 26 journées', num(avantSortie.g) === 26,
+   String(avantSortie.g))
+
+// Il part le 10 avril : les journées d'après ne sont plus les siennes.
+await db.query(`update public.employees set date_sortie='2026-04-10' where id=$1`, [eDixAvril])
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const apresSortie = await q1(
+  `select gardes_travaillees g, jours_payes jp, salaire_brut b from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eDixAvril])
+const ouvresJusquAu10 = joursAvril.slice(0, 26).filter((j) => j <= '2026-04-10').length
+ok('après son départ, la paie s’arrête à sa dernière journée',
+   num(apresSortie.g) === ouvresJusquAu10,
+   `${apresSortie.g} comptées / ${ouvresJusquAu10} travaillées`)
+ok('… et le salaire suit', num(apresSortie.b) === Math.round(5200 / 26 * ouvresJusquAu10 * 100) / 100,
+   String(apresSortie.b))
+
+// Parti avant le mois, il n'y paraît plus du tout.
+await db.query(`update public.employees set date_sortie='2026-03-31' where id=$1`, [eDixAvril])
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+ok('parti avant le mois, il ne paraît plus dans la paie',
+   num((await q1(`select count(*) n from public.lignes_paie
+                   where periode_id=$1 and employee_id=$2`, [periode, eDixAvril])).n) === 0)
+
+// Et le ménage des journées d'après : on ne les garde pas dans la grille.
+await db.query(`update public.employees set date_sortie='2026-04-10' where id=$1`, [eDixAvril])
+await connecte(bureau)
+const journeesRetirees = num((await q1(
+  `select public.nettoyer_pointages_apres_sortie($1) n`, [eDixAvril])).n)
+ok('les journées postérieures au départ sont retirées',
+   journeesRetirees === 26 - ouvresJusquAu10, `${journeesRetirees} retirées`)
+ok('… celles d’avant restent',
+   num((await q1(`select count(*) n from public.pointages
+                   where employee_id=$1`, [eDixAvril])).n) === ouvresJusquAu10)
+ok('… et recommencer ne retire rien de plus',
+   num((await q1(`select public.nettoyer_pointages_apres_sortie($1) n`, [eDixAvril])).n) === 0)
+
 // ════════ UN ARRIVANT EST POINTÉ DÈS SON INSCRIPTION ════════
 // Le mois est rempli d'avance pour tout le monde ; celui qui arrive en
 // cours de mois ne doit pas rester à zéro.

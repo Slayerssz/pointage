@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 30 sur 45 — Transport et panier, saisis à la paie
+--  BLOC 30 sur 46 — Transport et panier, saisis à la paie
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 29.
 --

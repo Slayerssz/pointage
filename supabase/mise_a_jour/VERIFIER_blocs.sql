@@ -139,7 +139,11 @@ with attendu (numero, bloc, objet, present) as (
                   and pg_get_functiondef(p.oid) like '%v_p.jours_base%) as jours_payes%')),
   (45, 'Pointer un arrivant',      'fonction pointer_depuis_embauche',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'public' and p.proname = 'pointer_depuis_embauche'))
+                where n.nspname = 'public' and p.proname = 'pointer_depuis_embauche')),
+  (46, 'Départ et journées',       'la paie borne au contrat',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                  and pg_get_functiondef(p.oid) like '%p.pointed_on <= e.date_sortie%'))
 )
 select numero,
        bloc,

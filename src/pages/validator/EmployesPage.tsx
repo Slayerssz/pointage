@@ -976,6 +976,15 @@ function EmployeeFormModal({
       if (employee) {
         const { error } = await supabase.from('employees').update(payload).eq('id', employee.id)
         if (error) throw error
+        // Le mois est posé d'avance : qui part le 3 garde les journées
+        // du 4 au 31, qu'il n'a pas faites. On les retire, pour que la
+        // grille dise la même chose que la paie.
+        if (payload.date_sortie) {
+          const { error: erreurMenage } = await supabase.rpc(
+            'nettoyer_pointages_apres_sortie', { p_employee: employee.id },
+          )
+          if (erreurMenage) console.warn('Journées non retirées :', erreurMenage.message)
+        }
       } else {
         const { data: cree, error } = await supabase
           .from('employees')

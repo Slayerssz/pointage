@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 43 sur 45 — Le journal dit ce qui a changé
+--  BLOC 43 sur 46 — Le journal dit ce qui a changé
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 42.
 --

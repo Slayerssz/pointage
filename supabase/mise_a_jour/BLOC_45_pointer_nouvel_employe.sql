@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 45 sur 45 — Un nouvel arrivant est pointé dès son inscription
+--  BLOC 45 sur 46 — Un nouvel arrivant est pointé dès son inscription
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 44.
 --

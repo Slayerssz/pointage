@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 44 sur 45 — Un mois complet paie un mois complet
+--  BLOC 44 sur 46 — Un mois complet paie un mois complet
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 43.
 --

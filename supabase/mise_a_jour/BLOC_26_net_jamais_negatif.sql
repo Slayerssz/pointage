@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 26 sur 45 — Un net à payer ne peut pas être négatif
+--  BLOC 26 sur 46 — Un net à payer ne peut pas être négatif
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run. À exécuter APRÈS le BLOC 25.
 --

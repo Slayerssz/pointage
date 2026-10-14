@@ -1,5 +1,5 @@
 -- ============================================================================
---  BLOC 9 sur 45 — Une seule dette par employé
+--  BLOC 9 sur 46 — Une seule dette par employé
 --  ============================================================
 --  Supabase → SQL Editor → coller → Run.  À exécuter APRÈS le BLOC 8.
 --
