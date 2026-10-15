@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { formatDateFr, todayIso } from '../../lib/dates'
 import { formatDH } from '../../lib/paie'
@@ -21,6 +21,7 @@ import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
 import { useSites, useSitesPrincipaux, useSociete } from '../../lib/queries'
 import ApercuEmploye from '../../components/ApercuEmploye'
+import DemanderDateSortie from '../../components/DemanderDateSortie'
 import { estAdministrateur } from '../../lib/roles'
 
 /**
@@ -81,6 +82,29 @@ export default function SortiesPage() {
   const { data: tousLesSites } = useSites(companyId)
   const { data: principaux } = useSitesPrincipaux(companyId)
   const [apercu, setApercu] = useState<Employee | null>(null)
+  // Corriger une date de sortie : ceux qu'on a marqués avant la mise à
+  // jour portent la date du jour, et non celle de leur vrai départ.
+  const [aCorriger, setACorriger] = useState<Employee | null>(null)
+  const qc = useQueryClient()
+
+  const corriger = useMutation({
+    mutationFn: async ({ id, date }: { id: string; date: string }) => {
+      const { error } = await supabase
+        .from('employees').update({ date_sortie: date }).eq('id', id)
+      if (error) throw error
+      // Les journées posées après le départ ne sont pas les siennes.
+      const { error: erreurMenage } = await supabase.rpc(
+        'nettoyer_pointages_apres_sortie', { p_employee: id },
+      )
+      if (erreurMenage) throw erreurMenage
+    },
+    onSuccess: () => {
+      for (const cle of ['employees-sortis', 'employees-actifs', 'employees',
+                         'lignes-paie', 'site-week-pointages', 'site-employees']) {
+        qc.invalidateQueries({ queryKey: [cle] })
+      }
+    },
+  })
 
   const { data: sorties } = useSorties(companyId)
   const [choisi, setChoisi] = useState<string>('')
@@ -113,11 +137,11 @@ export default function SortiesPage() {
         ) : (
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
             {(partis ?? []).map((e) => (
-              <li key={e.id}>
+              <li key={e.id} className="flex flex-wrap items-center">
                 <button
                   onClick={() => setApercu(e)}
                   title="Voir sa fiche"
-                  className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
+                  className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-slate-800">
@@ -142,6 +166,14 @@ export default function SortiesPage() {
                     <span className="text-slate-300">›</span>
                   </span>
                 </button>
+                <span className="shrink-0 px-4 py-2.5">
+                  <button
+                    onClick={() => setACorriger(e)}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    Modifier la date
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
@@ -196,6 +228,22 @@ export default function SortiesPage() {
             />
           )}
         </>
+      )}
+
+      {aCorriger && (
+        <DemanderDateSortie
+          nom={aCorriger.nom_prenom}
+          dateInitiale={aCorriger.date_sortie ?? undefined}
+          onConfirmer={(date) => {
+            corriger.mutate({ id: aCorriger.id, date })
+            setACorriger(null)
+          }}
+          onAnnuler={() => setACorriger(null)}
+        />
+      )}
+
+      {corriger.error && (
+        <ErrorNote>Date non enregistrée : {(corriger.error as Error).message}</ErrorNote>
       )}
 
       {apercu && (
