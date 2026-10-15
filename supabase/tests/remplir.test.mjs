@@ -214,123 +214,63 @@ await verifierLeRemplissage({
 })
 
 /**
- * Le mois en cours — REMPLIR_mois_courant_present.sql.
+ * Ce que le remplissage d'octobre ÉCARTE.
  *
- * Celui-ci ne porte aucune date : il trouve le mois lui-même. On ne peut
- * donc pas écrire les attendus à la main, ils sont tirés du calendrier au
- * moment où le test tourne. Et on vérifie en plus ce que les deux autres
- * fichiers ne font pas : une société dont le mois est clos est écartée
- * sans que le reste du groupe en souffre.
+ * Le scénario partagé ci-dessus vérifie ce qui est inscrit. Ici, ce qui
+ * ne doit pas l'être : quelqu'un dont on ignore le jour de repos — on
+ * lui poserait les 31 jours, repos compris — et une société dont le mois
+ * est déjà clos, qui ne doit pas pour autant bloquer le reste du groupe.
  */
-section('Remplir le mois en cours')
+section('Octobre — les écartés')
 {
-  const cal = await q1(`
-    select date_trunc('month', (now() at time zone 'Africa/Casablanca'))::date::text as debut,
-           ((date_trunc('month', (now() at time zone 'Africa/Casablanca'))
-              + interval '1 month - 1 day')::date)::text as fin`)
-  const debut = cal.debut
-  const fin = cal.fin
-  const compte = await q1(
-    `select count(*) as jours,
-            count(*) filter (where extract(isodow from g) = 7) as dimanches
-       from generate_series($1::date, $2::date, interval '1 day') g`, [debut, fin])
-  const jours = num(compte.jours)
-  const dimanches = num(compte.dimanches)
-  const ouvres = jours - dimanches
-  const jour = (n) => debut.slice(0, 8) + String(n).padStart(2, '0')
+  const DEBUT = '2026-10-01', FIN = '2026-10-31'
 
-  // Une deuxième société, dont le mois est déjà clôturé.
+  // Une deuxième société, dont octobre est déjà clôturé.
   await connecte(admin)
   const coClose = (await q1(`select public.admin_creer_entreprise('MOIS CLOS SARL') as id`)).id
   await connecte(bureau)
   const siteClose = (await q1(`select public.creer_site($1,'SITE CLOS') as id`, [coClose])).id
-  await db.query(
-    `insert into public.periodes_paie (company_id, annee, mois, statut)
-     values ($1, extract(year from $2::date)::int, extract(month from $2::date)::int,
-             'pointage_valide')`, [coClose, debut])
+  await db.exec(`insert into public.periodes_paie (company_id, annee, mois, statut)
+                 values ('${coClose}', 2026, 10, 'pointage_valide')`)
 
-  const emp = async (societe, lieu, nom, opts = {}) => (await q1(
-    `insert into public.employees (company_id, site_id, nom_prenom, jour_de_repos,
-                                   date_embauche, date_sortie)
-     values ($1,$2,$3,$4,$5,$6) returning id`,
-    [societe, lieu, nom, opts.repos ?? 7, opts.emb ?? null, opts.sortie ?? null])).id
+  const emp = async (societe, lieu, nom, repos) => (await q1(
+    `insert into public.employees (company_id, site_id, nom_prenom, jour_de_repos)
+     values ($1,$2,$3,$4) returning id`, [societe, lieu, nom, repos])).id
 
-  const cNormal = await emp(co, site, 'COURANT NORMAL')
-  const cMardi = await emp(co, site, 'COURANT REPOS MARDI', { repos: 2 })
-  const cTard = await emp(co, site, 'COURANT EMBAUCHE LE 15', { emb: jour(15) })
-  const cParti = await emp(co, site, 'COURANT PARTI LE 9', { sortie: jour(9) })
-  const cClos = await emp(coClose, siteClose, 'COURANT MOIS CLOS')
-
-  // Un M déjà posé le 3 : il doit rester M. Posé à la main, avec son
-  // propre horodatage, pour qu'il ne porte pas le repère du script.
-  // Le drapeau doit tenir d'une instruction à l'autre : PGlite ouvre une
-  // transaction par appel, d'où la portée session (false) et non locale.
-  await db.exec(`select set_config('app.pointage_manuel', 'on', false);`)
-  await db.query(
-    `insert into public.pointages (company_id, site_id, employee_id, agent_id,
-       pointed_at, pointed_on, status, type_garde, validated_by, validated_at)
-     values ($1,$2,$3,$4, now(), $5::date, 'validated', 'M', $4, now())`,
-    [co, site, cNormal, admin, jour(3)])
-  await db.exec(`select set_config('app.pointage_manuel', 'off', false);`)
+  const eSansRepos = await emp(co, site, 'SANS JOUR DE REPOS', null)
+  const eVendredi = await emp(co, site, 'REPOS VENDREDI', 5)
+  const eClos = await emp(coClose, siteClose, 'DANS LE MOIS CLOS', 7)
 
   const compterX = async (id) => num((await q1(
     `select count(*) as n from public.pointages
       where employee_id = $1 and type_garde = 'X'
-        and pointed_on between $2 and $3`, [id, debut, fin])).n)
-  const jt = async (id) => num((await q1(
-    `select jours_travailles as j from public.employees where id = $1`, [id])).j)
-  const marque = async () => num((await q1(
-    `select count(*) as n from public.pointages
-      where pointed_at = ($1::timestamp at time zone 'Africa/Casablanca')`, [debut])).n)
+        and pointed_on between $2 and $3`, [id, DEBUT, FIN])).n)
 
-  const avantCompteur = await jt(cNormal)
-  const bloc = fs.readFileSync(path.join(BLOCS, 'REMPLIR_mois_courant_present.sql'), 'utf8')
+  const bloc = fs.readFileSync(path.join(BLOCS, 'REMPLIR_octobre_present.sql'), 'utf8')
   await connecte(null)   // l'éditeur SQL : pas de session
   await db.exec(bloc)
 
-  ok(`le mois trouvé tout seul : ${debut} → ${fin} (${jours} jours)`, jours >= 28 && jours <= 31)
-  ok(`NORMAL : ${jours} jours − ${dimanches} dimanches − son M = ${ouvres - 1} X`,
-     (await compterX(cNormal)) === ouvres - 1, String(await compterX(cNormal)))
-  ok('… son M du 3 est resté M', num((await q1(
-    `select count(*) as n from public.pointages
-      where employee_id = $1 and pointed_on = $2::date and type_garde = 'M'`,
-    [cNormal, jour(3)])).n) === 1)
-  ok('… compteur augmenté des seules journées inscrites',
-     (await jt(cNormal)) === avantCompteur + ouvres - 1, String(await jt(cNormal)))
-
-  const joursDe = async (id) => (await rows(
-    `select pointed_on::text as d from public.pointages
-      where employee_id = $1 and pointed_on between $2 and $3 order by 1`,
-    [id, debut, fin])).map((r) => r.d)
-
-  ok('REPOS MARDI : aucun mardi', !(await rows(
+  ok('SANS JOUR DE REPOS : pas une seule journée posée',
+     (await compterX(eSansRepos)) === 0, String(await compterX(eSansRepos)))
+  ok('REPOS VENDREDI : aucun vendredi', !(await rows(
     `select 1 from public.pointages
-      where employee_id = $1 and extract(isodow from pointed_on) = 2`, [cMardi])).length)
-  ok('… mais les dimanches, oui', (await rows(
-    `select 1 from public.pointages
-      where employee_id = $1 and extract(isodow from pointed_on) = 7`, [cMardi])).length > 0)
-
-  const t = await joursDe(cTard)
-  ok('EMBAUCHÉ LE 15 : rien avant le 15', !t.some((d) => d < jour(15)))
-  ok('… et présent le 15', t.includes(jour(15)) || new Date(jour(15) + 'T12:00').getDay() === 0)
-
-  const p = await joursDe(cParti)
-  ok('PARTI LE 9 : rien après le 9', !p.some((d) => d > jour(9)))
-
+      where employee_id = $1 and extract(isodow from pointed_on) = 5`, [eVendredi])).length)
+  // Octobre 2026 commence un jeudi : cinq vendredis (2, 9, 16, 23, 30),
+  // donc 31 − 5 = 26 journées. Les lundis, eux, ne sont que quatre.
+  ok('… et les 26 autres journées, oui',
+     (await compterX(eVendredi)) === 26, String(await compterX(eVendredi)))
   ok('MOIS CLOS : sa société est écartée, pas un seul X',
-     (await compterX(cClos)) === 0, String(await compterX(cClos)))
-  ok('… et le reste du groupe est passé quand même', (await compterX(cNormal)) > 0)
+     (await compterX(eClos)) === 0, String(await compterX(eClos)))
+  ok('… et le reste du groupe est passé quand même', (await compterX(eVendredi)) > 0)
 
-  const avant = await marque()
+  // Le repos renseigné après coup : relancer le rattrape.
+  await db.query(`update public.employees set jour_de_repos = 1 where id = $1`, [eSansRepos])
   await db.exec(bloc)
-  ok('relancer le script n’inscrit rien de plus', avant === (await marque()),
-     `${avant} → ${await marque()}`)
-
-  // Un arrivant inscrit après le passage du script : le relancer le rattrape.
-  const cNeuf = await emp(co, site, 'COURANT ARRIVE APRES')
-  await db.exec(bloc)
-  ok('… mais rattrape bien un arrivant inscrit depuis',
-     (await compterX(cNeuf)) === ouvres, String(await compterX(cNeuf)))
+  ok('repos renseigné puis relance : il est rattrapé, sans ses lundis',
+     (await compterX(eSansRepos)) === 27, String(await compterX(eSansRepos)))
+  ok('… et aucun lundi', !(await rows(
+    `select 1 from public.pointages
+      where employee_id = $1 and extract(isodow from pointed_on) = 1`, [eSansRepos])).length)
 }
 
 console.log(`\n  ${F === 0 ? '✅' : '❌'}  ${P + F} vérifications, ${F} échec(s)`)
