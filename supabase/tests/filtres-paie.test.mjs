@@ -382,7 +382,7 @@ ok('… et ce qui est réécrit se relit à l’identique',
 // contredit lui-même — et c'est la banque qui le découvre.
 const { code: codeDh } = await transformWithOxc(
   fs.readFileSync('src/lib/dirhams.ts', 'utf8'), 'dh.ts', { lang: 'ts' })
-const { dirhams, totalDirhams } = await import(
+const { dirhams, ecrireDirhams, totalDirhams } = await import(
   'data:text/javascript;base64,' + Buffer.from(codeDh).toString('base64'))
 
 ok('2 000,50 part à 2 001', dirhams(2000.5) === 2001, String(dirhams(2000.5)))
@@ -399,6 +399,24 @@ ok('… et vaut toujours la colonne imprimée',
    totalDirhams(auHasard) === auHasard.reduce((s, l) => s + dirhams(l.net_a_payer), 0),
    String(totalDirhams(auHasard)))
 ok('une liste vide ne vaut pas NaN', totalDirhams([]) === 0)
+
+// La banque lit une colonne à deux décimales : on lui retire les
+// centimes, pas la virgule. « 3 115,00 », jamais « 3 115,38 ».
+ok('le montant imprimé garde sa virgule et deux décimales',
+   ecrireDirhams(3115.38) === '3 115,00', ecrireDirhams(3115.38))
+ok('… arrondies, pas tronquées', ecrireDirhams(2000.5) === '2 001,00',
+   ecrireDirhams(2000.5))
+ok('… y compris sur un rond', ecrireDirhams(1525) === '1 525,00', ecrireDirhams(1525))
+ok('… et sur un petit montant', ecrireDirhams(80) === '80,00', ecrireDirhams(80))
+ok('rien à écrire ne s’écrit pas', ecrireDirhams(null) === '' && ecrireDirhams(undefined) === '')
+// Les polices du PDF ne connaissent pas l'espace fine insécable et
+// l'impriment en barre oblique : le séparateur doit être une espace
+// ordinaire.
+ok('le séparateur de milliers est une espace ordinaire',
+   !/[  ]/.test(ecrireDirhams(1234567.89)), ecrireDirhams(1234567.89))
+ok('le total écrit égale la colonne écrite',
+   ecrireDirhams(totalDirhams(auHasard)) === '7 338,00',
+   ecrireDirhams(totalDirhams(auHasard)))
 
 // ── Le nom des onglets du classeur ───────────────────────────────────────
 // Excel refuse « : \\ / ? * [ ] » et s'arrête à 31 caractères ; un nom

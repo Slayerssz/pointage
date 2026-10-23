@@ -9,7 +9,7 @@
  */
 
 import { chargerImage } from './chargerImage'
-import { dirhams, totalDirhams } from './dirhams'
+import { ecrireDirhams, totalDirhams } from './dirhams'
 import { montantEnLettres } from './montantEnLettres'
 import { enteteDe } from './entetes'
 import { societeDe } from './societes'
@@ -119,7 +119,7 @@ export function papierDe(entreprise: string, modeleDocument?: string | null) {
 export const libelleOperations = (annee: number, mois: number) =>
   `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
 
-export { dirhams, totalDirhams } from './dirhams'
+export { dirhams, ecrireDirhams, totalDirhams } from './dirhams'
 
 export interface OrdreDeVirement {
   /** Ce qui identifie la feuille : le site, la banque… */
@@ -127,17 +127,8 @@ export interface OrdreDeVirement {
   lignes: LignePaie[]
 }
 
-/**
- * Un montant de virement : entier, séparateur de milliers, pas de
- * virgule. L'espace de groupement est forcée à l'espace ordinaire : les
- * polices intégrées au PDF ne connaissent pas l'espace fine insécable
- * que rend `toLocaleString`, et l'imprimaient en barre oblique —
- * « 2/970 » au lieu de « 2 970 ».
- */
-const n0 = (v: number | string | null | undefined) =>
-  v == null ? '' : dirhams(v)
-    .toLocaleString('fr-FR', { maximumFractionDigits: 0 })
-    .replace(/[\u202f\u00a0\s]/g, ' ')
+/** Le montant tel qu'il s'imprime : arrondi au dirham, décimales à 00. */
+const n0 = ecrireDirhams
 
 /**
  * Le modèle écrit les R.I.B. d'un seul tenant, sans séparateur. Mais

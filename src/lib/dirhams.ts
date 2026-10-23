@@ -22,3 +22,19 @@ export const dirhams = (v: number | string | null | undefined) =>
  */
 export const totalDirhams = (lignes: { net_a_payer: number | string }[]) =>
   lignes.reduce((s, l) => s + dirhams(l.net_a_payer), 0)
+
+/**
+ * Le montant tel qu'il s'imprime sur l'ordre : arrondi au dirham, puis
+ * écrit avec ses deux décimales — qui sont donc toujours « 00 ».
+ * « 3 115,00 », jamais « 3 115,38 ». La banque lit une colonne de
+ * montants à deux décimales ; ce sont les centimes qu'on ne veut pas,
+ * pas la virgule.
+ *
+ * L'espace de groupement est ramenée à l'espace ordinaire : les polices
+ * intégrées au PDF ne connaissent pas l'espace fine insécable et
+ * l'impriment en barre oblique — « 3/115,00 ».
+ */
+export const ecrireDirhams = (v: number | string | null | undefined) =>
+  v == null ? '' : dirhams(v)
+    .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .replace(/[\u202f\u00a0\s]/g, ' ')

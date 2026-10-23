@@ -47,8 +47,12 @@ const ENTETE = {
 /** Une cellule de corps : même police, même filet, même hauteur. */
 const CORPS = { ...POLICE, ...TRAIT, fontSize: 11, alignVertical: 'center', height: 25 } as const
 
-/** Pas de centimes : la banque vire des dirhams entiers. */
-const MONTANT = { type: Number, format: '#,##0' } as const
+/**
+ * Les montants sont arrondis au dirham ; le format en garde les deux
+ * décimales, qui valent donc toujours « 00 » — la banque lit une
+ * colonne à deux décimales.
+ */
+const MONTANT = { type: Number, format: '#,##0.00' } as const
 
 export async function exporterOrdreVirementExcel(opts: {
   ordres: OrdreDeVirement[]

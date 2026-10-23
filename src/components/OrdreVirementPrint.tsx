@@ -5,7 +5,7 @@ import PortailImpression from './PortailImpression'
 import {
   decouperOrdre, enregistrerOrdreVirementPdf, papierDe, veutLaFormule,
 } from '../lib/ordreVirementPdf'
-import { dirhams, totalDirhams } from '../lib/dirhams'
+import { ecrireDirhams, totalDirhams } from '../lib/dirhams'
 import { montantEnLettres } from '../lib/montantEnLettres'
 import { societeDe } from '../lib/societes'
 import type { LignePaie } from '../lib/types'
@@ -56,11 +56,11 @@ export default function OrdreVirementPrint({
   useModeImpression()
   const { pret, imprimer } = useImpression(0)
 
-  // La banque vire des dirhams entiers : 2 000, jamais 2 000,50. La même
-  // règle qu'au PDF, prise au même endroit — sinon la feuille affichée
-  // et le fichier enregistré annonceraient deux sommes différentes.
-  const n0 = (v: number | null | undefined) =>
-    v == null ? '' : dirhams(v).toLocaleString('fr-FR', { maximumFractionDigits: 0 })
+  // La banque vire des dirhams entiers : les centimes sont arrondis, et
+  // les décimales imprimées valent donc toujours « 00 ». La même règle
+  // qu'au PDF, prise au même endroit — sinon la feuille affichée et le
+  // fichier enregistré annonceraient deux sommes différentes.
+  const n0 = ecrireDirhams
   // Le modèle écrit les R.I.B. d'un seul tenant. Une société qui en a
   // deux les annonce avec le nom de chaque banque : dès qu'il y a autre
   // chose que des chiffres, on respecte ce qui a été saisi.
