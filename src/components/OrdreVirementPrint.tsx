@@ -5,6 +5,7 @@ import PortailImpression from './PortailImpression'
 import {
   decouperOrdre, enregistrerOrdreVirementPdf, papierDe, veutLaFormule,
 } from '../lib/ordreVirementPdf'
+import { dirhams, totalDirhams } from '../lib/dirhams'
 import { montantEnLettres } from '../lib/montantEnLettres'
 import { societeDe } from '../lib/societes'
 import type { LignePaie } from '../lib/types'
@@ -55,8 +56,11 @@ export default function OrdreVirementPrint({
   useModeImpression()
   const { pret, imprimer } = useImpression(0)
 
-  const n2 = (v: number | null | undefined) =>
-    v == null ? '' : Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // La banque vire des dirhams entiers : 2 000, jamais 2 000,50. La même
+  // règle qu'au PDF, prise au même endroit — sinon la feuille affichée
+  // et le fichier enregistré annonceraient deux sommes différentes.
+  const n0 = (v: number | null | undefined) =>
+    v == null ? '' : dirhams(v).toLocaleString('fr-FR', { maximumFractionDigits: 0 })
   // Le modèle écrit les R.I.B. d'un seul tenant. Une société qui en a
   // deux les annonce avec le nom de chaque banque : dès qu'il y a autre
   // chose que des chiffres, on respecte ce qui a été saisi.
@@ -117,7 +121,7 @@ export default function OrdreVirementPrint({
 
             return pages.map((page, p) => {
               // Chaque feuille ne totalise que ses propres virements.
-              const total = page.reduce((s, l) => s + Number(l.net_a_payer), 0)
+              const total = totalDirhams(page)
 
               return (
                 <article
@@ -167,7 +171,7 @@ export default function OrdreVirementPrint({
                       </tr>
                       <tr>
                         <td style={gras}>MONTANT TOTAL D'OPERATIONS</td>
-                        <td style={{ ...cell, fontWeight: 700 }}>{n2(total)}</td>
+                        <td style={{ ...cell, fontWeight: 700 }}>{n0(total)}</td>
                       </tr>
                       <tr>
                         <td style={gras}>LIBELLE OPERATIONS</td>
@@ -204,7 +208,7 @@ export default function OrdreVirementPrint({
                             {rib(l.rib) || <span style={{ color: '#b00', fontFamily: 'inherit' }}>R.I.B. MANQUANT</span>}
                           </td>
                           <td style={{ ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                            {n2(l.net_a_payer)}
+                            {n0(l.net_a_payer)}
                           </td>
                         </tr>
                       ))}
