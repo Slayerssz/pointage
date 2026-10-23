@@ -1,9 +1,14 @@
+import type React from 'react'
 import { enteteDe } from '../lib/entetes'
+import { papierDe } from '../lib/ordreVirementPdf'
 import { formatDateFr } from '../lib/dates'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
 import { enregistrerListeSimplifieePdf } from '../lib/listeSimplifieePdf'
+import {
+  decouperListeSimplifiee, titreSurUneLigne, type MesuresPage,
+} from '../lib/listeSimplifieeMiseEnPage'
 import type { Employee } from '../lib/types'
 
 /**
@@ -13,9 +18,14 @@ import type { Employee } from '../lib/types'
  * c'est ce que le client a le droit de voir. Ni salaire, ni adresse, ni
  * téléphone, contrairement à la liste complète qui, elle, reste interne.
  *
- * La mise en page suit le modèle papier : marché en haut à gauche, titre
- * et établissement centrés et soulignés, bandeau de période, tableau à
- * quatre colonnes, mentions légales en pied.
+ * Elle s'imprime sur le papier à en-tête de la société, comme l'ordre de
+ * virement : le bandeau et les mentions légales viennent du papier, on
+ * n'écrit que dans la bande qu'il laisse libre. La fiche d'une seule
+ * personne, elle, garde son propre en-tête — c'est un autre document.
+ *
+ * Une page par feuille, découpée ici plutôt que laissée au navigateur :
+ * chaque feuille doit reposer sur le papier, et une page que le
+ * navigateur coupe où il veut déborderait sur le pied imprimé.
  */
 export default function ListeSimplifieePrint({
   employees,
@@ -46,173 +56,185 @@ export default function ListeSimplifieePrint({
   useModeImpression()
 
   const entete = enteteDe(entreprise, modeleDocument)
-  const { pret, imprimer } = useImpression(entete.logo ? 1 : 0)
-  const pied = entete.pied
+  // Le papier de la société et la bande qu'il laisse libre : l'aperçu se
+  // cale exactement sur ce que dessinera le PDF.
+  const { papier, haut, bas } = papierDe(entreprise, modeleDocument)
+  const { pret, imprimer } = useImpression(!papier && entete.logo ? 1 : 0)
+  const pied = papier ? null : entete.pied
+
+  const surUneLigne = titreSurUneLigne(intitule, etablissement)
+  const mesures: MesuresPage = {
+    haut, bas,
+    avecMarche: Boolean(marche.trim()),
+    lignesDeTitre: surUneLigne ? 1 : 2,
+  }
+  const pages = decouperListeSimplifiee(employees, mesures)
 
   // Le bandeau et l'en-tête du tableau reprennent la couleur de la société,
   // très éclaircie : le document reste lisible en noir et blanc.
   const teinte = `color-mix(in srgb, ${entete.accent} 22%, white)`
+  const aplat = { printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' } as const
+  // L'interligne est fixé : celui du reste de l'application est à 1,5,
+  // ce qui donnait des rangées d'un millimètre plus hautes qu'au PDF —
+  // de quoi faire déborder la dernière de la bande libre du papier.
+  const cellule: React.CSSProperties = {
+    border: '1px solid #000', padding: '0.9mm 2mm', lineHeight: 1.15,
+  }
+
+  const nomFichier =
+    `Liste_${marche.replace(/[^\w]+/g, '-') || 'marche'}_${entreprise.replace(/\s+/g, '_')}`
 
   return (
     <PortailImpression>
       <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-800/60 print:static print:bg-white">
         <BarreImpression
-          titre={`${intitule} — ${employees.length} agent(s)`}
+          titre={`${intitule} — ${employees.length} agent(s), ${pages.length} page(s)`}
           pret={pret}
           imprimer={imprimer}
-          nomFichier={`Liste_${marche.replace(/[^\w]+/g, '-') || 'marche'}_${entreprise.replace(/\s+/g, '_')}`}
+          nomFichier={nomFichier}
           genererPdf={() =>
             enregistrerListeSimplifieePdf({
               employees, entreprise, modeleDocument, marche, intitule, etablissement,
-              du, au,
-              nomFichier: `Liste_${marche.replace(/[^\w]+/g, '-') || 'marche'}_${entreprise.replace(/\s+/g, '_')}`,
+              du, au, nomFichier,
             })
           }
           onClose={onClose}
         />
 
-        <article
-          /* À l'écran, la colonne flexible pousse les mentions légales
-             en bas de la feuille. À l'impression, le document redevient
-             un bloc ordinaire : une colonne flexible se coupe mal, et
-             c'est ce qui envoyait tout le tableau à la page suivante. */
-          className="document-imprimable mx-auto my-6 flex min-h-[277mm] flex-col bg-white shadow-xl print:my-0 print:block print:shadow-none"
-          style={{ width: '186mm', padding: '10mm 12mm', color: '#000', fontSize: '10pt' }}
-        >
-          {/* En-tête de la société */}
-          <header className="text-center">
-            {entete.logo ? (
-              <img
-                src={entete.logo}
-                alt={entreprise}
-                style={{ height: '28mm', margin: '0 auto', objectFit: 'contain' }}
-              />
-            ) : (
-              <p className="text-lg font-bold uppercase" style={{ color: entete.accent }}>
-                {entreprise}
-              </p>
-            )}
-          </header>
-
-          {marche.trim() && (
-            <p className="mt-6 font-semibold" style={{ fontSize: '11pt' }}>
-              MARCHE N°: {marche}
-            </p>
-          )}
-
-          <div className={`text-center ${marche.trim() ? 'mt-5' : 'mt-8'}`}>
-            <h1 className="font-bold underline" style={{ fontSize: '13pt' }}>
-              {intitule}
-            </h1>
-            <h2 className="mt-1 font-bold underline" style={{ fontSize: '12pt' }}>
-              {etablissement}
-            </h2>
-          </div>
-
-          {/* Bandeau de période, à la largeur du tableau */}
-          <div className="mx-auto mt-6" style={{ width: '82%' }}>
-            <p
-              className="py-1.5 text-center font-semibold italic"
+        <div className="document-imprimable">
+          {pages.map((liste, p) => (
+            <article
+              key={p}
+              className="mx-auto my-6 bg-white shadow-xl print:my-0 print:shadow-none"
               style={{
-                background: teinte,
-                border: '1px solid #000',
-                fontSize: '11pt',
-                printColorAdjust: 'exact',
-                WebkitPrintColorAdjust: 'exact',
+                width: '210mm', minHeight: '297mm',
+                padding: `${haut}mm 12mm ${297 - bas}mm`,
+                backgroundImage: papier ? `url(${papier.image})` : undefined,
+                backgroundSize: '210mm 297mm',
+                backgroundRepeat: 'no-repeat',
+                color: '#000', fontSize: '10pt', breakAfter: 'page',
               }}
             >
-              Période Du {formatDateFr(du)} Au {formatDateFr(au)}
-            </p>
+              {/* Le titre n'est porté que par la première feuille ; les
+                  suivantes reprennent seulement l'en-tête des colonnes. */}
+              {p === 0 && (
+                <>
+                  {!papier && (
+                    <header className="text-center">
+                      {entete.logo ? (
+                        <img
+                          src={entete.logo}
+                          alt={entreprise}
+                          style={{ height: '26mm', margin: '0 auto', objectFit: 'contain' }}
+                        />
+                      ) : (
+                        <p className="text-lg font-bold uppercase" style={{ color: entete.accent }}>
+                          {entreprise}
+                        </p>
+                      )}
+                    </header>
+                  )}
 
-            <table className="tableau-long w-full border-collapse" style={{ borderTop: 'none' }}>
-              <thead>
-                <tr
-                  style={{
-                    background: teinte,
-                    printColorAdjust: 'exact',
-                    WebkitPrintColorAdjust: 'exact',
-                  }}
-                >
-                  {['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS'].map((c, i) => (
-                    <th
-                      key={c}
-                      className="px-2 py-1.5 font-bold italic"
-                      style={{
-                        border: '1px solid #000',
-                        fontSize: '10pt',
-                        width: i === 0 ? '12%' : i === 1 ? '46%' : '21%',
-                      }}
-                    >
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((e, i) => (
-                  <tr key={e.id}>
-                    <td
-                      className="px-2 py-2 text-center"
-                      style={{ border: '1px solid #000' }}
-                    >
-                      {i + 1}
-                    </td>
-                    <td className="px-2 py-2 italic" style={{ border: '1px solid #000' }}>
-                      {e.nom_prenom}
-                    </td>
-                    <td
-                      className="px-2 py-2 text-center"
-                      style={{ border: '1px solid #000' }}
-                    >
-                      {e.cin || '—'}
-                    </td>
-                    <td
-                      className="px-2 py-2 text-center tabular-nums"
-                      style={{ border: '1px solid #000' }}
-                    >
-                      {e.cnss || '—'}
-                    </td>
+                  {marche.trim() && (
+                    <p className="font-semibold" style={{ fontSize: '11pt', marginBottom: '2mm' }}>
+                      MARCHE N°: {marche}
+                    </p>
+                  )}
+
+                  {/* L'établissement tient sur la ligne du titre quand il
+                      est court ; un nom long passe en dessous plutôt que
+                      de déborder. */}
+                  <div className="text-center" style={{ marginBottom: '4mm' }}>
+                    <h1 className="font-bold underline" style={{ fontSize: '13pt' }}>
+                      {intitule}
+                      {surUneLigne && etablissement.trim() && <> — {etablissement}</>}
+                    </h1>
+                    {!surUneLigne && etablissement.trim() && (
+                      <h2 className="font-bold underline" style={{ fontSize: '12pt' }}>
+                        {etablissement}
+                      </h2>
+                    )}
+                  </div>
+
+                  <p
+                    className="text-center font-semibold italic"
+                    style={{
+                      background: teinte, border: '1px solid #000', borderBottom: 'none',
+                      fontSize: '11pt', padding: '1.4mm 0', ...aplat,
+                    }}
+                  >
+                    Période Du {formatDateFr(du)} Au {formatDateFr(au)}
+                  </p>
+                </>
+              )}
+
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr style={{ background: teinte, ...aplat }}>
+                    {['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS'].map((c, i) => (
+                      <th
+                        key={c}
+                        className="font-bold italic"
+                        style={{
+                          ...cellule, fontSize: '10pt',
+                          width: i === 0 ? '12%' : i === 1 ? '46%' : '21%',
+                        }}
+                      >
+                        {c}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {liste.map((e, i) => (
+                    <tr key={e.id}>
+                      <td style={{ ...cellule, textAlign: 'center' }}>
+                        {pages.slice(0, p).reduce((t, l) => t + l.length, 0) + i + 1}
+                      </td>
+                      <td className="italic" style={cellule}>{e.nom_prenom}</td>
+                      <td style={{ ...cellule, textAlign: 'center' }}>{e.cin || '—'}</td>
+                      <td
+                        className="tabular-nums"
+                        style={{ ...cellule, textAlign: 'center' }}
+                      >
+                        {e.cnss || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-          {/* Les mentions légales, poussées en bas de page. Toutes les
-              sociétés n'en impriment pas : sans elles, la page se termine
-              simplement après le tableau. */}
-          {pied && (
-            <footer className="mt-auto pt-8">
-                <div
-                  style={{
-                    height: '2.5mm',
-                    background: entete.accent,
-                    printColorAdjust: 'exact',
-                    WebkitPrintColorAdjust: 'exact',
-                  }}
-                />
-                <div className="pt-1.5 text-center leading-snug" style={{ fontSize: '7pt' }}>
-                  <p className="font-semibold">Siège Social : {pied.siegeSocial}</p>
-                  <p>
-                    {[
-                      pied.if && `IF : ${pied.if}`,
-                      pied.rc && `RC : ${pied.rc}`,
-                      pied.patente && `PATENTE : ${pied.patente}`,
-                      pied.cnss && `CNSS : ${pied.cnss}`,
-                      pied.ice && `ICE : ${pied.ice}`,
-                    ].filter(Boolean).join('   ')}
-                  </p>
-                  <p>
-                    {[
-                      pied.rib && `${pied.banque ?? 'RIB'} : ${pied.rib}`,
-                      pied.tel && `TEL : ${pied.tel}`,
-                      pied.mail && `MAIL : ${pied.mail}`,
-                    ].filter(Boolean).join('   ')}
-                  </p>
-                </div>
-            </footer>
-          )}
-        </article>
+              {/* Sans papier à en-tête, les mentions légales ferment la
+                  dernière feuille — c'est le papier qui les porte sinon. */}
+              {pied && p === pages.length - 1 && (
+                <footer style={{ marginTop: '8mm' }}>
+                  <div style={{ height: '2.5mm', background: entete.accent, ...aplat }} />
+                  <div className="pt-1.5 text-center leading-snug" style={{ fontSize: '7pt' }}>
+                    <p className="font-semibold">Siège Social : {pied.siegeSocial}</p>
+                    <p>
+                      {[
+                        pied.if && `IF : ${pied.if}`,
+                        pied.rc && `RC : ${pied.rc}`,
+                        pied.patente && `PATENTE : ${pied.patente}`,
+                        pied.cnss && `CNSS : ${pied.cnss}`,
+                        pied.ice && `ICE : ${pied.ice}`,
+                      ].filter(Boolean).join('   ')}
+                    </p>
+                    <p>
+                      {[
+                        pied.rib && `${pied.banque ?? 'RIB'} : ${pied.rib}`,
+                        pied.tel && `TEL : ${pied.tel}`,
+                        pied.mail && `MAIL : ${pied.mail}`,
+                      ].filter(Boolean).join('   ')}
+                    </p>
+                  </div>
+                </footer>
+              )}
+            </article>
+          ))}
+        </div>
+
+        <style>{`@media print { @page { size: A4 portrait; margin: 0; } }`}</style>
       </div>
     </PortailImpression>
   )

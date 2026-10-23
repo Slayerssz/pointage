@@ -1,6 +1,11 @@
 import { chargerImage } from './chargerImage'
 import { formatDateFr } from './dates'
 import { enteteDe } from './entetes'
+import { papierDe } from './ordreVirementPdf'
+import {
+  H_BANDEAU, H_MARCHE, H_TITRE, decouperListeSimplifiee, titreSurUneLigne,
+  type MesuresPage,
+} from './listeSimplifieeMiseEnPage'
 import type { Employee } from './types'
 
 /**
@@ -10,10 +15,10 @@ import type { Employee } from './types'
  * passait par une capture d'écran, qui perd les filets d'un tableau à
  * bordures fusionnées et rendait une colonne de texte nu.
  *
- * Le dessin suit le modèle papier, dans le même ordre : le logo, le
- * numéro de marché, les deux titres soulignés, le bandeau de période,
- * le tableau à quatre colonnes, et les mentions légales en pied — une
- * seule fois, à la fin, comme à l'impression.
+ * Elle est posée sur le papier à en-tête de la société, comme l'ordre de
+ * virement : le logo et les mentions légales viennent du papier, et on
+ * n'écrit que dans la bande qu'il laisse libre. Le découpage en pages
+ * est celui de l'aperçu — la même fonction les sert tous les deux.
  */
 
 /** « #0f2155 » → [15, 33, 85]. Noir si la couleur n'est pas lisible. */
@@ -41,7 +46,7 @@ export async function dessinerListeSimplifiee(opts: {
   du: string
   au: string
   /** Injectable pour les essais hors navigateur. */
-  logoCharge?: (url: string) => Promise<string | null>
+  papierCharge?: (url: string) => Promise<string | null>
 }) {
   const [{ jsPDF }, autoTableMod] = await Promise.all([
     import('jspdf'), import('jspdf-autotable'),
@@ -50,94 +55,129 @@ export async function dessinerListeSimplifiee(opts: {
   const { employees, entreprise, marche, intitule, etablissement } = opts
 
   const entete = enteteDe(entreprise, opts.modeleDocument)
-  const logo = entete.logo
-    ? await (opts.logoCharge ?? chargerImage)(entete.logo)
+  const { papier, haut, bas } = papierDe(entreprise, opts.modeleDocument)
+  const image = papier
+    ? await (opts.papierCharge ?? chargerImage)(papier.image)
+    : null
+  // Sans papier, le logo seul tient lieu d'en-tête.
+  const logo = !image && entete.logo
+    ? await (opts.papierCharge ?? chargerImage)(entete.logo)
     : null
   const teinte = eclaircir(entete.accent, 0.22)
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const largeur = doc.internal.pageSize.getWidth()
-  const hauteur = doc.internal.pageSize.getHeight()
-  const MARGE = 14
-  let y = 14
+  const MARGE = 12
+  const DISPO = largeur - 2 * MARGE
 
-  // Le logo, centré, sur 28 mm de haut au plus — ses proportions sont
-  // gardées : un logo étiré se remarque tout de suite.
-  if (logo) {
-    const p = doc.getImageProperties(logo)
-    const h = 26
-    const l = (p.width / p.height) * h
-    doc.addImage(logo, (largeur - l) / 2, y, l, h)
-    y += h + 6
-  } else {
-    doc.setFontSize(15).setFont('helvetica', 'bold').setTextColor(...versRvb(entete.accent))
-    doc.text(entreprise.toUpperCase(), largeur / 2, y + 7, { align: 'center' })
-    doc.setTextColor(0)
-    y += 14
+  const surUneLigne = titreSurUneLigne(intitule, etablissement)
+  const mesures: MesuresPage = {
+    haut, bas,
+    avecMarche: Boolean(marche.trim()),
+    lignesDeTitre: surUneLigne ? 1 : 2,
+  }
+  const pages = decouperListeSimplifiee(employees, mesures)
+
+  /**
+   * Pose le papier sur la feuille courante, sous tout le reste.
+   *
+   * `preparee` retient la feuille qu'on vient de préparer soi-même. Sans
+   * elle, le crochet d'autotable reposait le papier sur la première page
+   * APRÈS qu'on y eut écrit le titre : l'image est opaque, et le titre
+   * disparaissait dessous.
+   */
+  let preparee = 0
+  const poserLePapier = () => {
+    if (image) doc.addImage(image, 'JPEG', 0, 0, 210, 297)
+    preparee = doc.getNumberOfPages()
   }
 
-  if (marche.trim()) {
-    doc.setFontSize(11).setFont('helvetica', 'bold').setTextColor(0)
-    doc.text(`MARCHE N°: ${marche}`, MARGE, y)
-    y += 8
-  }
-
-  // Les deux titres, centrés et soulignés comme sur le modèle.
-  const titreSouligne = (texte: string, taille: number) => {
-    doc.setFontSize(taille).setFont('helvetica', 'bold')
-    doc.text(texte, largeur / 2, y, { align: 'center' })
-    const l = doc.getTextWidth(texte)
-    doc.setLineWidth(0.3)
-    doc.line((largeur - l) / 2, y + 1.1, (largeur + l) / 2, y + 1.1)
-    y += taille * 0.52 + 3
-  }
-  titreSouligne(intitule, 13)
-  titreSouligne(etablissement, 11)
-  y += 4
-
-  // Le bandeau de période, à la largeur du tableau.
-  const LARGEUR_TABLE = largeur - 2 * MARGE
-  const HAUT_BANDEAU = 8
-  doc.setFillColor(...teinte)
-  doc.setDrawColor(0)
-  doc.setLineWidth(0.2)
-  doc.rect(MARGE, y, LARGEUR_TABLE, HAUT_BANDEAU, 'FD')
-  doc.setFontSize(11).setFont('helvetica', 'bolditalic')
-  doc.text(
-    `Période Du ${formatDateFr(opts.du)} Au ${formatDateFr(opts.au)}`,
-    largeur / 2, y + HAUT_BANDEAU / 2 + 1.5, { align: 'center' },
-  )
-  y += HAUT_BANDEAU
-
-  const parts = [0.12, 0.46, 0.21, 0.21]
+  const colonnes = [0.12, 0.46, 0.21, 0.21]
   const styleColonne: Record<number, object> = {}
-  parts.forEach((p, i) => {
+  colonnes.forEach((p, i) => {
     styleColonne[i] = {
-      cellWidth: LARGEUR_TABLE * p,
+      cellWidth: DISPO * p,
       halign: i === 1 ? 'left' : 'center',
       ...(i === 1 ? { fontStyle: 'italic' } : {}),
     }
   })
 
-  autoTable(doc, {
-    startY: y,
-    head: [['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS']],
-    body: employees.map((e, i) => [
-      String(i + 1), e.nom_prenom, e.cin || '—', e.cnss || '—',
-    ]),
-    theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 1.8, lineColor: [0, 0, 0], lineWidth: 0.2 },
-    headStyles: {
-      fillColor: teinte, textColor: 0, fontStyle: 'bolditalic', halign: 'center', fontSize: 10,
-    },
-    columnStyles: styleColonne,
-    margin: { left: MARGE, right: MARGE, top: 14 },
+  let numero = 0
+  pages.forEach((liste, p) => {
+    if (p > 0) doc.addPage('a4', 'portrait')
+    poserLePapier()
+    let y = haut
+
+    if (p === 0) {
+      if (logo) {
+        const prop = doc.getImageProperties(logo)
+        const h = 24
+        doc.addImage(logo, (largeur - (prop.width / prop.height) * h) / 2, y,
+                     (prop.width / prop.height) * h, h)
+        y += h + 4
+      }
+
+      if (marche.trim()) {
+        doc.setFontSize(11).setFont('helvetica', 'bold').setTextColor(0)
+        doc.text(`MARCHE N°: ${marche}`, MARGE, y + 5)
+        y += H_MARCHE
+      }
+
+      // Les titres, centrés et soulignés comme sur le modèle. Un
+      // établissement court rejoint le titre ; un nom long passe dessous.
+      const souligne = (texte: string, taille: number) => {
+        doc.setFontSize(taille).setFont('helvetica', 'bold').setTextColor(0)
+        doc.text(texte, largeur / 2, y + taille * 0.42, { align: 'center' })
+        const l = Math.min(doc.getTextWidth(texte), DISPO)
+        doc.setLineWidth(0.3)
+        doc.line((largeur - l) / 2, y + taille * 0.42 + 1.1,
+                 (largeur + l) / 2, y + taille * 0.42 + 1.1)
+        y += H_TITRE
+      }
+      souligne(
+        surUneLigne && etablissement.trim() ? `${intitule} — ${etablissement}` : intitule,
+        13,
+      )
+      if (!surUneLigne && etablissement.trim()) souligne(etablissement, 12)
+      y += 4
+
+      // Le bandeau de période, à la largeur du tableau.
+      doc.setFillColor(...teinte).setDrawColor(0).setLineWidth(0.2)
+      doc.rect(MARGE, y, DISPO, H_BANDEAU, 'FD')
+      doc.setFontSize(11).setFont('helvetica', 'bolditalic')
+      doc.text(
+        `Période Du ${formatDateFr(opts.du)} Au ${formatDateFr(opts.au)}`,
+        largeur / 2, y + H_BANDEAU / 2 + 1.5, { align: 'center' },
+      )
+      y += H_BANDEAU
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [['N°', 'NOM ET PRENOM', 'N°CIN', 'N° DE CNSS']],
+      body: liste.map((e) => {
+        numero += 1
+        return [String(numero), e.nom_prenom, e.cin || '—', e.cnss || '—']
+      }),
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 1.1, lineColor: [0, 0, 0], lineWidth: 0.2 },
+      headStyles: {
+        fillColor: teinte, textColor: 0, fontStyle: 'bolditalic', halign: 'center', fontSize: 10,
+      },
+      columnStyles: styleColonne,
+      margin: { left: MARGE, right: MARGE, top: haut, bottom: 297 - bas },
+      // Si une page devait tout de même déborder, elle reposerait quand
+      // même sur le papier : une feuille blanche au milieu se verrait.
+      // Celle qu'on vient de préparer, en revanche, a déjà le sien.
+      willDrawPage: () => {
+        if (doc.getNumberOfPages() !== preparee) poserLePapier()
+      },
+    })
   })
 
-  // Les mentions légales, une seule fois, en bas de la dernière page.
-  // Toutes les sociétés n'en impriment pas : sans elles, la page se
-  // termine simplement après le tableau.
-  const pied = entete.pied
+  // Les mentions légales ne sont imprimées que faute de papier : c'est
+  // lui qui les porte, et les répéter ferait doublon.
+  const pied = image ? null : entete.pied
   if (pied) {
     const fin = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
     const lignes = [
@@ -150,13 +190,10 @@ export async function dessinerListeSimplifiee(opts: {
        pied.mail && `MAIL : ${pied.mail}`].filter(Boolean).join('   '),
     ].filter((l) => l.trim())
 
-    // En bas de page si la place le permet, juste sous le tableau sinon.
-    const hautPied = lignes.length * 3.4 + 4
-    const yPied = Math.max(fin + 8, hauteur - MARGE - hautPied)
-
+    const yPied = Math.max(fin + 8, 297 - 14 - (lignes.length * 3.4 + 4))
     doc.setFillColor(...versRvb(entete.accent))
-    doc.rect(MARGE, yPied, LARGEUR_TABLE, 2.5, 'F')
-    doc.setFontSize(7).setFont('helvetica', 'normal').setTextColor(0)
+    doc.rect(MARGE, yPied, DISPO, 2.5, 'F')
+    doc.setFontSize(7).setTextColor(0)
     lignes.forEach((l, i) => {
       doc.setFont('helvetica', i === 0 ? 'bold' : 'normal')
       doc.text(l, largeur / 2, yPied + 6 + i * 3.4, { align: 'center' })

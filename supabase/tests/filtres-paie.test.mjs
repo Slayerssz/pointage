@@ -160,6 +160,59 @@ ok('choisir l’annexe isolée prend son monde',
 ok('personne ne se perd en route',
    [...choix.values()].flat().length === POUR_VIREMENT.length)
 
+// ── La liste simplifiée se pose sur le papier à en-tête ────────────────
+// Le papier impose sa bande libre : celui d'Al Safae s'arrête à 239 mm,
+// celui de Megainter descend à 274. L'un tient donc plusieurs lignes de
+// moins que l'autre, et la première page en tient moins que les autres
+// puisqu'elle porte le titre. Le PDF et l'aperçu appellent cette même
+// fonction : s'ils paginaient différemment, l'écran cesserait de
+// ressembler au papier.
+const { code: codeMep } = await transformWithOxc(
+  fs.readFileSync('src/lib/listeSimplifieeMiseEnPage.ts', 'utf8'), 'mep.ts', { lang: 'ts' })
+const { paginerListeSimplifiee, decouperListeSimplifiee, titreSurUneLigne, LIGNE } =
+  await import('data:text/javascript;base64,' + Buffer.from(codeMep).toString('base64'))
+
+const LARGE = { haut: 45, bas: 268, avecMarche: true, lignesDeTitre: 1 }  // Vigilma
+const ETROIT = { haut: 60, bas: 239, avecMarche: true, lignesDeTitre: 1 } // Al Safae
+
+ok('une liste courte tient sur une feuille',
+   paginerListeSimplifiee(12, LARGE).join('+') === '12', paginerListeSimplifiee(12, LARGE).join('+'))
+ok('la première page en tient moins que les suivantes',
+   paginerListeSimplifiee(200, LARGE)[0] < paginerListeSimplifiee(200, LARGE)[1],
+   paginerListeSimplifiee(200, LARGE).slice(0, 2).join(' puis '))
+ok('un papier plus court tient moins de monde',
+   paginerListeSimplifiee(200, ETROIT)[0] < paginerListeSimplifiee(200, LARGE)[0],
+   `${paginerListeSimplifiee(200, ETROIT)[0]} contre ${paginerListeSimplifiee(200, LARGE)[0]}`)
+ok('un titre sur deux lignes coûte une personne ou deux',
+   paginerListeSimplifiee(200, { ...LARGE, lignesDeTitre: 2 })[0]
+   < paginerListeSimplifiee(200, LARGE)[0])
+ok('sans marché, la première page gagne une place',
+   paginerListeSimplifiee(200, { ...LARGE, avecMarche: false })[0]
+   > paginerListeSimplifiee(200, LARGE)[0])
+
+for (const [nom, m] of [['large', LARGE], ['étroit', ETROIT]]) {
+  const pages = paginerListeSimplifiee(137, m)
+  ok(`papier ${nom} : personne ne se perd au découpage`,
+     pages.reduce((t, n) => t + n, 0) === 137, pages.join('+'))
+  ok(`papier ${nom} : aucune page ne déborde de la bande libre`,
+     pages.every((n) => n * LIGNE <= m.bas - m.haut),
+     `${Math.max(...pages)} × ${LIGNE} mm pour ${m.bas - m.haut} mm`)
+}
+
+const decoupe = decouperListeSimplifiee(Array.from({ length: 70 }, (_, i) => i), LARGE)
+ok('le découpage suit la pagination, dans l’ordre',
+   decoupe.flat().join(',') === Array.from({ length: 70 }, (_, i) => i).join(','))
+ok('une liste vide ne donne pas une page fantôme',
+   paginerListeSimplifiee(0, LARGE).join('') === '0')
+
+ok('un établissement court rejoint le titre',
+   titreSurUneLigne('Liste Des Agents De Gardiennage', 'DRISCOLL’S'))
+ok('… un nom long passe en dessous',
+   !titreSurUneLigne('Liste Des Agents De Gardiennage',
+                     'ETABLISSEMENT DE COOPERATION INTERCOMMUNALE AL BOUGHAZ'))
+ok('… et sans établissement, la question ne se pose pas',
+   titreSurUneLigne('Liste Du Personnel', '   '))
+
 // ── Les documents PDF se tracent, ils ne se photographient pas ─────────
 // « Enregistrer en PDF » capturait l'écran. Sur un tableau à bordures
 // fusionnées, la capture perd les filets : on recevait des colonnes de
