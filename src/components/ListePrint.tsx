@@ -93,13 +93,17 @@ export default function ListePrint({
       <div
         style={{ '--zoom-apercu': 0.34 } as React.CSSProperties}
         className="document-imprimable mx-auto my-6 max-w-[297mm] bg-white p-[12mm] text-[9pt] leading-snug text-black shadow-xl print:my-0 print:max-w-none print:p-0 print:shadow-none">
-        <header className="mb-5 border-b-2 border-black pb-3 text-center">
+        {/* Le filtre — le plus souvent l'annexe — tient sur la ligne du
+            titre : sur sa propre ligne, il coûtait une rangée du tableau. */}
+        <header className="mb-2.5 border-b-2 border-black pb-1.5 text-center">
           <h1 className="text-base font-bold uppercase tracking-wide">
             {entreprises ? 'TOUTES LES ENTREPRISES' : entreprise}
           </h1>
-          <p className="mt-1 text-lg font-bold uppercase">Liste du personnel</p>
-          {intitule && <p className="mt-1 text-[10pt]">{intitule}</p>}
-          <p className="mt-1 text-[8pt] text-slate-600">
+          <p className="text-[13pt] font-bold uppercase">
+            Liste du personnel
+            {intitule && <span className="font-semibold"> — {intitule}</span>}
+          </p>
+          <p className="text-[8pt] text-slate-600">
             {employees.length} employé(s) · éditée le {new Date().toLocaleDateString('fr-FR')}
           </p>
         </header>
@@ -111,8 +115,8 @@ export default function ListePrint({
           // empêcher laissait des pages à moitié vides dès qu'un site
           // ne tenait plus dans ce qui restait.
           return (
-            <section key={siteId} className="mb-6">
-              <h2 className="titre-suivi mb-1.5 flex items-baseline justify-between gap-3 border-b border-black pb-1">
+            <section key={siteId} className="mb-3">
+              <h2 className="titre-suivi mb-0.5 flex items-baseline justify-between gap-3 border-b border-black pb-0.5">
                 <span className="text-[11pt] font-bold uppercase">
                   {societe && (
                     <span className="mr-2 text-[9pt] font-normal">{societe} ·</span>
@@ -136,7 +140,7 @@ export default function ListePrint({
                       'Naissance', 'Embauche', 'Téléphone', 'Ville', 'Règlement', 'Salaire'].map((c) => (
                       <th
                         key={c}
-                        className={`border border-slate-400 px-1.5 py-1 text-[7.5pt] font-bold uppercase tracking-wide ${
+                        className={`border border-slate-400 px-1.5 py-0.5 text-[7.5pt] font-bold uppercase tracking-wide ${
                           c === 'Salaire' ? 'text-right' : 'text-left'
                         }`}
                       >
@@ -148,37 +152,37 @@ export default function ListePrint({
                 <tbody>
                   {liste.map((e) => (
                     <tr key={e.id} className={e.actif ? '' : 'text-slate-500'}>
-                      <td className="border border-slate-400 px-1.5 py-1 text-right tabular-nums">
+                      <td className="border border-slate-400 px-1.5 py-0.5 text-right tabular-nums">
                         {e.matricule ?? '—'}
                       </td>
-                      <td className="border border-slate-400 px-1.5 py-1 font-semibold">
+                      <td className="border border-slate-400 px-1.5 py-0.5 font-semibold">
                         {e.nom_prenom}
                         {!e.actif && <span className="font-normal"> (sorti)</span>}
                       </td>
-                      <td className="border border-slate-400 px-1.5 py-1">{e.qualification ?? '—'}</td>
-                      <td className="border border-slate-400 px-1.5 py-1">{e.cin ?? '—'}</td>
-                      <td className="border border-slate-400 px-1.5 py-1">{e.cnss ?? '—'}</td>
-                      <td className="border border-slate-400 px-1.5 py-1 whitespace-nowrap">
+                      <td className="border border-slate-400 px-1.5 py-0.5">{e.qualification ?? '—'}</td>
+                      <td className="border border-slate-400 px-1.5 py-0.5">{e.cin ?? '—'}</td>
+                      <td className="border border-slate-400 px-1.5 py-0.5">{e.cnss ?? '—'}</td>
+                      <td className="border border-slate-400 px-1.5 py-0.5 whitespace-nowrap">
                         {formatDateFr(e.date_naissance)}
                       </td>
-                      <td className="border border-slate-400 px-1.5 py-1 whitespace-nowrap">
+                      <td className="border border-slate-400 px-1.5 py-0.5 whitespace-nowrap">
                         {formatDateFr(e.date_embauche)}
                       </td>
-                      <td className="border border-slate-400 px-1.5 py-1 whitespace-nowrap">
+                      <td className="border border-slate-400 px-1.5 py-0.5 whitespace-nowrap">
                         {e.telephone ?? '—'}
                       </td>
-                      <td className="border border-slate-400 px-1.5 py-1">{e.ville ?? '—'}</td>
-                      <td className="border border-slate-400 px-1.5 py-1">{e.mode_reglement ?? '—'}</td>
-                      <td className="border border-slate-400 px-1.5 py-1 text-right tabular-nums whitespace-nowrap">
+                      <td className="border border-slate-400 px-1.5 py-0.5">{e.ville ?? '—'}</td>
+                      <td className="border border-slate-400 px-1.5 py-0.5">{e.mode_reglement ?? '—'}</td>
+                      <td className="border border-slate-400 px-1.5 py-0.5 text-right tabular-nums whitespace-nowrap">
                         {e.salaire != null ? formatDH(e.salaire) : '—'}
                       </td>
                     </tr>
                   ))}
                   <tr className="font-bold">
-                    <td colSpan={10} className="border border-slate-400 px-1.5 py-1 text-right">
+                    <td colSpan={10} className="border border-slate-400 px-1.5 py-0.5 text-right">
                       Total {nomSite(siteId)}
                     </td>
-                    <td className="border border-slate-400 px-1.5 py-1 text-right tabular-nums whitespace-nowrap">
+                    <td className="border border-slate-400 px-1.5 py-0.5 text-right tabular-nums whitespace-nowrap">
                       {formatDH(liste.reduce((t, e) => t + Number(e.salaire ?? 0), 0))}
                     </td>
                   </tr>
@@ -188,7 +192,7 @@ export default function ListePrint({
           )
         })}
 
-        <p className="mt-6 border-t border-black pt-2 text-right text-[9pt] font-bold">
+        <p className="mt-3 border-t border-black pt-1.5 text-right text-[9pt] font-bold">
           TOTAL GÉNÉRAL : {employees.length} employé(s) —{' '}
           {formatDH(employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0))}
         </p>

@@ -128,18 +128,35 @@ export async function dessinerListePersonnel(opts: {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const largeur = doc.internal.pageSize.getWidth()
 
-  doc.setFontSize(13).setFont('helvetica', 'bold')
-  doc.text(opts.titre.toUpperCase(), largeur / 2, 13, { align: 'center' })
-  doc.setFontSize(11)
-  doc.text('LISTE DU PERSONNEL', largeur / 2, 19, { align: 'center' })
+  const MARGE = 8
+  const DISPO = largeur - 2 * MARGE
 
-  let y = 24
-  doc.setFontSize(9).setFont('helvetica', 'normal')
-  if (opts.intitule) {
-    doc.text(opts.intitule, largeur / 2, y, { align: 'center' })
+  doc.setFontSize(13).setFont('helvetica', 'bold')
+  doc.text(opts.titre.toUpperCase(), largeur / 2, 12, { align: 'center' })
+
+  // Le filtre — le plus souvent l'annexe — tient sur la ligne du titre :
+  // sur sa propre ligne, il coûtait une rangée du tableau. Un nom long
+  // passe en dessous plutôt que de déborder de la page.
+  doc.setFontSize(11)
+  const titre = 'LISTE DU PERSONNEL'
+  const suite = opts.intitule ? ` — ${opts.intitule}` : ''
+  let y = 17.5
+  if (suite && doc.getTextWidth(titre + suite) <= DISPO) {
+    doc.text(titre + suite, largeur / 2, y, { align: 'center' })
     y += 5
+  } else {
+    doc.text(titre, largeur / 2, y, { align: 'center' })
+    y += 5
+    if (suite) {
+      doc.setFontSize(9.5)
+      for (const l of doc.splitTextToSize(opts.intitule!, DISPO) as string[]) {
+        doc.text(l, largeur / 2, y, { align: 'center' })
+        y += 4.4
+      }
+    }
   }
-  doc.setFontSize(8).setTextColor(90)
+
+  doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(90)
   doc.text(
     `${opts.effectif} employé(s) · éditée le ${new Date().toLocaleDateString('fr-FR')}`,
     largeur / 2, y, { align: 'center' },
@@ -152,11 +169,9 @@ export async function dessinerListePersonnel(opts: {
   // ramène à l'échelle pour occuper exactement la largeur disponible.
   // `cellWidth` compte la marge intérieure : la retrancher débordait de
   // la page d'autant de millimètres qu'il y a de colonnes.
-  const MARGE = 8
-  const PADDING = 1.1
-  const dispo = largeur - 2 * MARGE
+  const PADDING = 0.7
   const somme = COLONNES.reduce((t, c) => t + c.largeur, 0)
-  const echelle = dispo / somme
+  const echelle = DISPO / somme
 
   const styleColonne: Record<number, object> = {}
   COLONNES.forEach((c, i) => {
@@ -164,12 +179,12 @@ export async function dessinerListePersonnel(opts: {
   })
 
   autoTable(doc, {
-    startY: y + 4,
+    startY: y + 2.5,
     head: [COLONNES.map((c) => c.titre)],
     body: corps as never,
     theme: 'grid',
     styles: {
-      fontSize: 7.5, cellPadding: PADDING, lineColor: [120, 120, 120], lineWidth: 0.1,
+      fontSize: 7.5, cellPadding: { top: PADDING, bottom: PADDING, left: 1.1, right: 1.1 }, lineColor: [120, 120, 120], lineWidth: 0.1,
       overflow: 'linebreak',
     },
     headStyles: {
@@ -184,13 +199,13 @@ export async function dessinerListePersonnel(opts: {
       if (titres.has(donnees.row.index)) {
         donnees.cell.styles.fontStyle = 'bold'
         donnees.cell.styles.fillColor = [226, 232, 240]
-        donnees.cell.styles.fontSize = 8.5
+        donnees.cell.styles.fontSize = 8
       } else if (totaux.has(donnees.row.index)) {
         donnees.cell.styles.fontStyle = 'bold'
         donnees.cell.styles.fillColor = [241, 245, 249]
       }
     },
-    margin: { left: MARGE, right: MARGE, top: 12 },
+    margin: { left: MARGE, right: MARGE, top: 10 },
   })
 
   // Le total général, sous le tableau, sur la dernière page.
