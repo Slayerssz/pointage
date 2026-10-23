@@ -91,9 +91,12 @@ export default function ListePrint({
         {groupes.map(([siteId, liste]) => {
           const principal = nomPrincipal(siteId)
           const societe = nomEntreprise(siteId)
+          // Le bloc d'un site peut couler sur deux pages : l'en
+          // empêcher laissait des pages à moitié vides dès qu'un site
+          // ne tenait plus dans ce qui restait.
           return (
-            <section key={siteId} className="mb-6 break-inside-avoid">
-              <h2 className="mb-1.5 flex items-baseline justify-between gap-3 border-b border-black pb-1">
+            <section key={siteId} className="mb-6">
+              <h2 className="titre-suivi mb-1.5 flex items-baseline justify-between gap-3 border-b border-black pb-1">
                 <span className="text-[11pt] font-bold uppercase">
                   {societe && (
                     <span className="mr-2 text-[9pt] font-normal">{societe} ·</span>
@@ -110,7 +113,7 @@ export default function ListePrint({
                 </span>
               </h2>
 
-              <table className="w-full border-collapse">
+              <table className="tableau-long w-full border-collapse">
                 <thead>
                   <tr className="bg-slate-100">
                     {['N°', 'Nom & Prénom', 'Qualification', 'C.I.N.', 'N° CNSS',

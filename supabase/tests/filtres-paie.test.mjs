@@ -160,6 +160,61 @@ ok('choisir l’annexe isolée prend son monde',
 ok('personne ne se perd en route',
    [...choix.values()].flat().length === POUR_VIREMENT.length)
 
+// ── Découper un document haut en pages ─────────────────────────────────
+// « Enregistrer en PDF » réduisait la liste entière à une seule page :
+// deux cents noms dans une colonne illisible. On la coupe maintenant en
+// pages — encore faut-il couper au bon endroit.
+const { code: codeCoupe } = await transformWithOxc(
+  fs.readFileSync('src/lib/decoupePdf.ts', 'utf8'), 'dc.ts', { lang: 'ts' })
+const { decouperEnPages } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeCoupe).toString('base64'))
+
+const hauteurs = (t) => t.map((x) => x.fin - x.debut)
+const continu = (t, total) =>
+  t[0].debut === 0 && t[t.length - 1].fin === total
+  && t.every((x, i) => i === 0 || x.debut === t[i - 1].fin)
+
+const court = decouperEnPages(500, 1000)
+ok('un document plus court qu’une page tient en une tranche',
+   court.length === 1 && court[0].fin === 500)
+
+const pile = decouperEnPages(3000, 1000)
+ok('trois pages pleines font trois tranches',
+   pile.length === 3 && hauteurs(pile).every((h) => h === 1000), hauteurs(pile).join('+'))
+
+const reste = decouperEnPages(2500, 1000)
+ok('le reste part dans une dernière tranche',
+   hauteurs(reste).join('+') === '1000+1000+500', hauteurs(reste).join('+'))
+ok('… et rien ne se perd entre deux tranches', continu(reste, 2500))
+
+// Une ligne de texte tous les 100 px, épaisse de 40 : couper dedans
+// couperait les lettres en deux.
+const dansLeTexte = (y) => y % 100 >= 40
+const propre = decouperEnPages(3000, 1000, dansLeTexte)
+ok('on recule jusqu’à une ligne où l’on ne coupe rien',
+   propre.every((t) => t.fin === 3000 || dansLeTexte(t.fin)),
+   propre.map((t) => t.fin).join(' · '))
+ok('… sans reculer plus loin que nécessaire',
+   propre.every((t, i) => i === 0 || t.debut >= 1000 * i - 150),
+   propre.map((t) => t.debut).join(' · '))
+ok('… et la suite reprend exactement où l’on s’est arrêté', continu(propre, 3000))
+
+// Le cas désespéré : aucune coupe franche nulle part. Il faut quand
+// même avancer, sinon la boucle tourne sans fin et le PDF ne sort pas.
+const jamais = decouperEnPages(3000, 1000, () => false)
+ok('sans aucune coupe franche, on coupe quand même à la page',
+   hauteurs(jamais).join('+') === '1000+1000+1000', hauteurs(jamais).join('+'))
+ok('… et le document reste entier', continu(jamais, 3000))
+
+ok('une hauteur nulle ne donne aucune tranche',
+   decouperEnPages(0, 1000).length === 0 && decouperEnPages(3000, 0).length === 0)
+
+// Cent pages d'affilée : la borne de sécurité ne doit pas tronquer un
+// document long pour de vrai.
+const longue = decouperEnPages(100000, 1000)
+ok('cent pages sortent bien toutes', longue.length === 100 && continu(longue, 100000),
+   String(longue.length))
+
 // ── L'ordre de virement ne connaît pas les centimes ─────────────────────
 // La banque vire des dirhams entiers. Le piège est ailleurs : le total
 // écrit en toutes lettres doit égaler la colonne imprimée. Si l'un

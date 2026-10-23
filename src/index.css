@@ -220,4 +220,26 @@ body {
   body.impression .document-imprimable table {
     break-inside: avoid;
   }
+
+  /* Les listes, elles, sont faites pour couler sur plusieurs pages.
+     Leur interdire de se couper poussait le tableau entier à la page
+     suivante : on sortait une page de titre, puis les gens. */
+  body.impression .document-imprimable .tableau-long {
+    break-inside: auto;
+  }
+
+  /* L'en-tête des colonnes se répète en haut de chaque page. */
+  body.impression .document-imprimable .tableau-long thead {
+    display: table-header-group;
+  }
+
+  /* On coupe entre deux lignes, jamais au milieu de l'une d'elles. */
+  body.impression .document-imprimable .tableau-long tr {
+    break-inside: avoid;
+  }
+
+  /* Un titre de site ne reste pas seul en bas d'une page. */
+  body.impression .document-imprimable .titre-suivi {
+    break-after: avoid;
+  }
 }

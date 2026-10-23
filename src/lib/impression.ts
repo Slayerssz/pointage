@@ -1,3 +1,4 @@
+import { decouperEnPages } from './decoupePdf'
 import { useCallback, useEffect, useState } from 'react'
 
 /**
@@ -76,7 +77,9 @@ export function useModeImpression() {
 
 /**
  * Enregistre le document affiché en PDF, sans passer par la boîte de
- * dialogue d'impression : une page par fiche, à l'identique de l'écran.
+ * dialogue d'impression. Une page par fiche quand le document en
+ * contient ; sinon, le document est découpé en pages A4, comme le
+ * ferait l'imprimante.
  */
 export async function enregistrerPdf(
   nomFichier: string,
@@ -92,7 +95,7 @@ export async function enregistrerPdf(
   const racine = document.querySelector<HTMLElement>('.document-imprimable')
   if (!racine) throw new Error('Document introuvable.')
 
-  // Une page par article ; à défaut, tout le document sur une page
+  // Une page par article ; à défaut, tout le document, qu'on découpera.
   const articles = [...racine.querySelectorAll<HTMLElement>(':scope > article')]
   const blocs = articles.length > 0 ? articles : [racine]
 
@@ -100,28 +103,75 @@ export async function enregistrerPdf(
   const largeurPage = pdf.internal.pageSize.getWidth()
   const hauteurPage = pdf.internal.pageSize.getHeight()
   const marge = 8
+  const dispoL = largeurPage - marge * 2
+  const dispoH = hauteurPage - marge * 2
+  let premiere = true
 
-  for (let i = 0; i < blocs.length; i++) {
-    const canvas = await html2canvas(blocs[i], {
+  for (const bloc of blocs) {
+    const canvas = await html2canvas(bloc, {
       scale: 2,               // net à l'impression
       backgroundColor: '#ffffff',
       useCORS: true,
       logging: false,
     })
 
-    // Mise à l'échelle en conservant les proportions
-    const dispoL = largeurPage - marge * 2
-    const dispoH = hauteurPage - marge * 2
-    const ratio = Math.min(dispoL / canvas.width, dispoH / canvas.height)
-    const l = canvas.width * ratio
-    const h = canvas.height * ratio
+    // Le bloc est mis à la largeur de la page. S'il tient aussi en
+    // hauteur, il part d'une pièce ; sinon on le coupe en pages.
+    const echelle = dispoL / canvas.width
+    if (canvas.height * echelle <= dispoH) {
+      if (!premiere) pdf.addPage('a4', orientation)
+      premiere = false
+      pdf.addImage(
+        canvas.toDataURL('image/jpeg', 0.94), 'JPEG',
+        marge, marge, dispoL, canvas.height * echelle,
+      )
+      continue
+    }
 
-    if (i > 0) pdf.addPage('a4', orientation)
-    pdf.addImage(
-      canvas.toDataURL('image/jpeg', 0.94), 'JPEG',
-      (largeurPage - l) / 2, marge, l, h,
+    const tranches = decouperEnPages(
+      canvas.height,
+      Math.floor(dispoH / echelle),
+      coupeFranche(canvas),
     )
+    for (const { debut, fin } of tranches) {
+      const morceau = document.createElement('canvas')
+      morceau.width = canvas.width
+      morceau.height = fin - debut
+      const ctx = morceau.getContext('2d')
+      if (!ctx) throw new Error('Découpage impossible.')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, morceau.width, morceau.height)
+      ctx.drawImage(canvas, 0, debut, canvas.width, fin - debut,
+                    0, 0, canvas.width, fin - debut)
+
+      if (!premiere) pdf.addPage('a4', orientation)
+      premiere = false
+      pdf.addImage(
+        morceau.toDataURL('image/jpeg', 0.94), 'JPEG',
+        marge, marge, dispoL, morceau.height * echelle,
+      )
+    }
   }
 
   pdf.save(nomFichier.endsWith('.pdf') ? nomFichier : `${nomFichier}.pdf`)
+}
+
+/**
+ * Où l'on peut couper sans rien trancher : une ligne entièrement
+ * blanche — l'espace entre deux blocs — ou au contraire une ligne
+ * pleine d'encre sur toute sa largeur, qui est le filet d'un tableau.
+ * Entre les deux, on traverse du texte.
+ */
+function coupeFranche(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return () => true
+  return (y: number) => {
+    if (y <= 0 || y >= canvas.height) return false
+    const { data } = ctx.getImageData(0, y, canvas.width, 1)
+    let encre = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 200 || data[i + 1] < 200 || data[i + 2] < 200) encre++
+    }
+    return encre === 0 || encre >= canvas.width * 0.9
+  }
 }

@@ -64,7 +64,11 @@ export default function ListeSimplifieePrint({
         />
 
         <article
-          className="document-imprimable mx-auto my-6 flex min-h-[277mm] flex-col bg-white shadow-xl print:my-0 print:shadow-none"
+          /* À l'écran, la colonne flexible pousse les mentions légales
+             en bas de la feuille. À l'impression, le document redevient
+             un bloc ordinaire : une colonne flexible se coupe mal, et
+             c'est ce qui envoyait tout le tableau à la page suivante. */
+          className="document-imprimable mx-auto my-6 flex min-h-[277mm] flex-col bg-white shadow-xl print:my-0 print:block print:shadow-none"
           style={{ width: '186mm', padding: '10mm 12mm', color: '#000', fontSize: '10pt' }}
         >
           {/* En-tête de la société */}
@@ -112,7 +116,7 @@ export default function ListeSimplifieePrint({
               Période Du {formatDateFr(du)} Au {formatDateFr(au)}
             </p>
 
-            <table className="w-full border-collapse" style={{ borderTop: 'none' }}>
+            <table className="tableau-long w-full border-collapse" style={{ borderTop: 'none' }}>
               <thead>
                 <tr
                   style={{
