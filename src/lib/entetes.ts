@@ -60,7 +60,7 @@ export interface PiedDePage {
 
 const ENTETES: Record<string, Entete> = {
   'EDEN VERT SERVICE': {
-    papier: { image: '/lettres/eden-vert-service.jpg', haut: 56, bas: 271 },
+    papier: { image: '/lettres/eden-vert-service.jpg', haut: 53, bas: 271 },
     logo: '/entetes/eden-vert-service.png',
     accent: '#366d81',
   },
@@ -72,17 +72,17 @@ const ENTETES: Record<string, Entete> = {
     accent: '#0f2155',
   },
   'GROUPE TRIPLE A': {
-    papier: { image: '/lettres/groupe-triple-a.jpg', haut: 44, bas: 268 },
+    papier: { image: '/lettres/groupe-triple-a.jpg', haut: 43, bas: 271 },
     logo: '/entetes/groupe-triple-a.png',
     accent: '#94040d',
   },
   BO: {
-    papier: { image: '/lettres/bo.jpg', haut: 39, bas: 269 },
+    papier: { image: '/lettres/bo.jpg', haut: 40, bas: 271 },
     logo: '/entetes/bo.png',
     accent: '#0c6aa4',
   },
   TRIMAX: {
-    papier: { image: '/lettres/trimax.jpg', haut: 49, bas: 265 },
+    papier: { image: '/lettres/trimax.jpg', haut: 46, bas: 265 },
     logo: '/entetes/trimax.png',
     accent: '#171b32',
   },
@@ -104,19 +104,28 @@ const ENTETES: Record<string, Entete> = {
     },
   },
   'DUO MULTI SERVICE': {
-    papier: { image: '/lettres/duo-multi-service.jpg', haut: 35, bas: 261 },
+    papier: { image: '/lettres/duo-multi-service.jpg', haut: 32, bas: 262 },
     logo: '/entetes/duo-multi-service.png',
     accent: '#a8070c',
   },
   'NORD PLANET': {
-    papier: { image: '/lettres/nord-planet.jpg', haut: 45, bas: 269 },
+    papier: { image: '/lettres/nord-planet.jpg', haut: 43, bas: 271 },
     logo: '/entetes/nord-planet.png',
     accent: '#006f9d',
   },
   'SERCLEAN NEGOCE': {
-    papier: { image: '/lettres/serclean-negoce.jpg', haut: 48, bas: 239 },
+    papier: { image: '/lettres/serclean-negoce.jpg', haut: 46, bas: 245 },
     logo: '/entetes/serclean-negoce.png',
     accent: '#2c2667',
+  },
+  // Arrivée avec son papier seul : le logo n'existe pas encore en
+  // fichier propre, son en-tête tient donc sur sa couleur et son nom.
+  'EXSERIA GROUPE': {
+    // Le bas remonte haut : les losanges d'or et de gris du pied
+    // mordent sur la page bien avant les mentions légales.
+    papier: { image: '/lettres/exseria.jpg', haut: 37, bas: 263 },
+    logo: null,
+    accent: '#846c24',
   },
   // Son papier nous est venu en scan : le fond porte quelques grains de
   // gris, et le logo n'existe pas encore en fichier propre. Le document
@@ -128,7 +137,7 @@ const ENTETES: Record<string, Entete> = {
   },
   // Le logo porte « MEGAINTER », la base « MEGANTER » : c'est bien la même société.
   'MEGAINTER SERVICE MAROC': {
-    papier: { image: '/lettres/meganter-service-maroc.jpg', haut: 59, bas: 274 },
+    papier: { image: '/lettres/meganter-service-maroc.jpg', haut: 56, bas: 274 },
     logo: '/entetes/meganter-service-maroc.png',
     accent: '#616364',
   },
@@ -183,6 +192,8 @@ const ALIAS: Record<string, string> = {
   'COOPERATIVE EDEN VERT SERVICE': 'EDEN VERT SERVICE',
   'TRIMAX SURVEILLANCE': 'TRIMAX',
   'VIGILMA GARD': 'VIGILMA GARD MAROC',
+  EXSERIA: 'EXSERIA GROUPE',
+  'TRAITEUR AYA SARL': 'TRAITEUR AYA',
 }
 
 const PAR_CLE = new Map(Object.entries(ENTETES).map(([k, v]) => [cle(k), v]))

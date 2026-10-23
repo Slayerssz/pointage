@@ -278,16 +278,16 @@ const { enteteDe, entreprisesAvecEntete } = await import(
   'data:text/javascript;base64,' + Buffer.from(codeEntetes).toString('base64'))
 
 const SOCIETES = entreprisesAvecEntete()
-ok('les onze sociétés ont un en-tête',
-   SOCIETES.length === 11 && SOCIETES.every((s) => enteteDe(s).accent),
+ok('les douze sociétés ont un en-tête',
+   SOCIETES.length === 12 && SOCIETES.every((s) => enteteDe(s).accent),
    `${SOCIETES.length} société(s)`)
-// Traiteur Aya est arrivée avec son papier mais sans logo en fichier
-// propre : son en-tête tient sur sa seule couleur, et c'est voulu.
+// Traiteur Aya et Exseria sont arrivées avec leur papier mais sans logo
+// en fichier propre : leur en-tête tient sur leur seule couleur.
 ok('dix d’entre elles ont leur logo',
    SOCIETES.filter((s) => enteteDe(s).logo !== null).length === 10,
    SOCIETES.filter((s) => enteteDe(s).logo === null).join(' · '))
-ok('les onze accents sont distincts',
-   new Set(SOCIETES.map((s) => enteteDe(s).accent)).size === 11)
+ok('les douze accents sont distincts',
+   new Set(SOCIETES.map((s) => enteteDe(s).accent)).size === 12)
 ok('la casse et les accents n’empêchent pas la correspondance',
    enteteDe('groupe triple a').accent === '#94040d'
    && enteteDe('Éden Vert Service').accent === '#366d81')
@@ -312,10 +312,10 @@ for (const [ecrit, officiel] of MEME_MAISON) {
      enteteDe(ecrit).logo ?? 'aucun logo')
 }
 
-// Les onze ont désormais fourni leur papier à en-tête : plus un seul
+// Les douze ont désormais fourni leur papier à en-tête : plus un seul
 // document ne part sur feuille blanche.
 const SANS_PAPIER = SOCIETES.filter((s) => !enteteDe(s).papier)
-ok('les onze sociétés ont leur papier à en-tête', SANS_PAPIER.length === 0,
+ok('les douze sociétés ont leur papier à en-tête', SANS_PAPIER.length === 0,
    SANS_PAPIER.join(' · '))
 ok('… la bande libre descend toujours sous le bandeau',
    SOCIETES.every((s) => {
