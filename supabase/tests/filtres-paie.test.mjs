@@ -160,6 +160,72 @@ ok('choisir l’annexe isolée prend son monde',
 ok('personne ne se perd en route',
    [...choix.values()].flat().length === POUR_VIREMENT.length)
 
+// ── Les documents PDF se tracent, ils ne se photographient pas ─────────
+// « Enregistrer en PDF » capturait l'écran. Sur un tableau à bordures
+// fusionnées, la capture perd les filets : on recevait des colonnes de
+// texte nu. Ces modules dessinent le document ; ils tiennent sur
+// plusieurs fichiers, d'où le passage par un assemblage.
+const { rolldown } = await import('rolldown')
+async function chargerModule(chemin) {
+  const b = await rolldown({
+    input: chemin, external: ['jspdf', 'jspdf-autotable'], logLevel: 'silent',
+  })
+  const { output } = await b.generate({ format: 'esm' })
+  return import('data:text/javascript;base64,'
+                + Buffer.from(output[0].code).toString('base64'))
+}
+
+const { rangeesListePersonnel, totalSalaires } =
+  await chargerModule('src/lib/listePersonnelPdf.ts')
+
+const qqn = (nom, sal, actif = true) => ({
+  id: nom, matricule: '1', nom_prenom: nom, salaire: sal, actif,
+  qualification: null, cin: null, cnss: null, date_naissance: null,
+  date_embauche: null, telephone: null, ville: null, mode_reglement: null,
+})
+const groupes = [
+  { site: 'BUREAU', principal: null, employees: [qqn('A', 1000)] },
+  { site: 'DEPOT', principal: 'TANGER',
+    employees: [qqn('B', 2000), qqn('C', 3000, false)] },
+]
+const { corps, titres, totaux } = rangeesListePersonnel(groupes)
+
+ok('chaque annexe apporte son titre, ses gens et son total',
+   corps.length === 2 + 3 + 2, String(corps.length))
+ok('le titre vient avant les gens, le total après',
+   [...titres].join(',') === '0,3' && [...totaux].join(',') === '2,6',
+   `titres ${[...titres]} · totaux ${[...totaux]}`)
+ok('le titre rappelle le site principal',
+   String(corps[3][0].content) === 'DEPOT — TANGER', String(corps[3][0].content))
+ok('… et l’effectif de l’annexe',
+   String(corps[3][1].content) === '2 employé(s)', String(corps[3][1].content))
+ok('le total d’une annexe additionne les siens',
+   totalSalaires(groupes[1].employees) === 5000)
+ok('quelqu’un de sorti reste dans la liste, signalé',
+   String(corps[5][1]).includes('(sorti)'), String(corps[5][1]))
+ok('le titre couvre toute la largeur sauf l’effectif',
+   corps[0][0].colSpan === 10)
+// Les polices intégrées au PDF ne connaissent pas l'espace fine
+// insécable et l'impriment en barre oblique : « 3/192,00 ».
+ok('aucune espace exotique dans les montants',
+   !JSON.stringify(corps).match(/[  ]/),
+   JSON.stringify(corps).slice(0, 80))
+
+// Une société sans annexe ne doit pas sortir un tableau vide et faux.
+const vide = rangeesListePersonnel([])
+ok('aucune annexe ne donne aucune rangée', vide.corps.length === 0)
+
+const { versRvb, eclaircir } = await chargerModule('src/lib/listeSimplifieePdf.ts')
+ok('une couleur se lit en rouge, vert, bleu',
+   versRvb('#0f2155').join(',') === '15,33,85', versRvb('#0f2155').join(','))
+ok('… avec ou sans dièse', versRvb('94040d').join(',') === versRvb('#94040d').join(','))
+ok('une couleur illisible retombe sur le noir',
+   versRvb('bleu nuit').join(',') === '0,0,0')
+ok('le bandeau est la couleur très éclaircie',
+   eclaircir('#000000', 0.22).join(',') === '199,199,199',
+   eclaircir('#000000', 0.22).join(','))
+ok('… et le blanc reste blanc', eclaircir('#ffffff', 0.22).join(',') === '255,255,255')
+
 // ── Découper un document haut en pages ─────────────────────────────────
 // « Enregistrer en PDF » réduisait la liste entière à une seule page :
 // deux cents noms dans une colonne illisible. On la coupe maintenant en

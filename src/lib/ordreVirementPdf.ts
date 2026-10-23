@@ -8,6 +8,7 @@
  * On le trace donc au millimètre, d'après le modèle papier du groupe.
  */
 
+import { chargerImage } from './chargerImage'
 import { dirhams, totalDirhams } from './dirhams'
 import { montantEnLettres } from './montantEnLettres'
 import { enteteDe } from './entetes'
@@ -102,30 +103,6 @@ export const veutLaFormule = (entreprise: string) => {
 }
 
 /**
- * Le papier à en-tête, prêt à être posé dans le PDF. jsPDF veut les
- * données de l'image, pas son adresse : on va donc la chercher.
- *
- * Le chargement peut échouer — réseau coupé, fichier absent. Dans ce cas
- * le document sort sans son papier plutôt que pas du tout : un ordre de
- * virement sur feuille blanche reste un ordre de virement.
- */
-async function chargerPapier(url: string): Promise<string | null> {
-  try {
-    const reponse = await fetch(url)
-    if (!reponse.ok) return null
-    const blob = await reponse.blob()
-    return await new Promise<string>((resoudre, rejeter) => {
-      const lecteur = new FileReader()
-      lecteur.onload = () => resoudre(String(lecteur.result))
-      lecteur.onerror = () => rejeter(lecteur.error)
-      lecteur.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
-}
-
-/**
  * Le papier de la société et les marges qu'il impose. Sans papier, on
  * retombe sur celles d'origine — la feuille blanche reste utilisable.
  */
@@ -200,7 +177,7 @@ export async function dessinerOrdreVirement(opts: {
   // libre. S'il n'a pas pu être chargé, le document sort sur feuille
   // blanche, avec les marges d'origine : mieux vaut cela que rien.
   const { papier } = papierDe(entreprise, opts.modeleDocument)
-  const image = papier ? await (opts.papierCharge ?? chargerPapier)(papier.image) : null
+  const image = papier ? await (opts.papierCharge ?? chargerImage)(papier.image) : null
   const haut = image ? papier!.haut : P.haut
   const bas = image ? papier!.bas : P.bas
   const avecFormule = veutLaFormule(entreprise)

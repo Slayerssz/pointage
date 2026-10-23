@@ -5,6 +5,7 @@ import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impr
 import BarreImpression from './BarreImpression'
 import { formatDH } from '../lib/paie'
 import { exporterListePersonnelExcel } from '../lib/exports'
+import { enregistrerListePersonnelPdf } from '../lib/listePersonnelPdf'
 import PortailImpression from './PortailImpression'
 
 /**
@@ -69,6 +70,21 @@ export default function ListePrint({
         imprimer={imprimer}
         nomFichier={`Liste_${entreprise.replace(/\s+/g, '_')}`}
         orientation="landscape"
+        genererPdf={() =>
+          enregistrerListePersonnelPdf({
+            groupes: groupes.map(([siteId, liste]) => ({
+              site: nomSite(siteId),
+              principal: nomPrincipal(siteId),
+              societe: nomEntreprise(siteId),
+              employees: liste,
+            })),
+            titre: entreprises ? 'Toutes les entreprises' : entreprise,
+            intitule,
+            effectif: employees.length,
+            total: employees.reduce((t, e) => t + Number(e.salaire ?? 0), 0),
+            nomFichier: `Liste_${entreprise.replace(/\s+/g, '_')}`,
+          })
+        }
         exporterExcel={() => exporterListePersonnelExcel({ employees, entreprise, intitule, nomSite })}
         onClose={onClose}
       />

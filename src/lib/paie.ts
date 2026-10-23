@@ -21,26 +21,11 @@ export function moisLabel(annee: number, mois: number): string {
   return `${MOIS_FR[mois - 1]} ${annee}`
 }
 
-/** Formatte un montant : « 5 200,00 DH ». */
-export function formatDH(n: number | null | undefined, devise = 'DH'): string {
-  if (n == null) return '—'
-  return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${devise}`
-}
-
-/**
- * Le même montant sans sa devise, pour les endroits où la colonne est
- * étroite et où l'unité est déjà dite — sur un téléphone, « 3 046,00 DH »
- * se coupe en deux lignes.
- */
-export function formatMontant(n: number | null | undefined): string {
-  if (n == null) return '—'
-  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-export function formatNombre(n: number | null | undefined, max = 2): string {
-  if (n == null) return '—'
-  return n.toLocaleString('fr-FR', { maximumFractionDigits: max })
-}
+// Les formateurs de montants vivent à part, dans un fichier qui ne
+// dépend de rien : les documents PDF s'en servent sans entraîner avec
+// eux la connexion à la base. Ils restent exportés d'ici, où tout
+// l'écran de paie va les chercher.
+export { formatDH, formatMontant, formatNombre } from './montants'
 
 export const STATUT_PERIODE: Record<PeriodeStatut, { label: string; tone: 'slate' | 'amber' | 'green' | 'blue' | 'red' }> = {
   ouvert: { label: 'Ouvert — se met à jour avec le pointage', tone: 'slate' },

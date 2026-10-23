@@ -3,6 +3,7 @@ import { formatDateFr } from '../lib/dates'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
 import BarreImpression from './BarreImpression'
 import PortailImpression from './PortailImpression'
+import { enregistrerListeSimplifieePdf } from '../lib/listeSimplifieePdf'
 import type { Employee } from '../lib/types'
 
 /**
@@ -60,6 +61,13 @@ export default function ListeSimplifieePrint({
           pret={pret}
           imprimer={imprimer}
           nomFichier={`Liste_${marche.replace(/[^\w]+/g, '-') || 'marche'}_${entreprise.replace(/\s+/g, '_')}`}
+          genererPdf={() =>
+            enregistrerListeSimplifieePdf({
+              employees, entreprise, modeleDocument, marche, intitule, etablissement,
+              du, au,
+              nomFichier: `Liste_${marche.replace(/[^\w]+/g, '-') || 'marche'}_${entreprise.replace(/\s+/g, '_')}`,
+            })
+          }
           onClose={onClose}
         />
 

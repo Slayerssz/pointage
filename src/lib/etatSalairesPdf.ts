@@ -61,12 +61,11 @@ export async function dessinerEtatSalaires(opts: {
   // Les largeurs sont déclarées en millimètres « idéaux ». Selon le
   // nombre de colonnes et l'orientation, leur somme tombe au-dessus ou
   // en dessous de la page : on les ramène toutes à l'échelle, pour que
-  // le tableau occupe exactement la largeur disponible. La marge
-  // intérieure des cellules n'entre pas dans `cellWidth` : elle se
-  // retranche d'abord.
+  // le tableau occupe exactement la largeur disponible. `cellWidth`
+  // compte déjà la marge intérieure de la cellule.
   const MARGE = 10
   const PADDING = 1.4
-  const dispo = largeur - 2 * MARGE - colonnes.length * 2 * PADDING
+  const dispo = largeur - 2 * MARGE
   const somme = colonnes.reduce((t, c) => t + c.largeur, 0)
   const echelle = dispo / somme
 
