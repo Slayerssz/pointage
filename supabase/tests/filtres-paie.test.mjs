@@ -160,6 +160,31 @@ ok('choisir l’annexe isolée prend son monde',
 ok('personne ne se perd en route',
    [...choix.values()].flat().length === POUR_VIREMENT.length)
 
+// ── L'ordre de virement ne connaît pas les centimes ─────────────────────
+// La banque vire des dirhams entiers. Le piège est ailleurs : le total
+// écrit en toutes lettres doit égaler la colonne imprimée. Si l'un
+// arrondit la somme et l'autre somme les arrondis, le document se
+// contredit lui-même — et c'est la banque qui le découvre.
+const { code: codeDh } = await transformWithOxc(
+  fs.readFileSync('src/lib/dirhams.ts', 'utf8'), 'dh.ts', { lang: 'ts' })
+const { dirhams, totalDirhams } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeDh).toString('base64'))
+
+ok('2 000,50 part à 2 001', dirhams(2000.5) === 2001, String(dirhams(2000.5)))
+ok('2 000,49 reste à 2 000', dirhams(2000.49) === 2000, String(dirhams(2000.49)))
+ok('on arrondit, on ne tronque pas', dirhams(2999.9) === 3000, String(dirhams(2999.9)))
+ok('une chaîne passe comme un nombre', dirhams('3115.38') === 3115)
+ok('rien du tout vaut zéro', dirhams(null) === 0 && dirhams(undefined) === 0)
+
+const aCentimes = [{ net_a_payer: 100.5 }, { net_a_payer: 100.5 }, { net_a_payer: 100.5 }]
+ok('le total somme les arrondis, et non l’inverse',
+   totalDirhams(aCentimes) === 303, String(totalDirhams(aCentimes)))
+const auHasard = [1234.56, 987.49, 2000.5, 3115.38, 0].map((n) => ({ net_a_payer: n }))
+ok('… et vaut toujours la colonne imprimée',
+   totalDirhams(auHasard) === auHasard.reduce((s, l) => s + dirhams(l.net_a_payer), 0),
+   String(totalDirhams(auHasard)))
+ok('une liste vide ne vaut pas NaN', totalDirhams([]) === 0)
+
 // ── Le nom des onglets du classeur ───────────────────────────────────────
 // Excel refuse « : \\ / ? * [ ] » et s'arrête à 31 caractères ; un nom
 // fautif fait refuser le classeur entier à l'ouverture.
@@ -253,11 +278,16 @@ const { enteteDe, entreprisesAvecEntete } = await import(
   'data:text/javascript;base64,' + Buffer.from(codeEntetes).toString('base64'))
 
 const SOCIETES = entreprisesAvecEntete()
-ok('les dix sociétés ont un en-tête',
-   SOCIETES.length === 10 && SOCIETES.every((s) => enteteDe(s).logo !== null),
+ok('les onze sociétés ont un en-tête',
+   SOCIETES.length === 11 && SOCIETES.every((s) => enteteDe(s).accent),
    `${SOCIETES.length} société(s)`)
-ok('les dix accents sont distincts',
-   new Set(SOCIETES.map((s) => enteteDe(s).accent)).size === 10)
+// Traiteur Aya est arrivée avec son papier mais sans logo en fichier
+// propre : son en-tête tient sur sa seule couleur, et c'est voulu.
+ok('dix d’entre elles ont leur logo',
+   SOCIETES.filter((s) => enteteDe(s).logo !== null).length === 10,
+   SOCIETES.filter((s) => enteteDe(s).logo === null).join(' · '))
+ok('les onze accents sont distincts',
+   new Set(SOCIETES.map((s) => enteteDe(s).accent)).size === 11)
 ok('la casse et les accents n’empêchent pas la correspondance',
    enteteDe('groupe triple a').accent === '#94040d'
    && enteteDe('Éden Vert Service').accent === '#366d81')
@@ -282,15 +312,16 @@ for (const [ecrit, officiel] of MEME_MAISON) {
      enteteDe(ecrit).logo ?? 'aucun logo')
 }
 
-// Huit sociétés ont fourni leur papier à en-tête ; les deux autres
-// s'impriment sur feuille blanche, et cela doit rester volontaire.
-const AVEC_PAPIER = SOCIETES.filter((s) => enteteDe(s).papier)
-ok('huit sociétés ont leur papier à en-tête', AVEC_PAPIER.length === 8,
-   `${AVEC_PAPIER.length} : ${AVEC_PAPIER.join(', ')}`)
-ok('… et les deux qui manquent sont bien celles qu’on attend',
-   SOCIETES.filter((s) => !enteteDe(s).papier).sort().join(' · ')
-   === 'AL SAFAE EL MAGHREB · VIGILMA GARD MAROC',
-   SOCIETES.filter((s) => !enteteDe(s).papier).join(' · '))
+// Les onze ont désormais fourni leur papier à en-tête : plus un seul
+// document ne part sur feuille blanche.
+const SANS_PAPIER = SOCIETES.filter((s) => !enteteDe(s).papier)
+ok('les onze sociétés ont leur papier à en-tête', SANS_PAPIER.length === 0,
+   SANS_PAPIER.join(' · '))
+ok('… la bande libre descend toujours sous le bandeau',
+   SOCIETES.every((s) => {
+     const p = enteteDe(s).papier
+     return p.haut > 20 && p.bas > p.haut + 150 && p.bas < 290
+   }))
 ok('… et la raison sociale complète le retrouve aussi',
    Boolean(enteteDe('B.O NETTOYAGE S.A.R.L').papier)
    && Boolean(enteteDe('TRIMAX SURVEILLANCE SARL').papier))

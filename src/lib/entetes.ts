@@ -64,7 +64,13 @@ const ENTETES: Record<string, Entete> = {
     logo: '/entetes/eden-vert-service.png',
     accent: '#366d81',
   },
-  'AL SAFAE EL MAGHREB': { logo: '/entetes/al-safae-el-maghreb.png', accent: '#0f2155' },
+  'AL SAFAE EL MAGHREB': {
+    // Le bas réservé l'est largement : les triangles du coin droit
+    // descendent jusqu'au pied, et on n'écrit pas par-dessus.
+    papier: { image: '/lettres/al-safae-el-maghreb.jpg', haut: 60, bas: 239 },
+    logo: '/entetes/al-safae-el-maghreb.png',
+    accent: '#0f2155',
+  },
   'GROUPE TRIPLE A': {
     papier: { image: '/lettres/groupe-triple-a.jpg', haut: 44, bas: 268 },
     logo: '/entetes/groupe-triple-a.png',
@@ -81,6 +87,7 @@ const ENTETES: Record<string, Entete> = {
     accent: '#171b32',
   },
   'VIGILMA GARD MAROC': {
+    papier: { image: '/lettres/vigilma-gard-maroc.jpg', haut: 45, bas: 268 },
     logo: '/entetes/vigilma-gard-maroc.png',
     accent: '#63656a',
     pied: {
@@ -110,6 +117,14 @@ const ENTETES: Record<string, Entete> = {
     papier: { image: '/lettres/serclean-negoce.jpg', haut: 48, bas: 239 },
     logo: '/entetes/serclean-negoce.png',
     accent: '#2c2667',
+  },
+  // Son papier nous est venu en scan : le fond porte quelques grains de
+  // gris, et le logo n'existe pas encore en fichier propre. Le document
+  // s'imprime quand même sur son papier.
+  'TRAITEUR AYA': {
+    papier: { image: '/lettres/traiteur-aya.jpg', haut: 35, bas: 271 },
+    logo: null,
+    accent: '#b23a3a',
   },
   // Le logo porte « MEGAINTER », la base « MEGANTER » : c'est bien la même société.
   'MEGAINTER SERVICE MAROC': {

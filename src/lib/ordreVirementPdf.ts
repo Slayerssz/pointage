@@ -8,6 +8,7 @@
  * On le trace donc au millimètre, d'après le modèle papier du groupe.
  */
 
+import { dirhams, totalDirhams } from './dirhams'
 import { montantEnLettres } from './montantEnLettres'
 import { enteteDe } from './entetes'
 import { societeDe } from './societes'
@@ -141,6 +142,8 @@ export function papierDe(entreprise: string, modeleDocument?: string | null) {
 export const libelleOperations = (annee: number, mois: number) =>
   `Virement Salaire mois ${String(mois).padStart(2, '0')}/${annee}`
 
+export { dirhams, totalDirhams } from './dirhams'
+
 export interface OrdreDeVirement {
   /** Ce qui identifie la feuille : le site, la banque… */
   intitule: string
@@ -148,14 +151,15 @@ export interface OrdreDeVirement {
 }
 
 /**
- * Un montant à la française. Le séparateur de milliers est forcé à
- * l'espace ordinaire : les polices intégrées au PDF ne connaissent pas
- * l'espace fine insécable que rend `toLocaleString`, et l'imprimaient
- * en barre oblique — « 2/970,00 » au lieu de « 2 970,00 ».
+ * Un montant de virement : entier, séparateur de milliers, pas de
+ * virgule. L'espace de groupement est forcée à l'espace ordinaire : les
+ * polices intégrées au PDF ne connaissent pas l'espace fine insécable
+ * que rend `toLocaleString`, et l'imprimaient en barre oblique —
+ * « 2/970 » au lieu de « 2 970 ».
  */
-const n2 = (v: number | string | null | undefined) =>
-  v == null ? '' : Number(v)
-    .toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const n0 = (v: number | string | null | undefined) =>
+  v == null ? '' : dirhams(v)
+    .toLocaleString('fr-FR', { maximumFractionDigits: 0 })
     .replace(/[\u202f\u00a0\s]/g, ' ')
 
 /**
@@ -254,7 +258,7 @@ export async function dessinerOrdreVirement(opts: {
       // totalise que les virements qu'elle porte. Reprendre le total de
       // l'ordre entier ferait annoncer à la banque, sur chaque feuille,
       // une somme qui ne correspond pas aux lignes imprimées dessous.
-      const total = page.reduce((s, l) => s + Number(l.net_a_payer), 0)
+      const total = totalDirhams(page)
       if (!premiere) doc.addPage('a4', 'portrait')
       premiere = false
       poserLePapier()
@@ -281,7 +285,7 @@ export async function dessinerOrdreVirement(opts: {
       ligneCartouche('RAISON SOCIAL', `SOCIETE ${raison}`, { valeurGrasse: true })
       ligneCartouche('RIB ORDINATEUR', ribPropre, { valeurGrasse: true })
       ligneCartouche("NOMBRE TOTAL D'OPERATIONS", String(page.length), { valeurGrasse: true })
-      ligneCartouche("MONTANT TOTAL D'OPERATIONS", n2(total), { valeurGrasse: true })
+      ligneCartouche("MONTANT TOTAL D'OPERATIONS", n0(total), { valeurGrasse: true })
       ligneCartouche('LIBELLE OPERATIONS', libelle, { valeurGrasse: true })
 
       // La formule adressée à la banque : Vigilma et Serclean seulement.
@@ -339,7 +343,7 @@ export async function dessinerOrdreVirement(opts: {
           // largement dans la colonne (46 mm sur les 66 disponibles).
           case_(x + COL.nom, y, COL.rib, LIGNE, rib, { mono: true, taille: 9, gras: true })
         }
-        case_(x + COL.nom + COL.rib, y, COL.montant, LIGNE, n2(l.net_a_payer), {
+        case_(x + COL.nom + COL.rib, y, COL.montant, LIGNE, n0(l.net_a_payer), {
           aligne: 'right', taille: 9,
         })
         y += LIGNE
