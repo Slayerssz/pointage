@@ -129,7 +129,7 @@ const VALEURS = [
   ['X',   1,   'une garde'],
   ['X15', 1.5, 'une garde et demie'],
   ['XX',  2,   'deux gardes'],
-  ['RT',  1,   'repos travaillé'],
+  ['RT',  2,   'repos travaillé : la journée, et celle en plus'],
   ['M',   1,   'malade, payé'],
   ['C',   1,   'congé payé'],
 ]
@@ -169,7 +169,7 @@ const JOURS = [
   ['2026-02-03', 'X05', 0.5],
   ['2026-02-04', 'X15', 1.5],
   ['2026-02-05', 'XX',  2],
-  ['2026-02-06', 'RT',  1],
+  ['2026-02-06', 'RT',  2],
 ]
 let cumul = 0
 for (const [jour, type, valeur] of JOURS) {
@@ -179,21 +179,21 @@ for (const [jour, type, valeur] of JOURS) {
                           [eGardes])).jours_travailles)
   ok(`${jour} pointé « ${type} » → compteur à ${cumul}`, c === cumul, String(c))
 }
-ok(`total : 1 + 0,5 + 1,5 + 2 + 1 = 6 gardes`, cumul === 6)
+ok(`total : 1 + 0,5 + 1,5 + 2 + 2 = 7 gardes`, cumul === 7)
 
 // Retirer un pointage rend exactement ce qu'il avait ajouté.
 const pXX = (await q1(
   `select id from public.pointages where employee_id=$1 and pointed_on='2026-02-05'`, [eGardes])).id
 await q1(`select public.supprimer_pointage($1)`, [pXX])
 ok('supprimer le « XX » retire bien 2 gardes, pas 1',
-   num((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles) === 4,
+   num((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles) === 5,
    String((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles))
 
 // Repointer le même jour est refusé net : le compteur ne peut pas doubler.
 await refuse('repointer un jour déjà pointé est refusé',
   `select public.marquer_present($1,'2026-02-02'::date,'X')`, [eGardes], /déjà un pointage/i)
 ok('… le compteur n’a pas bougé',
-   num((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles) === 4)
+   num((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles) === 5)
 ok('… et il n’y a toujours qu’un pointage ce jour-là',
    num((await q1(`select count(*) as c from public.pointages
                    where employee_id=$1 and pointed_on='2026-02-02'`, [eGardes])).c) === 1)
@@ -1372,6 +1372,69 @@ await connecte(rh)
 await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
   /Action réservée/i)
+
+// ═══════ LE REPOS TRAVAILLÉ PAIE UNE JOURNÉE DE PLUS ═══════
+// Travailler son jour de repos ne rapportait rien : un RT comptait pour
+// une journée ordinaire, et le plafond des 26 la reprenait aussitôt que
+// le mois était complet. Le plafond borne le mois ; il ne doit pas
+// reprendre ce qui a été fait EN PLUS du mois.
+
+section('Le repos travaillé')
+
+await connecte(bureau)
+const eRepos = await employe('REPOS TRAVAILLE', { cin: 'RT1', cnss: '970000001', salaire: 2600 })
+// Un mois plein : 26 journées ordinaires, le plafond est atteint.
+for (const j of joursAvril.slice(0, 26)) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [eRepos, j])
+}
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const plein = await q1(
+  `select gardes_travaillees g, jours_payes jp, salaire_brut b from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eRepos])
+ok('un mois plein paie ses 26 jours, pas un de plus', num(plein.jp) === 26, String(plein.jp))
+ok('… soit le salaire entier', num(plein.b) === 2600, String(plein.b))
+
+// Avril 2026 n'a que 26 jours hors dimanche : les dimanches sont donc
+// ses jours de repos, et c'est l'un d'eux qu'il vient travailler.
+await connecte(bureau)
+await q1(`select public.marquer_present($1,'2026-04-05'::date,'RT')`, [eRepos])
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const avecRt = await q1(
+  `select gardes_travaillees g, jours_payes jp, salaire_brut b from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eRepos])
+ok('le repos travaillé vaut deux gardes', num(avecRt.g) === num(plein.g) + 2,
+   `${plein.g} → ${avecRt.g}`)
+ok('… et ajoute UNE journée payée par-dessus le plafond',
+   num(avecRt.jp) === 27, String(avecRt.jp))
+ok('… soit le salaire plus un vingt-sixième',
+   num(avecRt.b) === Math.round(2600 * 27 / 26 * 100) / 100, String(avecRt.b))
+
+// Deux repos travaillés valent deux journées de plus, pas davantage.
+await connecte(bureau)
+await q1(`select public.marquer_present($1,'2026-04-12'::date,'RT')`, [eRepos])
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+ok('deux repos travaillés valent deux journées de plus',
+   num((await q1(`select jours_payes jp from public.lignes_paie
+                   where periode_id=$1 and employee_id=$2`, [periode, eRepos])).jp) === 28)
+
+// Le plafond tient toujours pour qui n'a travaillé que des jours ordinaires.
+const eTrenteEtUn = await employe('MOIS DE TRENTE ET UN', { cin: 'M31', cnss: '970000002' })
+await connecte(bureau)
+for (const j of joursAvril.slice(0, 26)) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [eTrenteEtUn, j])
+}
+// Une 27e journée ordinaire : un dimanche pointé « X », et non « RT ».
+await q1(`select public.marquer_present($1,'2026-04-05'::date,'X')`, [eTrenteEtUn])
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const borne = await q1(
+  `select gardes_travaillees g, jours_payes jp from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eTrenteEtUn])
+ok('27 journées ordinaires restent payées 26', num(borne.jp) === 26,
+   `${borne.g} travaillées → ${borne.jp} payées`)
 
 // ═══════ UN DÉPART N'EMPORTE QUE SES PROPRES JOURNÉES ═══════
 // Le mois d'avril a été rempli du 1er au 26 pour MOIS COMPLET. S'il part

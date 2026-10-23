@@ -29,7 +29,8 @@ import RecusEspecePrint from '../../components/RecusEspecePrint'
 import EtatSalairesPrint from '../../components/EtatSalairesPrint'
 import ChoixEtatSalaires from '../../components/ChoixEtatSalaires'
 import type { LignePaie, PeriodePaie } from '../../lib/types'
-import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import { ChampDecimal, Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import { lireNombre } from '../../lib/nombreSaisi'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import { useSociete } from '../../lib/queries'
 import { estAdministrateur } from '../../lib/roles'
@@ -1083,12 +1084,12 @@ function useSaisieLigne(ligne: LignePaie, modifiable: boolean, onSaved: () => vo
     mutationFn: async () => {
       const { error } = await supabase.rpc('maj_ligne_paie', {
         p_ligne: ligne.id,
-        p_prime: Number(prime) || 0,
-        p_retenue_dette: Number(dette) || 0,
-        p_autres_retenues: Number(autres) || 0,
+        p_prime: lireNombre(prime) ?? 0,
+        p_retenue_dette: lireNombre(dette) ?? 0,
+        p_autres_retenues: lireNombre(autres) ?? 0,
         p_observations: null,
-        p_frais_transport: Number(transport) || 0,
-        p_frais_panier: Number(panier) || 0,
+        p_frais_transport: lireNombre(transport) ?? 0,
+        p_frais_panier: lireNombre(panier) ?? 0,
       })
       if (error) throw error
     },
@@ -1096,22 +1097,26 @@ function useSaisieLigne(ligne: LignePaie, modifiable: boolean, onSaved: () => vo
   })
 
   const modifie =
-    Number(prime) !== Number(ligne.prime) ||
-    Number(dette) !== Number(ligne.retenue_dette) ||
-    Number(autres) !== Number(ligne.autres_retenues) ||
-    Number(transport) !== Number(ligne.frais_transport) ||
-    Number(panier) !== Number(ligne.frais_panier)
+    (lireNombre(prime) ?? 0) !== Number(ligne.prime) ||
+    (lireNombre(dette) ?? 0) !== Number(ligne.retenue_dette) ||
+    (lireNombre(autres) ?? 0) !== Number(ligne.autres_retenues) ||
+    (lireNombre(transport) ?? 0) !== Number(ligne.frais_transport) ||
+    (lireNombre(panier) ?? 0) !== Number(ligne.frais_panier)
 
+  // Du texte, pas un champ « number » : celui-ci escamotait la virgule
+  // et transformait 100,50 en 10050.
   const champ = (v: string, set: (s: string) => void, max?: number) => (
-    <input
-      type="number"
-      min="0"
-      step="0.01"
-      max={max}
+    <ChampDecimal
       value={v}
       disabled={!modifiable}
-      onChange={(e) => set(e.target.value)}
-      onBlur={() => modifie && enregistrer.mutate()}
+      onChange={set}
+      onBlur={() => {
+        // La retenue de dette ne peut pas dépasser ce qui reste dû :
+        // on ramène au plafond plutôt que de laisser passer.
+        const n = lireNombre(v)
+        if (max != null && n != null && n > max) { set(String(max)); return }
+        if (modifie) enregistrer.mutate()
+      }}
       className="w-full rounded border border-slate-300 px-2 py-1 text-right text-sm tabular-nums disabled:border-transparent disabled:bg-transparent md:w-24"
     />
   )

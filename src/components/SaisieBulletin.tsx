@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useFermerSurEchap } from '../lib/impression'
+import { lireNombre } from '../lib/nombreSaisi'
+import { ChampDecimal } from './ui'
 
 /**
  * LES TROIS CHIFFRES DU BULLETIN.
@@ -40,12 +42,17 @@ export default function SaisieBulletin({
   const [gainLibelle, setGainLibelle] = useState('')
   const [gainMontant, setGainMontant] = useState('')
 
-  const n = (v: string) => Number(v.replace(',', '.')) || 0
-  const vide = salaireBrut.trim() === '' || jours.trim() === ''
+  // Les champs sont du texte : « 3000,50 » dans un champ de type
+  // « number » y laissait « 300050 », et le bulletin partait à trois
+  // cent mille dirhams sans que rien ne le signale.
+  const n = (v: string) => lireNombre(v) ?? 0
+  const illisible = (v: string) => v.trim() !== '' && lireNombre(v) === null
+  const vide = lireNombre(salaireBrut) === null || lireNombre(jours) === null
+  const malEcrit = [salaireBrut, jours, avance, gainMontant].some(illisible)
   const negatif = n(salaireBrut) < 0 || n(jours) < 0 || n(avance) < 0 || n(gainMontant) < 0
   // Un montant sans nom n'aurait pas de libellé sur le bulletin.
   const gainSansNom = n(gainMontant) > 0 && gainLibelle.trim() === ''
-  const invalide = vide || negatif || gainSansNom
+  const invalide = vide || malEcrit || negatif || gainSansNom
 
   const champ = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums'
 
@@ -73,21 +80,20 @@ export default function SaisieBulletin({
 
         <label className="mt-4 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Salaire brut (DH)</span>
-          <input
-            type="number" step="0.01" min="0" autoFocus
+          <ChampDecimal
+            autoFocus
             value={salaireBrut}
-            onChange={(e) => setSalaireBrut(e.target.value)}
-            placeholder="ex. 3046"
+            onChange={setSalaireBrut}
+            placeholder="ex. 3046,50"
             className={champ}
           />
         </label>
 
         <label className="mt-3 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Jours travaillés</span>
-          <input
-            type="number" step="0.5" min="0"
+          <ChampDecimal
             value={jours}
-            onChange={(e) => setJours(e.target.value)}
+            onChange={setJours}
             placeholder="ex. 26"
             className={champ}
           />
@@ -95,10 +101,9 @@ export default function SaisieBulletin({
 
         <label className="mt-3 block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Avance (DH)</span>
-          <input
-            type="number" step="0.01" min="0"
+          <ChampDecimal
             value={avance}
-            onChange={(e) => setAvance(e.target.value)}
+            onChange={setAvance}
             placeholder="0"
             className={champ}
           />
@@ -121,10 +126,9 @@ export default function SaisieBulletin({
               placeholder="ex. Prime exceptionnelle"
               className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
-            <input
-              type="number" step="0.01" min="0"
+            <ChampDecimal
               value={gainMontant}
-              onChange={(e) => setGainMontant(e.target.value)}
+              onChange={setGainMontant}
               placeholder="0"
               className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums"
             />
@@ -134,6 +138,11 @@ export default function SaisieBulletin({
           )}
         </div>
 
+        {malEcrit && (
+          <p className="mt-3 text-sm text-red-600">
+            Un montant se tape en chiffres, la virgule pour les centimes : 3046,50.
+          </p>
+        )}
         {negatif && (
           <p className="mt-3 text-sm text-red-600">Un montant ne peut pas être négatif.</p>
         )}

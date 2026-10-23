@@ -136,14 +136,21 @@ with attendu (numero, bloc, objet, present) as (
   (44, 'Jours payés bornés',       'generer_lignes_paie plafonne',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                  and pg_get_functiondef(p.oid) like '%v_p.jours_base%) as jours_payes%')),
+                  -- Le plafond lui-même, quelle que soit la suite : le
+                  -- BLOC 47 ajoute le supplément derrière, sur la même ligne.
+                  and pg_get_functiondef(p.oid) like '%v_p.jours_base%jours_payes%')),
   (45, 'Pointer un arrivant',      'fonction pointer_depuis_embauche',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'pointer_depuis_embauche')),
   (46, 'Départ et journées',       'la paie borne au contrat',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                  and pg_get_functiondef(p.oid) like '%p.pointed_on <= e.date_sortie%'))
+                  and pg_get_functiondef(p.oid) like '%p.pointed_on <= e.date_sortie%')),
+  (47, 'Repos travaillé',          'le RT vaut deux journées',
+       public.garde_valeur('RT') = 2
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                      and pg_get_functiondef(p.oid) like '%jours_supplementaires%'))
 )
 select numero,
        bloc,

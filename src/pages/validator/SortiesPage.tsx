@@ -17,12 +17,13 @@ import DocumentsSignes from '../../components/DocumentsSignes'
 import ArchiveSorties from '../../components/ArchiveSorties'
 import { useDocuments } from '../../lib/documents'
 import { useModeleSociete } from '../../lib/modeleSociete'
-import { Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
+import { ChampDecimal, Chip, EmptyState, ErrorNote, Spinner } from '../../components/ui'
 import type { Employee } from '../../lib/types'
 import { useSites, useSitesPrincipaux, useSociete } from '../../lib/queries'
 import ApercuEmploye from '../../components/ApercuEmploye'
 import DemanderDateSortie from '../../components/DemanderDateSortie'
 import { estAdministrateur } from '../../lib/roles'
+import { lireNombre } from '../../lib/nombreSaisi'
 
 /**
  * LES SORTIES.
@@ -454,7 +455,7 @@ function FormulaireSortie({
   const champs = {
     employeeId: employee.id,
     dateSortie: f.date_sortie,
-    montant: Number(f.montant) || 0,
+    montant: lireNombre(f.montant) ?? 0,
     mode: f.mode,
     motif: '',
     champs: docLibre,
@@ -535,9 +536,9 @@ function FormulaireSortie({
           <span className="mb-1 block text-sm font-medium text-slate-700">
             Solde de tout compte (DH) *
           </span>
-          <input
-            type="number" min="0" step="0.01" value={f.montant}
-            onChange={(e) => setF((p) => ({ ...p, montant: e.target.value }))}
+          <ChampDecimal
+            value={f.montant}
+            onChange={(v) => setF((p) => ({ ...p, montant: v }))}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
         </label>

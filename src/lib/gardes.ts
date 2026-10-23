@@ -21,7 +21,7 @@ export const TYPES_GARDE: GardeInfo[] = [
   { code: 'X', symbole: 'X', label: 'Travaillé une garde', valeur: 1, absence: false, couleur: 'bg-emerald-500 text-white', groupe: 'travail' },
   { code: 'X15', symbole: 'X̸', label: 'Travaillé une garde et demi', valeur: 1.5, absence: false, couleur: 'bg-emerald-600 text-white', groupe: 'travail' },
   { code: 'XX', symbole: 'XX', label: 'Travaillé deux gardes', valeur: 2, absence: false, couleur: 'bg-emerald-700 text-white', groupe: 'travail' },
-  { code: 'RT', symbole: 'RT', label: 'Repos travaillé', valeur: 1, absence: false, couleur: 'bg-teal-600 text-white', groupe: 'travail' },
+  { code: 'RT', symbole: 'RT', label: 'Repos travaillé (compte double)', valeur: 2, absence: false, couleur: 'bg-teal-600 text-white', groupe: 'travail' },
   { code: 'XF', symbole: 'XF', label: 'Férié travaillé (compte double)', valeur: 2, absence: false, couleur: 'bg-orange-600 text-white', groupe: 'ferie' },
   { code: 'F', symbole: 'F', label: 'Férié chômé (payé)', valeur: 1, absence: true, couleur: 'bg-orange-400 text-white', groupe: 'ferie' },
   { code: 'M', symbole: 'M', label: 'Malade (absence approuvée)', valeur: 1, absence: true, couleur: 'bg-violet-500 text-white', groupe: 'absence' },

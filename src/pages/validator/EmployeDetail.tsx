@@ -12,7 +12,7 @@ import {
 import { TYPES_CONTRAT, contratAffichage, contratStatut, joursRestants } from '../../lib/contrats'
 import { gardeLabel } from '../../lib/gardes'
 import type { Conge, Contrat, Employee, TypeContrat } from '../../lib/types'
-import { Chip, ErrorNote, Spinner } from '../../components/ui'
+import { ChampDecimal, Chip, ErrorNote, Spinner } from '../../components/ui'
 import DocumentsSignes from '../../components/DocumentsSignes'
 import EngagementConge from '../../components/EngagementConge'
 import PanneauDocument from '../../components/PanneauDocument'
@@ -21,6 +21,7 @@ import { modeleEngagement } from '../../lib/engagementConge'
 import { champsASaisir, dateDoc, valeursEmploye } from '../../lib/champsDocument'
 import { useModeleSociete } from '../../lib/modeleSociete'
 import { useDocuments } from '../../lib/documents'
+import { lireNombre } from '../../lib/nombreSaisi'
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none'
@@ -318,7 +319,7 @@ function ContratForm({
         date_debut: f.date_debut,
         date_fin: f.date_fin || null,
         poste: f.poste.trim() || null,
-        salaire_mensuel: f.salaire_mensuel.trim() ? Number(f.salaire_mensuel) : null,
+        salaire_mensuel: lireNombre(f.salaire_mensuel),
         signe_a: f.signe_a.trim() || null,
         signe_le: f.signe_le || null,
         archive: f.archive,
@@ -415,8 +416,8 @@ function ContratForm({
                    onChange={(e) => set('date_fin')(e.target.value)} className={inputCls} />,
           )}
           {surLePapier('salaire') && field('Salaire mensuel (DH)', (
-            <input type="number" min="0" step="0.01" value={f.salaire_mensuel}
-                   onChange={(e) => set('salaire_mensuel')(e.target.value)} className={inputCls} />
+            <ChampDecimal value={f.salaire_mensuel}
+                   onChange={set('salaire_mensuel')} className={inputCls} />
           ))}
           {surLePapier('fait_a') && field('Fait à', (
             <input type="text" value={f.signe_a} onChange={(e) => set('signe_a')(e.target.value)} className={inputCls} />
@@ -823,7 +824,7 @@ function DettePanel({ employee }: { employee: Employee }) {
 
   const enregistrer = useMutation({
     mutationFn: async () => {
-      const v = Number(montant)
+      const v = lireNombre(montant) ?? NaN
       if (!Number.isFinite(v) || v < 0) throw new Error('Le montant doit être positif ou nul.')
       const { error } = await supabase
         .from('employees').update({ dette: v }).eq('id', employee.id)
@@ -835,7 +836,7 @@ function DettePanel({ employee }: { employee: Employee }) {
     },
   })
 
-  const modifie = Number(montant) !== Number(employee.dette ?? 0)
+  const modifie = (lireNombre(montant) ?? NaN) !== Number(employee.dette ?? 0)
 
   return (
     <div>
@@ -850,9 +851,9 @@ function DettePanel({ employee }: { employee: Employee }) {
         <div className="flex flex-wrap items-end gap-3">
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-slate-700">Montant dû (DH)</span>
-            <input
-              type="number" min="0" step="0.01" value={montant}
-              onChange={(e) => setMontant(e.target.value)}
+            <ChampDecimal
+              value={montant}
+              onChange={setMontant}
               className={`${inputCls} w-44 tabular-nums`}
             />
           </label>

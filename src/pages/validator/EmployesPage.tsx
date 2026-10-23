@@ -25,10 +25,11 @@ import ApercuEmploye from '../../components/ApercuEmploye'
 import ListeSimplifieeDialogue from '../../components/ListeSimplifieeDialogue'
 import ChoixImpression from '../../components/ChoixImpression'
 import ListePrint from '../../components/ListePrint'
-import { Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
+import { ChampDecimal, Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spinner } from '../../components/ui'
 import EmployeDetail from './EmployeDetail'
 import ContratRedaction from '../../components/ContratRedaction'
 import { estAdministrateur } from '../../lib/roles'
+import { lireNombre } from '../../lib/nombreSaisi'
 
 const PAGE_SIZE = 50
 
@@ -960,8 +961,8 @@ function EmployeeFormModal({
         horaire: form.horaire || null,
         rib: form.rib.trim() || null,
         banque: form.banque.trim() || null,
-        salaire: form.salaire.trim() ? Number(form.salaire) : null,
-        heures_par_jour: form.heures_par_jour.trim() ? Number(form.heures_par_jour) : null,
+        salaire: lireNombre(form.salaire),
+        heures_par_jour: lireNombre(form.heures_par_jour),
         situation_familiale: form.situation_familiale || null,
         // Un célibataire n'a pas d'enfants à déclarer ici
         nombre_enfants: SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale)
@@ -1189,10 +1190,10 @@ function EmployeeFormModal({
             <p className="text-sm font-semibold text-slate-700">Paie & banque</p>
           </div>
           {field('Salaire mensuel (DH)', (
-            <input type="number" min="0" step="0.01" value={form.salaire} onChange={(e) => set('salaire')(e.target.value)} className={inputCls} placeholder="ex. 3000" />
+            <ChampDecimal value={form.salaire} onChange={set('salaire')} className={inputCls} placeholder="ex. 3000,50" />
           ))}
           {field('Heures par jour', (
-            <input type="number" min="0" step="0.5" value={form.heures_par_jour} onChange={(e) => set('heures_par_jour')(e.target.value)} className={inputCls} placeholder="ex. 8" />
+            <ChampDecimal value={form.heures_par_jour} onChange={set('heures_par_jour')} className={inputCls} placeholder="ex. 8" />
           ))}
           {field('Banque', (
             <ChoixBanque value={form.banque} onChange={set('banque')} className={inputCls} />

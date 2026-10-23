@@ -116,6 +116,14 @@ export default function ArchiveBulletins({
               </li>
             ))}
           </ul>
+          {/* Le refus se lit ici, sous les boutons. Plus bas, il passait
+              inaperçu : on cliquait « Autoriser », rien ne bougeait, et
+              rien ne disait pourquoi. */}
+          {repondre.error && (
+            <p className="mt-2 text-sm font-medium text-red-700">
+              Autorisation impossible : {repondre.error.message}
+            </p>
+          )}
         </div>
       )}
 
@@ -201,7 +209,6 @@ export default function ArchiveBulletins({
         </div>
       ))}
 
-      {repondre.error && <ErrorNote>{repondre.error.message}</ErrorNote>}
       {supprimer.error && <ErrorNote>{supprimer.error.message}</ErrorNote>}
 
       {aDemander && (

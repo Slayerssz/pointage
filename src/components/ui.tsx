@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { frappeAcceptable } from '../lib/nombreSaisi'
 
 export function Spinner({ label }: { label?: string }) {
   return (
@@ -164,5 +165,55 @@ export function Pagination({
         Suivant →
       </button>
     </div>
+  )
+}
+
+/**
+ * UN CHAMP DE NOMBRE À VIRGULE.
+ *
+ * Pas un `<input type="number">` : celui-ci escamote la virgule au lieu
+ * de la refuser. Taper « 3000,50 » y laissait « 300050 » — un bulletin
+ * de trois mille dirhams devenu trois cent mille, en silence.
+ *
+ * Ici le champ est du texte, la frappe est filtrée au caractère près, et
+ * la virgule est acceptée comme le point. La valeur reste la chaîne
+ * tapée ; c'est `lireNombre` qui la convertit au moment de s'en servir.
+ */
+export function ChampDecimal({
+  value,
+  onChange,
+  className,
+  placeholder,
+  autoFocus,
+  disabled,
+  onBlur,
+  id,
+}: {
+  value: string
+  onChange: (v: string) => void
+  className?: string
+  placeholder?: string
+  autoFocus?: boolean
+  disabled?: boolean
+  onBlur?: () => void
+  id?: string
+}) {
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      autoFocus={autoFocus}
+      disabled={disabled}
+      onBlur={onBlur}
+      value={value}
+      placeholder={placeholder}
+      className={className}
+      onChange={(e) => {
+        // Ce qui n'est pas une frappe de nombre est ignoré : le champ
+        // garde ce qu'il avait, plutôt que d'accueillir une lettre.
+        if (frappeAcceptable(e.target.value)) onChange(e.target.value)
+      }}
+    />
   )
 }

@@ -334,6 +334,47 @@ const longue = decouperEnPages(100000, 1000)
 ok('cent pages sortent bien toutes', longue.length === 100 && continu(longue, 100000),
    String(longue.length))
 
+// ── Lire un nombre tapé à la main ──────────────────────────────────────
+// Un champ « number » n'accepte pas la virgule, et ne se contente pas de
+// la refuser : taper « 3000,50 » y laisse « 300050 ». Un bulletin de
+// trois mille dirhams devenait un bulletin de trois cent mille, sans un
+// mot. D'où des champs en texte, et cette lecture-ci.
+const { code: codeNb } = await transformWithOxc(
+  fs.readFileSync('src/lib/nombreSaisi.ts', 'utf8'), 'nb.ts', { lang: 'ts' })
+const { lireNombre, lireNombreOu, frappeAcceptable, ecrireNombre } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeNb).toString('base64'))
+
+ok('la virgule vaut le point', lireNombre('3000,50') === 3000.5, String(lireNombre('3000,50')))
+ok('le point marche aussi', lireNombre('3000.50') === 3000.5)
+ok('un entier reste entier', lireNombre('3046') === 3046)
+ok('les espaces de groupement tombent',
+   lireNombre('3 000,50') === 3000.5 && lireNombre('3 000,50') === 3000.5
+   && lireNombre('3 000,50') === 3000.5, String(lireNombre('3 000,50')))
+ok('un champ vide ne vaut pas zéro mais rien',
+   lireNombre('') === null && lireNombre('   ') === null)
+ok('ce qui n’est pas un nombre est refusé',
+   ['abc', '12abc', '1,2,3', '--3', '3-', ',', '.'].every((v) => lireNombre(v) === null),
+   ['abc', '12abc', '1,2,3', '--3', '3-'].map((v) => `${v}→${lireNombre(v)}`).join(' '))
+ok('… et surtout pas changé en autre chose',
+   lireNombre('300050') === 300050 && lireNombre('3000,50') !== 300050)
+ok('un négatif se lit négatif', lireNombre('-12,5') === -12.5)
+ok('une valeur par défaut remplace l’absence',
+   lireNombreOu('', 0) === 0 && lireNombreOu('abc', 7) === 7 && lireNombreOu('4,5', 0) === 4.5)
+
+// Ce qu'on laisse taper : les états de passage comptent, sinon on ne
+// peut pas écrire « 3, » avant « 3,5 ».
+ok('on peut taper un nombre à virgule, caractère par caractère',
+   ['', '3', '30', '300', '3000', '3000,', '3000,5', '3000,50'].every(frappeAcceptable))
+ok('… le point aussi', ['3.', '3.5'].every(frappeAcceptable))
+ok('… et le signe seul, le temps de la frappe', frappeAcceptable('-'))
+ok('une lettre n’entre pas dans un montant',
+   !frappeAcceptable('3a') && !frappeAcceptable('abc') && !frappeAcceptable('3,5,'))
+
+ok('un nombre se réécrit avec sa virgule',
+   ecrireNombre(3000.5) === '3000,5' && ecrireNombre(26) === '26' && ecrireNombre(null) === '')
+ok('… et ce qui est réécrit se relit à l’identique',
+   [0, 26, 3000.5, 1525, -12.5].every((n) => lireNombre(ecrireNombre(n)) === n))
+
 // ── L'ordre de virement ne connaît pas les centimes ─────────────────────
 // La banque vire des dirhams entiers. Le piège est ailleurs : le total
 // écrit en toutes lettres doit égaler la colonne imprimée. Si l'un
