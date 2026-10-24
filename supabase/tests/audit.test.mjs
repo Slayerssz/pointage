@@ -1373,6 +1373,41 @@ await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
   /Action réservée/i)
 
+// ═══════ LE BRUT SAISI SE LIT SUR SA PROPRE LIGNE ═══════
+// La colonne « Base » de la ligne SALAIRE BRUT montrait le salaire du
+// contrat même quand la paie imposait un autre brut : on lisait le
+// contrat sur la ligne du brut, puis le montant saisi deux lignes plus
+// bas, en assiette de C.N.S.S. De quoi croire les deux intervertis.
+
+section('Le salaire brut saisi')
+
+await connecte(paie)
+const ligneDuBulletin = async (brut, jours, libelle) => {
+  const doc = (await q1(`select public.bulletin_paie($1,$2,$3,$4,0,null,0) as d`,
+                        [periode, ePlein, brut, jours])).d
+  return doc[0].lignes.find((l) => new RegExp(libelle).test(l.libelle))
+}
+
+// ePlein : salaire de contrat 5200, mois complet de 26 jours.
+const brutSaisi = await ligneDuBulletin(3500, 26, '^SALAIRE BRUT$')
+ok('le brut saisi se lit en base de sa propre ligne', num(brutSaisi.base) === 3500,
+   String(brutSaisi.base))
+ok('… et en gain, comme avant', num(brutSaisi.gain) === 3500, String(brutSaisi.gain))
+ok('… la C.N.S.S. garde la même assiette',
+   num((await ligneDuBulletin(3500, 26, 'C.N.S.S')).base) === 3500)
+
+// Sur un mois partiel, la base affichée reste celle qui donne le brut :
+// la ligne doit pouvoir se relire — base × jours / base de jours.
+const brutPartiel = await ligneDuBulletin(3500, 20, '^SALAIRE BRUT$')
+ok('sur un mois partiel, la ligne se relit juste',
+   Math.abs(num(brutPartiel.base) * 20 / 26 - 3500) < 0.01,
+   `${brutPartiel.base} × 20 / 26 = ${(num(brutPartiel.base) * 20 / 26).toFixed(2)}`)
+
+// Sans saisie, rien ne change : c'est le salaire du contrat.
+const brutSansSaisie = await ligneDuBulletin(null, null, '^SALAIRE BRUT$')
+ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) === 5200,
+   String(brutSansSaisie.base))
+
 // ═══════ LE REPOS TRAVAILLÉ PAIE UNE JOURNÉE DE PLUS ═══════
 // Travailler son jour de repos ne rapportait rien : un RT comptait pour
 // une journée ordinaire, et le plafond des 26 la reprenait aussitôt que

@@ -150,7 +150,11 @@ with attendu (numero, bloc, objet, present) as (
        public.garde_valeur('RT') = 2
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                     where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                      and pg_get_functiondef(p.oid) like '%jours_supplementaires%'))
+                      and pg_get_functiondef(p.oid) like '%jours_supplementaires%')),
+  (48, 'Base du brut saisi',       'la ligne SALAIRE BRUT porte sa propre base',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'bulletin_paie'
+                  and pg_get_functiondef(p.oid) like '%base_brut%'))
 )
 select numero,
        bloc,
