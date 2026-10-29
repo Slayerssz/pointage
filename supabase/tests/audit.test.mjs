@@ -317,7 +317,10 @@ const ligne = async (emp) => await q1(
 const lPlein = await ligne(ePlein)
 ok('26 gardes sur base 26 → salaire entier, 5 200,00 DH',
    num(lPlein.salaire_brut) === 5200, String(lPlein.salaire_brut))
-ok('… soit 26 × 8 h = 208 heures', num(lPlein.heures_effectuees) === 208,
+// La semaine légale marocaine fait 44 heures — cinq journées pleines
+// et le samedi en demi-journée — soit 191 heures par mois, et non
+// 26 × 8 = 208. Les heures suivent les jours payés sur cette durée.
+ok('… soit le mois légal entier, 191 heures', num(lPlein.heures_effectuees) === 191,
    String(lPlein.heures_effectuees))
 
 // Un mois complet paie un mois complet, jamais davantage.
@@ -333,13 +336,15 @@ const lPartiel = await ligne(ePartiel)
 // 5 200 ÷ 26 × 20 = 200 × 20 = 4 000,00
 ok('20 gardes → 5 200 ÷ 26 × 20 = 4 000,00 DH',
    num(lPartiel.salaire_brut) === 4000, String(lPartiel.salaire_brut))
-ok('… soit 160 heures', num(lPartiel.heures_effectuees) === 160)
+ok('… soit 20 / 26 × 191 = 146,92 heures',
+   num(lPartiel.heures_effectuees) === 146.92, String(lPartiel.heures_effectuees))
 
 const lDemi = await ligne(eDemi)
 // 12 demi-gardes = 6 gardes → 200 × 6 = 1 200,00
 ok('12 demi-gardes = 6 gardes → 1 200,00 DH',
    num(lDemi.salaire_brut) === 1200, String(lDemi.salaire_brut))
-ok('… soit 48 heures', num(lDemi.heures_effectuees) === 48, String(lDemi.heures_effectuees))
+ok('… soit 6 / 26 × 191 = 44,08 heures',
+   num(lDemi.heures_effectuees) === 44.08, String(lDemi.heures_effectuees))
 
 // Prime et retenue : le net suit exactement.
 await q1(`select public.maj_ligne_paie($1,350,0,120,'Prime et retenue')`, [lPartiel.id])

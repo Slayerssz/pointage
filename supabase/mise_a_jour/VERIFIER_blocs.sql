@@ -154,7 +154,11 @@ with attendu (numero, bloc, objet, present) as (
   (48, 'Base du brut saisi',       'la ligne SALAIRE BRUT porte sa propre base',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'bulletin_paie'
-                  and pg_get_functiondef(p.oid) like '%base_brut%'))
+                  and pg_get_functiondef(p.oid) like '%base_brut%')),
+  (49, 'Heures du mois',          'la paie compte 191 heures, pas 26 × 8',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                  and pg_get_functiondef(p.oid) like '%v_heures_mois%'))
 )
 select numero,
        bloc,

@@ -58,6 +58,22 @@ function valeursDuContrat(c: Contrat): Record<string, string> {
   }
 }
 
+/**
+ * Les trois volets de la fiche. Vingt champs à la file ne se lisaient
+ * plus, surtout sur un téléphone : on les range par sujet — qui est la
+ * personne, où elle travaille, comment on la paie.
+ *
+ * Le registre dit aussi où se trouve chaque champ obligatoire : quand
+ * l'enregistrement bute sur l'un d'eux, c'est son onglet qui s'ouvre.
+ */
+const ONGLETS_FICHE = [
+  { code: 'identite', label: 'Identité' },
+  { code: 'poste', label: 'Poste' },
+  { code: 'paie', label: 'Paie & banque' },
+] as const
+
+type OngletFiche = (typeof ONGLETS_FICHE)[number]['code']
+
 export default function EmployesPage() {
   const { companyId } = useParams()
   const { profile } = useAuth()
@@ -897,6 +913,7 @@ function EmployeeFormModal({
   // « Fiche » = les informations de l'employé ; « Dossier » = contrats,
   // congés et dettes (uniquement pour un employé déjà enregistré).
   const [vue, setVue] = useState<'fiche' | 'dossier'>('fiche')
+  const [onglet, setOnglet] = useState<OngletFiche>('identite')
 
   // La question posée quand on passe quelqu'un à « Sorti ».
   const [dateSortieADemander, setDateSortieADemander] = useState(false)
@@ -932,15 +949,22 @@ function EmployeeFormModal({
 
   const save = useMutation({
     mutationFn: async () => {
-      if (!form.nom_prenom.trim()) throw new Error('Le nom est obligatoire.')
-      if (!form.site_id) throw new Error('Choisissez un site.')
+      // Un champ manquant peut être sur un autre onglet que celui qu'on
+      // regarde : on l'ouvre, sans quoi le message désignerait un champ
+      // invisible.
+      const refuser = (onglet: OngletFiche, message: string) => {
+        setOnglet(onglet)
+        throw new Error(message)
+      }
+      if (!form.nom_prenom.trim()) refuser('identite', 'Le nom est obligatoire.')
+      if (!form.site_id) refuser('poste', 'Choisissez un site.')
       if (form.statut === 'sorti' && !form.date_sortie) {
-        throw new Error('Indiquez le dernier jour travaillé avant de marquer la sortie.')
+        refuser('poste', 'Indiquez le dernier jour travaillé avant de marquer la sortie.')
       }
       // À l'inscription, le jour de repos décide des journées qu'on va
       // poser : sans lui, on pointerait quelqu'un sept jours sur sept.
       if (!employee && !form.jour_de_repos) {
-        throw new Error('Choisissez son jour de repos : ses journées du mois en dépendent.')
+        refuser('poste', 'Choisissez son jour de repos : ses journées du mois en dépendent.')
       }
       const payload = {
         site_id: form.site_id,
@@ -1073,11 +1097,86 @@ function EmployeeFormModal({
           </div>
         )}
 
+        {/* Vingt champs à la file, c'était illisible — surtout sur un
+            téléphone. Ils sont rangés par sujet ; le bouton Enregistrer
+            porte sur la fiche entière, quel que soit l'onglet ouvert. */}
+        <div className={`mb-4 flex gap-1 rounded-xl bg-slate-100 p-1 ${employee && vue !== 'fiche' ? 'hidden' : ''}`}>
+          {ONGLETS_FICHE.map((o) => (
+            <button
+              key={o.code}
+              type="button"
+              onClick={() => setOnglet(o.code)}
+              className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                onglet === o.code
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+
         <div className={`grid gap-4 sm:grid-cols-2 ${employee && vue !== 'fiche' ? 'hidden' : ''}`}>
-          {field('Nom & Prénom *', (
+          {onglet === 'identite' && (
+            <>
+{field('Nom & Prénom *', (
             <input type="text" value={form.nom_prenom} onChange={(e) => set('nom_prenom')(e.target.value)} className={inputCls} />
           ))}
-          {field('Site *', (
+          
+{field('CIN', (
+            <input type="text" value={form.cin} onChange={(e) => set('cin')(e.target.value)} className={inputCls} />
+          ))}
+          
+{field('CNSS', (
+            <input type="text" value={form.cnss} onChange={(e) => set('cnss')(e.target.value)} className={inputCls} />
+          ))}
+          
+{field('Date de naissance', (
+            <DateInputFr value={form.date_naissance} onChange={set('date_naissance')} className={inputCls} />
+          ))}
+          
+{field('Situation familiale', (
+            <select
+              value={form.situation_familiale}
+              onChange={(e) => set('situation_familiale')(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">— Non renseignée —</option>
+              {SITUATIONS_FAMILIALES.map((sf) => (
+                <option key={sf} value={sf}>{sf}</option>
+              ))}
+            </select>
+          ))}
+          
+{SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale) &&
+            field("Nombre d'enfants", (
+              <input
+                type="number" min="0" max="30" value={form.nombre_enfants}
+                onChange={(e) => set('nombre_enfants')(e.target.value)} className={inputCls}
+              />
+            ))}
+          
+{field('Téléphone', (
+            <input type="tel" value={form.telephone} onChange={(e) => set('telephone')(e.target.value)} className={inputCls} placeholder="06 00 00 00 00" />
+          ))}
+          
+{field('Ville', (
+            <input type="text" value={form.ville} onChange={(e) => set('ville')(e.target.value)} className={inputCls} />
+          ))}
+          
+<div className="sm:col-span-2">
+            {field('Adresse', (
+              <input type="text" value={form.adresse} onChange={(e) => set('adresse')(e.target.value)} className={inputCls} />
+            ))}
+          </div>
+          
+            </>
+          )}
+
+          {onglet === 'poste' && (
+            <>
+{field('Site *', (
             <select value={form.site_id} onChange={(e) => set('site_id')(e.target.value)} className={inputCls}>
               <option value="">— Choisir un site —</option>
               {sites?.map((s) => (
@@ -1085,33 +1184,29 @@ function EmployeeFormModal({
               ))}
             </select>
           ))}
-          {field(employee ? 'Matricule' : 'Matricule (vide = automatique)', (
+          
+{field(employee ? 'Matricule' : 'Matricule (vide = automatique)', (
             <input type="number" value={form.matricule} onChange={(e) => set('matricule')(e.target.value)} className={inputCls} placeholder="automatique" />
           ))}
-          {field('Qualification', (
+          
+{field('Qualification', (
             <select value={form.qualification} onChange={(e) => set('qualification')(e.target.value)} className={inputCls}>
               {[...new Set([...QUALIFICATIONS, form.qualification].filter(Boolean))].map((q) => (
                 <option key={q} value={q}>{q}</option>
               ))}
             </select>
           ))}
-          {field('Département', (
+          
+{field('Département', (
             <input type="text" value={form.departement} onChange={(e) => set('departement')(e.target.value)}
                    className={inputCls} placeholder="ex. NETTOYAGE, SÉCURITÉ" />
           ))}
-          {field('CIN', (
-            <input type="text" value={form.cin} onChange={(e) => set('cin')(e.target.value)} className={inputCls} />
-          ))}
-          {field('CNSS', (
-            <input type="text" value={form.cnss} onChange={(e) => set('cnss')(e.target.value)} className={inputCls} />
-          ))}
-          {field('Date de naissance', (
-            <DateInputFr value={form.date_naissance} onChange={set('date_naissance')} className={inputCls} />
-          ))}
-          {field("Date d'embauche", (
+          
+{field("Date d'embauche", (
             <DateInputFr value={form.date_embauche} onChange={set('date_embauche')} className={inputCls} />
           ))}
-          {employee && !ficheSeule && field('Statut', (
+          
+{employee && !ficheSeule && field('Statut', (
             <select
               value={form.statut}
               onChange={(e) => {
@@ -1129,44 +1224,8 @@ function EmployeeFormModal({
           ), form.statut === 'sorti' && form.date_sortie
                ? `Sorti le ${formatDateFr(form.date_sortie)} — cliquez de nouveau sur « Sorti » pour changer la date.`
                : undefined)}
-          {field('Situation familiale', (
-            <select
-              value={form.situation_familiale}
-              onChange={(e) => set('situation_familiale')(e.target.value)}
-              className={inputCls}
-            >
-              <option value="">— Non renseignée —</option>
-              {SITUATIONS_FAMILIALES.map((sf) => (
-                <option key={sf} value={sf}>{sf}</option>
-              ))}
-            </select>
-          ))}
-          {SITUATIONS_AVEC_ENFANTS.includes(form.situation_familiale as SituationFamiliale) &&
-            field("Nombre d'enfants", (
-              <input
-                type="number" min="0" max="30" value={form.nombre_enfants}
-                onChange={(e) => set('nombre_enfants')(e.target.value)} className={inputCls}
-              />
-            ))}
-          {field('Téléphone', (
-            <input type="tel" value={form.telephone} onChange={(e) => set('telephone')(e.target.value)} className={inputCls} placeholder="06 00 00 00 00" />
-          ))}
-          {field('Ville', (
-            <input type="text" value={form.ville} onChange={(e) => set('ville')(e.target.value)} className={inputCls} />
-          ))}
-          <div className="sm:col-span-2">
-            {field('Adresse', (
-              <input type="text" value={form.adresse} onChange={(e) => set('adresse')(e.target.value)} className={inputCls} />
-            ))}
-          </div>
-          {field('Mode de règlement', (
-            <select value={form.mode_reglement} onChange={(e) => set('mode_reglement')(e.target.value)} className={inputCls}>
-              {[...new Set([...MODES_REGLEMENT, form.mode_reglement].filter(Boolean))].map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          ))}
-          {field(employee ? 'Jour de repos' : 'Jour de repos *', (
+          
+{field(employee ? 'Jour de repos' : 'Jour de repos *', (
             <select value={form.jour_de_repos} onChange={(e) => set('jour_de_repos')(e.target.value)} className={inputCls}>
               <option value="">{employee ? 'Aucun' : '— Choisir —'}</option>
               {JOURS_SEMAINE.map((jour, i) => (
@@ -1176,7 +1235,8 @@ function EmployeeFormModal({
           ), !employee
                ? 'Obligatoire : ses journées du mois se posent toutes seules, et c’est ce jour-là qu’elles épargnent.'
                : undefined)}
-          {/* Un agent de nuit ne se planifie pas comme une agente du matin. */}
+          
+{/* Un agent de nuit ne se planifie pas comme une agente du matin. */}
           {field('Horaire', (
             <select value={form.horaire} onChange={(e) => set('horaire')(e.target.value)} className={inputCls}>
               <option value="">Non fixé</option>
@@ -1186,23 +1246,39 @@ function EmployeeFormModal({
             </select>
           ))}
 
-          <div className="sm:col-span-2 mt-2 border-t border-slate-100 pt-4">
-            <p className="text-sm font-semibold text-slate-700">Paie & banque</p>
-          </div>
-          {field('Salaire mensuel (DH)', (
+          
+            </>
+          )}
+
+          {onglet === 'paie' && (
+            <>
+{field('Mode de règlement', (
+            <select value={form.mode_reglement} onChange={(e) => set('mode_reglement')(e.target.value)} className={inputCls}>
+              {[...new Set([...MODES_REGLEMENT, form.mode_reglement].filter(Boolean))].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          ))}
+          
+{field('Salaire mensuel (DH)', (
             <ChampDecimal value={form.salaire} onChange={set('salaire')} className={inputCls} placeholder="ex. 3000,50" />
           ))}
-          {field('Heures par jour', (
+          
+{field('Heures par jour', (
             <ChampDecimal value={form.heures_par_jour} onChange={set('heures_par_jour')} className={inputCls} placeholder="ex. 8" />
           ))}
-          {field('Banque', (
+          
+{field('Banque', (
             <ChoixBanque value={form.banque} onChange={set('banque')} className={inputCls} />
           ))}
-          <div className="sm:col-span-2">
+          
+<div className="sm:col-span-2">
             {field('RIB', (
               <input type="text" value={form.rib} onChange={(e) => set('rib')(e.target.value)} className={inputCls} placeholder="24 chiffres" />
             ))}
           </div>
+            </>
+          )}
         </div>
 
         {save.error && (!employee || vue === 'fiche') && (
