@@ -27,7 +27,10 @@ const LARGEUR = COL.nom + COL.rib + COL.montant
 /** Cartouche : la colonne des intitulés, puis celle des valeurs. */
 const CARTOUCHE = { label: 74, valeur: LARGEUR - 74, hauteur: 7 }
 
-const LIGNE = 7.5
+// La hauteur d'une ligne de bénéficiaire. Resserrée : chaque
+// millimètre repris est une personne de plus sur la feuille, et la
+// banque préfère un ordre d'une page à un ordre de trois.
+const LIGNE = 6.5
 
 /** Les hauteurs fixes de la feuille, en millimètres. */
 const H_CARTOUCHE = CARTOUCHE.hauteur * 6 // la case date, puis cinq intitulés
@@ -35,8 +38,15 @@ const H_ENTETE_TABLEAU = 9
 /** Deux lignes d'adresse, et trois réservées à la somme en toutes lettres. */
 const H_FORMULE = 1.5 + 4.6 * 5 + 1.4
 const H_SANS_FORMULE = 3
-/** Le pavé des signatures, sur la dernière feuille d'un ordre. */
-const H_SIGNATURES = 6 + 7 + 40
+/**
+ * La place laissée pour signer, et la hauteur totale du pavé : le
+ * blanc, son bandeau et l'espace qui l'en sépare. Les deux sont liés —
+ * la pagination compte sur `H_SIGNATURES` et le dessin trace
+ * `H_PAVE_SIGNATURE` ; les laisser diverger faisait déborder chaque
+ * feuille de la bande libre du papier.
+ */
+const H_PAVE_SIGNATURE = 29
+const H_SIGNATURES = 6 + 7 + H_PAVE_SIGNATURE
 
 /**
  * Combien de bénéficiaires par feuille ? Cela dépend du papier : celui
@@ -56,18 +66,23 @@ export function paginerOrdre(
   // dernière : une feuille qu'on présente à la banque sans signature
   // n'est pas un ordre. Toutes réservent donc la même place, et tiennent
   // le même nombre de bénéficiaires.
-  const parPage = Math.max(1, Math.floor((o.bas - o.haut - tete - H_SIGNATURES) / LIGNE))
+  // Un millimètre de marge : la dernière rangée ne doit pas venir se
+  // poser exactement sur le bord de la bande libre du papier.
+  const parPage = Math.max(
+    1, Math.floor((o.bas - o.haut - tete - H_SIGNATURES - 1) / LIGNE),
+  )
 
   if (nbLignes <= 0) return [0]
   if (nbLignes <= parPage) return [nbLignes]
 
-  // Réparti au plus juste : mieux vaut trois feuilles de onze qu'une
-  // pleine et une presque vide.
-  const k = Math.ceil(nbLignes / parPage)
+  // Chaque feuille est remplie avant d'en ouvrir une autre. On a
+  // longtemps réparti au plus juste — trois feuilles de onze plutôt
+  // qu'une pleine et une presque vide — mais ce qui compte au guichet
+  // est le nombre de feuilles à signer et à porter, pas leur équilibre.
   const pages: number[] = []
   let reste = nbLignes
-  for (let i = k; i > 0; i--) {
-    const t = Math.min(parPage, Math.ceil(reste / i))
+  while (reste > 0) {
+    const t = Math.min(parPage, reste)
     pages.push(t)
     reste -= t
   }
@@ -324,7 +339,7 @@ export async function dessinerOrdreVirement(opts: {
               'Partie réservée aux personnes habilitées à transmettre les ordres de virements',
               { gras: true, fond: true, taille: 9 })
         y += 7
-        doc.rect(x, y, LARGEUR, 40)
+        doc.rect(x, y, LARGEUR, H_PAVE_SIGNATURE)
         doc.setFont('times', 'bold').setFontSize(9.5)
         doc.text('Signatures  autorisées :', x + 2, y + 6)
         doc.text('Autentification Signatures "Cachet Agence":', x + LARGEUR - 2, y + 6, { align: 'right' })

@@ -86,7 +86,12 @@ export default function OrdreVirementPrint({
 
   // Bordures épaisses du modèle : un trait franc, noir, partout.
   const B = '1.4px solid #000'
-  const cell: React.CSSProperties = { border: B, padding: '1.6mm 2.2mm', fontSize: '9.5pt' }
+  // La marge intérieure et l'interligne sont fixés : une rangée doit
+  // mesurer les 6,5 mm sur lesquels la pagination a compté, sinon la
+  // dernière déborderait du papier.
+  const cell: React.CSSProperties = {
+    border: B, padding: '0.9mm 2.2mm', fontSize: '9.5pt', lineHeight: 1.15,
+  }
   const gras: React.CSSProperties = { ...cell, fontWeight: 700 }
 
   return (
@@ -201,7 +206,7 @@ export default function OrdreVirementPrint({
                     </thead>
                     <tbody>
                       {page.map((l) => (
-                        <tr key={l.id} style={{ height: '7.6mm' }}>
+                        <tr key={l.id} style={{ height: '6.5mm' }}>
                           <td style={{ ...cell, textTransform: 'uppercase' }}>{l.nom_prenom}</td>
                           <td style={{ ...cell, fontFamily: 'monospace', fontWeight: 700,
                                        letterSpacing: '.03em', whiteSpace: 'nowrap' }}>
@@ -226,7 +231,7 @@ export default function OrdreVirementPrint({
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ ...gras, borderRight: 'none', height: '42mm', verticalAlign: 'top', width: '50%' }}>
+                          <td style={{ ...gras, borderRight: 'none', height: '29mm', verticalAlign: 'top', width: '50%' }}>
                             Signatures&nbsp; autorisées :
                           </td>
                           <td style={{ ...gras, borderLeft: 'none', verticalAlign: 'top', textAlign: 'right' }}>

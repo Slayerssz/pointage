@@ -90,7 +90,10 @@ ok('renouvellement : un an moins un jour', unAnApres('2026-07-01') === '2027-06-
 ok('renouvellement sur année bissextile', unAnApres('2027-03-01') === '2028-02-29', unAnApres('2027-03-01'))
 // La méthode fautive : toISOString() recule d'un jour dès que le fuseau est en avance
 const fautif = (iso) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) }
-const decalage = new Date().getTimezoneOffset() < 0
+// Le décalage se lit sur la date EXAMINÉE, pas sur aujourd'hui : dans
+// un fuseau à heure d'été, les deux diffèrent la moitié de l'année, et
+// le test se jugeait alors sur la mauvaise branche.
+const decalage = new Date('2026-09-10T00:00:00').getTimezoneOffset() < 0
 ok(decalage ? 'la méthode par toISOString aurait bien été fautive ici'
             : 'fuseau non décalé : les deux méthodes coïncident',
    decalage ? fautif('2026-09-10') !== '2026-09-11' : fautif('2026-09-10') === '2026-09-11',
@@ -278,6 +281,52 @@ ok('le bandeau est la couleur très éclaircie',
    eclaircir('#000000', 0.22).join(',') === '199,199,199',
    eclaircir('#000000', 0.22).join(','))
 ok('… et le blanc reste blanc', eclaircir('#ffffff', 0.22).join(',') === '255,255,255')
+
+// ── Combien de bénéficiaires par feuille de virement ───────────────────
+// Dix personnes tenaient sur deux feuilles chez les sociétés au papier
+// court. Chaque feuille se remplit désormais avant d'en ouvrir une
+// autre, et la place rendue par le pavé des signatures en fait tenir
+// davantage. Ce qui ne doit JAMAIS arriver : annoncer plus de lignes
+// que la bande libre du papier n'en porte.
+const { rolldown: rolldownOv } = await import('rolldown')
+const bOv = await rolldownOv({
+  input: 'src/lib/ordreVirementPdf.ts', external: ['jspdf'], logLevel: 'silent',
+})
+const { output: sortieOv } = await bOv.generate({ format: 'esm' })
+const { paginerOrdre, papierDe, veutLaFormule } = await import(
+  'data:text/javascript;base64,' + Buffer.from(sortieOv[0].code).toString('base64'))
+
+const PAPIERS = ['BO', 'DUO MULTI SERVICE', 'EDEN VERT SERVICE', 'EXSERIA GROUPE',
+  'GROUPE TRIPLE A', 'MEGAINTER SERVICE MAROC', 'NORD PLANET', 'SERCLEAN NEGOCE',
+  'TRIMAX', 'AL SAFAE EL MAGHREB', 'VIGILMA GARD MAROC', 'TRAITEUR AYA']
+const mesures = (nom) => {
+  const { haut, bas } = papierDe(nom)
+  return { haut, bas, avecFormule: veutLaFormule(nom) }
+}
+
+for (const nom of PAPIERS) {
+  const m = mesures(nom)
+  const parPage = paginerOrdre(999, m)[0]
+  ok(`${nom} : dix bénéficiaires tiennent sur une feuille`,
+     paginerOrdre(10, m).length === 1, `${parPage} par feuille`)
+  // Hauteurs mesurées sur le dessin : cartouche 42, formule 25,9 (ou 3),
+  // en-tête 9, ligne 6,5, pavé des signatures 42.
+  const tete = 42 + (m.avecFormule ? 1.5 + 4.6 * 5 + 1.4 : 3) + 9
+  ok(`… et une feuille pleine tient dans la bande libre`,
+     tete + parPage * 6.5 + 42 <= m.bas - m.haut,
+     `${(tete + parPage * 6.5 + 42).toFixed(1)} mm pour ${(m.bas - m.haut).toFixed(1)} mm`)
+}
+
+const serclean = mesures('SERCLEAN NEGOCE')   // le papier le plus court
+const sercleanParPage = paginerOrdre(999, serclean)[0]
+ok('les feuilles se remplissent, au lieu de s’équilibrer',
+   paginerOrdre(sercleanParPage + 1, serclean).join('+')
+   === `${sercleanParPage}+1`,
+   paginerOrdre(sercleanParPage + 1, serclean).join('+'))
+ok('… et personne ne se perd au découpage',
+   paginerOrdre(137, serclean).reduce((t, n) => t + n, 0) === 137)
+ok('une liste vide donne une feuille, pas zéro',
+   paginerOrdre(0, serclean).join('') === '0')
 
 // ── Découper un document haut en pages ─────────────────────────────────
 // « Enregistrer en PDF » réduisait la liste entière à une seule page :
