@@ -22,6 +22,7 @@ import type { Employee } from '../../lib/types'
 import { useSites, useSitesPrincipaux, useSociete } from '../../lib/queries'
 import ApercuEmploye from '../../components/ApercuEmploye'
 import DemanderDateSortie from '../../components/DemanderDateSortie'
+import ReprendreEmploye from '../../components/ReprendreEmploye'
 import { estAdministrateur } from '../../lib/roles'
 import { lireNombre } from '../../lib/nombreSaisi'
 
@@ -86,7 +87,18 @@ export default function SortiesPage() {
   // Corriger une date de sortie : ceux qu'on a marqués avant la mise à
   // jour portent la date du jour, et non celle de leur vrai départ.
   const [aCorriger, setACorriger] = useState<Employee | null>(null)
+  // Reprendre quelqu'un : il revient avec toute sa fiche, mais le jour
+  // du retour et son annexe ne se devinent pas.
+  const [aReprendre, setAReprendre] = useState<Employee | null>(null)
   const qc = useQueryClient()
+
+  /** Les écrans qui montrent du monde doivent tous se rafraîchir. */
+  const rafraichir = () => {
+    for (const cle of ['employees-sortis', 'employees-actifs', 'employees',
+                       'lignes-paie', 'site-week-pointages', 'site-employees']) {
+      qc.invalidateQueries({ queryKey: [cle] })
+    }
+  }
 
   const corriger = useMutation({
     mutationFn: async ({ id, date }: { id: string; date: string }) => {
@@ -99,12 +111,17 @@ export default function SortiesPage() {
       )
       if (erreurMenage) throw erreurMenage
     },
-    onSuccess: () => {
-      for (const cle of ['employees-sortis', 'employees-actifs', 'employees',
-                         'lignes-paie', 'site-week-pointages', 'site-employees']) {
-        qc.invalidateQueries({ queryKey: [cle] })
-      }
+    onSuccess: rafraichir,
+  })
+
+  const reprendre = useMutation({
+    mutationFn: async (v: { id: string; date: string; siteId: string }) => {
+      const { error } = await supabase.rpc('reprendre_employe', {
+        p_employee: v.id, p_date: v.date, p_site: v.siteId,
+      })
+      if (error) throw error
     },
+    onSuccess: () => { rafraichir(); setAReprendre(null) },
   })
 
   const { data: sorties } = useSorties(companyId)
@@ -167,7 +184,13 @@ export default function SortiesPage() {
                     <span className="text-slate-300">›</span>
                   </span>
                 </button>
-                <span className="shrink-0 px-4 py-2.5">
+                <span className="flex shrink-0 gap-2 px-4 py-2.5">
+                  <button
+                    onClick={() => { reprendre.reset(); setAReprendre(e) }}
+                    className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                  >
+                    Le reprendre
+                  </button>
                   <button
                     onClick={() => setACorriger(e)}
                     className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -240,6 +263,19 @@ export default function SortiesPage() {
             setACorriger(null)
           }}
           onAnnuler={() => setACorriger(null)}
+        />
+      )}
+
+      {aReprendre && (
+        <ReprendreEmploye
+          nom={aReprendre.nom_prenom}
+          dateSortie={aReprendre.date_sortie}
+          sites={tousLesSites ?? []}
+          enCours={reprendre.isPending}
+          erreur={reprendre.error ? (reprendre.error as Error).message : null}
+          onConfirmer={({ date, siteId }) =>
+            reprendre.mutate({ id: aReprendre.id, date, siteId })}
+          onAnnuler={() => { reprendre.reset(); setAReprendre(null) }}
         />
       )}
 

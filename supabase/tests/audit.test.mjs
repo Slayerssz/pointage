@@ -1378,6 +1378,85 @@ await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
   /Action réservée/i)
 
+// ═══════ REPRENDRE QUELQU'UN QUI ÉTAIT SORTI ═══════
+// Il revient avec tout son passé : matricule, ancienneté, contrats,
+// mois déjà payés. Ce qui ne se devine pas, et qu'on demande donc :
+// le jour du retour — ses journées ne se posent pas avant — et son
+// annexe, qui n'est pas forcément l'ancienne.
+
+section('Reprendre quelqu’un qui était sorti')
+const aujRep = (await q1(`select (now() at time zone 'Africa/Casablanca')::date::text d`)).d
+const moisRep = aujRep.slice(0, 7)
+const jourRep = (n) => `${moisRep}-${String(n).padStart(2, '0')}`
+const numeroRep = Number(aujRep.slice(8))
+console.log('    aujourd’hui :', aujRep)
+
+await connecte(bureau)
+const siteDeRetour = (await q1(`select public.creer_site($1,'AUTRE ANNEXE') as id`, [co])).id
+const eRevenant = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, matricule, salaire,
+                                 jour_de_repos, date_embauche)
+   values ($1,$2,'REVENANT SAID',777,3000,7,'2024-01-15') returning id`, [co, site])).id
+
+// Il a travaillé les premiers joursPointes du mois, puis il est parti le 3.
+for (let j = 1; j <= 3; j++) {
+  if (new Date(jourRep(j) + 'T12:00').getDay() === 0) continue
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [eRevenant, jourRep(j)])
+}
+await db.query(`update public.employees set date_sortie=$2, actif=false where id=$1`,
+               [eRevenant, jourRep(3)])
+const avantReprise = await q1(`select count(*) n from public.pointages where employee_id=$1`, [eRevenant])
+console.log('    pointages avant la reprise :', avantReprise.n)
+
+// Reprise au milieu du mois, sur une AUTRE annexe.
+const dateRetour = jourRep(Math.max(5, numeroRep - 2))
+const journeesPosees = num((await q1(`select public.reprendre_employe($1,$2::date,$3) as n`,
+                           [eRevenant, dateRetour, siteDeRetour])).n)
+const ficheRevenant = await q1(
+  `select actif, date_sortie, date_reprise::text dr, site_id, matricule,
+          date_embauche::text de from public.employees where id=$1`, [eRevenant])
+ok('il est de nouveau en poste', ficheRevenant.actif === true && ficheRevenant.date_sortie === null)
+ok('… le jour du retour est retenu', ficheRevenant.dr === dateRetour, String(ficheRevenant.dr))
+ok('… il est sur la nouvelle annexe', ficheRevenant.site_id === siteDeRetour)
+ok('… et garde son matricule et son ancienneté',
+   num(ficheRevenant.matricule) === 777 && ficheRevenant.de === '2024-01-15', `${ficheRevenant.matricule} / ${ficheRevenant.de}`)
+
+const joursPointes = (await rows(
+  `select pointed_on::text d from public.pointages where employee_id=$1 order by 1`, [eRevenant]))
+  .map((r) => r.d)
+ok('ses anciennes journées sont intactes', joursPointes.filter((d) => d <= jourRep(3)).length >= 2,
+   joursPointes.filter((d) => d <= jourRep(3)).join(' '))
+ok('rien entre son départ et son retour',
+   !joursPointes.some((d) => d > jourRep(3) && d < dateRetour),
+   joursPointes.filter((d) => d > jourRep(3) && d < dateRetour).join(' '))
+ok('… et ses journées reprennent au jour du retour',
+   joursPointes.some((d) => d === dateRetour) || new Date(dateRetour + 'T12:00').getDay() === 0,
+   `posées : ${journeesPosees} · ${joursPointes.filter((d) => d >= dateRetour).join(' ')}`)
+
+await refuse('on ne reprend pas quelqu’un qui n’est pas sorti',
+  `select public.reprendre_employe($1,$2::date,$3)`, [eRevenant, dateRetour, siteDeRetour], /pas sortie/i)
+
+// Les refus qui protègent la paie.
+const eAutreParti = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, salaire, jour_de_repos,
+                                 date_embauche, date_sortie, actif)
+   values ($1,$2,'AUTRE PARTI',3000,7,'2024-01-15','2026-09-20',false) returning id`,
+  [co, site])).id
+await refuse('… ni avant la date de son départ',
+  `select public.reprendre_employe($1,'2026-09-19'::date,$2)`, [eAutreParti, siteDeRetour], /postérieur au départ/i)
+await refuse('… ni à une date à venir',
+  `select public.reprendre_employe($1,(now()+interval '3 days')::date,$2)`, [eAutreParti, siteDeRetour], /à venir/i)
+await refuse('… ni sans annexe',
+  `select public.reprendre_employe($1,$2::date,null)`, [eAutreParti, aujRep], /annexe/i)
+
+const coAilleurs = (await (async () => { await connecte(admin)
+  return q1(`select public.admin_creer_entreprise('AILLEURS SARL') as id`) })()).id
+await connecte(bureau)
+const siteDAilleurs = (await q1(`select public.creer_site($1,'CHEZ EUX') as id`, [coAilleurs])).id
+await refuse('… ni sur l’annexe d’une autre société',
+  `select public.reprendre_employe($1,$2::date,$3)`, [eAutreParti, aujRep, siteDAilleurs],
+  /pas celle de sa société/i)
+
 // ═══════ LE BRUT SAISI SE LIT SUR SA PROPRE LIGNE ═══════
 // La colonne « Base » de la ligne SALAIRE BRUT montrait le salaire du
 // contrat même quand la paie imposait un autre brut : on lisait le

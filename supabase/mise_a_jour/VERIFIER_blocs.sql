@@ -158,7 +158,13 @@ with attendu (numero, bloc, objet, present) as (
   (49, 'Heures du mois',          'la paie compte 191 heures, pas 26 × 8',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                  and pg_get_functiondef(p.oid) like '%v_heures_mois%'))
+                  and pg_get_functiondef(p.oid) like '%v_heures_mois%')),
+  (50, 'Reprise',                 'on peut remettre un sorti au travail',
+       exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = 'employees'
+                  and column_name = 'date_reprise')
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'reprendre_employe'))
 )
 select numero,
        bloc,

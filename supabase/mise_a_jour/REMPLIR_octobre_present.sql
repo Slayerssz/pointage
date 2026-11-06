@@ -10,7 +10,8 @@
 --
 --     · le jour de repos hebdomadaire            (reste vide, affiché R)
 --     · tout jour déjà marqué : F, C, M, X…      (jamais écrasé)
---     · les jours avant l'embauche ou après la sortie
+--     · les jours avant l'embauche, après la sortie, ou avant le
+--       retour de quelqu'un qu'on a repris
 --     · les employés dont le jour de repos n'est pas renseigné — sans
 --       lui, on ne sait pas quel jour épargner, et on leur poserait les
 --       31 jours. Ils sont nommés à la fin : renseigner leur repos sur
@@ -79,6 +80,8 @@ begin
      and extract(isodow from d)::int <> e.jour_de_repos
      and (e.date_embauche is null or e.date_embauche <= d::date)
      and (e.date_sortie   is null or e.date_sortie   >= d::date)
+     -- Quelqu'un repris en cours de mois n'était pas là avant son retour.
+     and (e.date_reprise  is null or e.date_reprise  <= d::date)
      and not exists (select 1 from public.periodes_paie pp
                       where pp.company_id = e.company_id
                         and pp.annee = 2026 and pp.mois = 10
