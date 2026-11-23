@@ -164,7 +164,12 @@ with attendu (numero, bloc, objet, present) as (
                 where table_schema = 'public' and table_name = 'employees'
                   and column_name = 'date_reprise')
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                    where n.nspname = 'public' and p.proname = 'reprendre_employe'))
+                    where n.nspname = 'public' and p.proname = 'reprendre_employe')),
+  (51, 'Repos au jour le jour',   'la lettre R existe et ne vaut rien',
+       public.garde_valeur('R') = 0
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                      and pg_get_functiondef(p.oid) like '%type_garde = ''R''%'))
 )
 select numero,
        bloc,

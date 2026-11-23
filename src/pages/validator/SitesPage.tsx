@@ -26,6 +26,7 @@ export default function SitesPage() {
   const [ajoute, setAjoute] = useState(false)
   const [principalEdite, setPrincipalEdite] = useState<SitePrincipal | null>(null)
   const [ajoutePrincipal, setAjoutePrincipal] = useState(false)
+  const [recherche, setRecherche] = useState('')
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [cible, setCible] = useState('')
 
@@ -81,6 +82,22 @@ export default function SitesPage() {
   }))
   const independantes = (annexes ?? []).filter((s) => !s.site_principal_id)
 
+  // La recherche porte sur l'annexe comme sur son site principal : on
+  // tape « ONDA » sans savoir lequel des deux porte le nom.
+  const q = recherche.trim().toLowerCase()
+  const correspond = (nom: string) => nom.toLowerCase().includes(q)
+  const groupesFiltres = q
+    ? groupes
+        .map((g) => ({
+          principal: g.principal,
+          sites: correspond(g.principal.name) ? g.sites : g.sites.filter((s) => correspond(s.name)),
+        }))
+        .filter((g) => correspond(g.principal.name) || g.sites.length > 0)
+    : groupes
+  const independantesFiltrees = q ? independantes.filter((s) => correspond(s.name)) : independantes
+  const rienTrouve =
+    q && groupesFiltres.length === 0 && independantesFiltrees.length === 0
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6">
@@ -91,6 +108,20 @@ export default function SitesPage() {
           tout le personnel d’un ensemble comme « la commune ».
         </p>
       </div>
+
+      <input
+        type="search"
+        value={recherche}
+        onChange={(e) => setRecherche(e.target.value)}
+        placeholder="Chercher un site…"
+        className="mb-5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:max-w-sm"
+      />
+
+      {rienTrouve && (
+        <p className="mb-5 rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+          Aucun site ne porte ce nom.
+        </p>
+      )}
 
       {/* ---------- Sites principaux ---------- */}
       <div className="mb-6">
@@ -116,7 +147,7 @@ export default function SitesPage() {
         {principaux && principaux.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <ul className="divide-y divide-slate-100">
-              {groupes.map(({ principal, sites }) => (
+              {groupesFiltres.map(({ principal, sites }) => (
                 <li key={principal.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div>
                     <p className="font-medium text-slate-900">{principal.name}</p>
@@ -203,7 +234,7 @@ export default function SitesPage() {
       {annexes && annexes.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <ul className="divide-y divide-slate-100">
-            {[...groupes.flatMap((g) => g.sites), ...independantes].map((s) => (
+            {[...groupesFiltres.flatMap((g) => g.sites), ...independantesFiltrees].map((s) => (
               <li key={s.id} className="flex items-center gap-3 px-4 py-3">
                 <input
                   type="checkbox"
@@ -482,7 +513,12 @@ function PrincipalModal({
         const { error } = await supabase.rpc('maj_site_principal', { p_id: principal.id, p_nom: nom })
         if (error) throw error
       } else {
-        const { error } = await supabase.rpc('creer_site_principal', { p_company: companyId, p_nom: nom })
+        // Le site principal naît avec sa première annexe, du même nom :
+        // on pointe dessus tout de suite, sans avoir à inventer une
+        // subdivision que le lieu n'a pas.
+        const { error } = await supabase.rpc('creer_site_principal_avec_annexe', {
+          p_company: companyId, p_nom: nom,
+        })
         if (error) throw error
       }
     },

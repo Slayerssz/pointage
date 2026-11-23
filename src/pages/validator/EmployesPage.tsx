@@ -3,9 +3,7 @@ import { useParams } from 'react-router-dom'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import {
-  JOURS_SEMAINE,
   formatDateFr,
-  jourDeReposLabel,
   retirementStatus,
 } from '../../lib/dates'
 import { useEmployeFiltres, useSites, useSitesPrincipaux, useSociete, useTousLesSites } from '../../lib/queries'
@@ -565,7 +563,6 @@ export default function EmployesPage() {
                 <th className="px-4 py-3.5 font-medium">Identité</th>
                 <th className="px-4 py-3.5 font-medium">Contact</th>
                 <th className="px-4 py-3.5 font-medium">Dates</th>
-                <th className="px-4 py-3.5 font-medium">Repos</th>
                 <th className="px-4 py-3.5 font-medium">Contrat</th>
                 <th className="px-4 py-3.5 font-medium">Règlement</th>
                 <th className="px-4 py-3.5 text-right font-medium">Salaire</th>
@@ -680,10 +677,6 @@ export default function EmployesPage() {
                       <p className="text-xs text-slate-500">
                         Embauche {formatDateFr(emp.date_embauche)}
                       </p>
-                    </td>
-
-                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
-                      {jourDeReposLabel(emp.jour_de_repos)}
                     </td>
 
                     <td className="px-4 py-3.5">
@@ -892,6 +885,38 @@ export default function EmployesPage() {
 }
 
 /** Formulaire complet — création (employee=null) ou modification. */
+/**
+ * LA FICHE SEULE, OUVERTE D'AILLEURS.
+ *
+ * Le pointage ouvre la fiche d'un agent d'un clic sur son nom : on la
+ * lit et on la corrige sans quitter la grille. C'est le même
+ * formulaire que dans l'onglet Employés — un seul, pour qu'il n'y ait
+ * pas deux façons de modifier quelqu'un.
+ *
+ * Sans le dossier (contrats, congés, dettes) ni la suppression : on
+ * passe par l'onglet Employés pour cela.
+ */
+export function FicheEmployeModal({
+  companyId,
+  employee,
+  onClose,
+}: {
+  companyId: string
+  employee: Employee
+  onClose: () => void
+}) {
+  return (
+    <EmployeeFormModal
+      companyId={companyId}
+      employee={employee}
+      entreprise=""
+      ficheSeule
+      onImprimerContrat={() => {}}
+      onClose={onClose}
+    />
+  )
+}
+
 function EmployeeFormModal({
   companyId,
   employee,
@@ -934,7 +959,6 @@ function EmployeeFormModal({
     adresse: employee?.adresse ?? '',
     ville: employee?.ville ?? '',
     mode_reglement: employee?.mode_reglement ?? 'Virement',
-    jour_de_repos: employee?.jour_de_repos?.toString() ?? '',
     horaire: employee?.horaire ?? '',
     rib: employee?.rib ?? '',
     banque: employee?.banque ?? '',
@@ -961,11 +985,6 @@ function EmployeeFormModal({
       if (form.statut === 'sorti' && !form.date_sortie) {
         refuser('poste', 'Indiquez le dernier jour travaillé avant de marquer la sortie.')
       }
-      // À l'inscription, le jour de repos décide des journées qu'on va
-      // poser : sans lui, on pointerait quelqu'un sept jours sur sept.
-      if (!employee && !form.jour_de_repos) {
-        refuser('poste', 'Choisissez son jour de repos : ses journées du mois en dépendent.')
-      }
       const payload = {
         site_id: form.site_id,
         // Vide à la création → matricule attribué automatiquement (dernier + 1)
@@ -981,7 +1000,6 @@ function EmployeeFormModal({
         adresse: form.adresse.trim() || null,
         ville: form.ville.trim().toUpperCase() || null,
         mode_reglement: form.mode_reglement || null,
-        jour_de_repos: form.jour_de_repos ? Number(form.jour_de_repos) : null,
         horaire: form.horaire || null,
         rib: form.rib.trim() || null,
         banque: form.banque.trim() || null,
@@ -1225,18 +1243,10 @@ function EmployeeFormModal({
                ? `Sorti le ${formatDateFr(form.date_sortie)} — cliquez de nouveau sur « Sorti » pour changer la date.`
                : undefined)}
           
-{field(employee ? 'Jour de repos' : 'Jour de repos *', (
-            <select value={form.jour_de_repos} onChange={(e) => set('jour_de_repos')(e.target.value)} className={inputCls}>
-              <option value="">{employee ? 'Aucun' : '— Choisir —'}</option>
-              {JOURS_SEMAINE.map((jour, i) => (
-                <option key={jour} value={i + 1}>{jour}</option>
-              ))}
-            </select>
-          ), !employee
-               ? 'Obligatoire : ses journées du mois se posent toutes seules, et c’est ce jour-là qu’elles épargnent.'
-               : undefined)}
-          
-{/* Un agent de nuit ne se planifie pas comme une agente du matin. */}
+{/* Plus de jour de repos sur la fiche : il ne tenait pas dans
+              la réalité d'un planning. Le repos se pose au pointage,
+              sur le jour voulu, avec la lettre R. */}
+          {/* Un agent de nuit ne se planifie pas comme une agente du matin. */}
           {field('Horaire', (
             <select value={form.horaire} onChange={(e) => set('horaire')(e.target.value)} className={inputCls}>
               <option value="">Non fixé</option>

@@ -31,7 +31,15 @@ interface Props {
   /** Les sites principaux qui les regroupent. */
   principaux: SitePrincipal[]
   /** Contenu affiché quand une annexe est dépliée (la liste des employés). */
-  renderSite: (site: Site, expanded: boolean) => ReactNode
+  renderSite?: (site: Site, expanded: boolean) => ReactNode
+  /**
+   * Quand il est fourni, cliquer une annexe l'ouvre au lieu de la
+   * déplier : le pointage s'affiche alors en plein écran, et non dans
+   * un repli de la liste.
+   */
+  onSiteClick?: (site: Site) => void
+  /** Filtre vivant sur le nom du site ou de son site principal. */
+  recherche?: string
 }
 
 /**
@@ -43,7 +51,7 @@ interface Props {
  * directement, comme avant : l'écran reste utilisable.
  * Le contenu d'une annexe n'est monté (donc chargé) qu'à son ouverture.
  */
-export default function SitesTree({ sites, principaux, renderSite }: Props) {
+export default function SitesTree({ sites, principaux, renderSite, onSiteClick, recherche }: Props) {
   const [ouvertsPrincipaux, setOuvertsPrincipaux] = useState<Set<string>>(new Set())
   const [ouvertesAnnexes, setOuvertesAnnexes] = useState<Set<string>>(new Set())
 
@@ -59,7 +67,7 @@ export default function SitesTree({ sites, principaux, renderSite }: Props) {
   const basculerAnnexe = basculer(setOuvertesAnnexes)
 
   const annexeItem = (site: Site, imbriquee: boolean) => {
-    const ouverte = ouvertesAnnexes.has(site.id)
+    const ouverte = !onSiteClick && ouvertesAnnexes.has(site.id)
     return (
       <div
         key={site.id}
@@ -70,8 +78,8 @@ export default function SitesTree({ sites, principaux, renderSite }: Props) {
         }
       >
         <button
-          onClick={() => basculerAnnexe(site.id)}
-          aria-expanded={ouverte}
+          onClick={() => (onSiteClick ? onSiteClick(site) : basculerAnnexe(site.id))}
+          aria-expanded={onSiteClick ? undefined : ouverte}
           className={`flex w-full items-center justify-between gap-3 text-left ${
             imbriquee ? 'bg-slate-50/60 px-4 py-3 pl-12 hover:bg-slate-100/70' : 'px-4 py-3.5'
           }`}
@@ -82,23 +90,50 @@ export default function SitesTree({ sites, principaux, renderSite }: Props) {
             </span>
             <span className="truncate font-medium text-slate-900">{site.name}</span>
           </span>
-          <Chevron ouvert={ouverte} />
+          {onSiteClick ? (
+            <span className="shrink-0 text-slate-400">›</span>
+          ) : (
+            <Chevron ouvert={ouverte} />
+          )}
         </button>
-        {ouverte && <div className="border-t border-slate-100 bg-white">{renderSite(site, ouverte)}</div>}
+        {ouverte && renderSite && (
+          <div className="border-t border-slate-100 bg-white">{renderSite(site, ouverte)}</div>
+        )}
       </div>
     )
   }
 
+  // La recherche porte sur le nom de l'annexe comme sur celui de son
+  // site principal : on cherche « ONDA » sans savoir lequel des deux
+  // le porte.
+  const q = (recherche ?? '').trim().toLowerCase()
+  const nomPrincipal = (site: Site) =>
+    principaux.find((p) => p.id === site.site_principal_id)?.name ?? ''
+  const retenus = q
+    ? sites.filter((s) =>
+        s.name.toLowerCase().includes(q) || nomPrincipal(s).toLowerCase().includes(q))
+    : sites
+
+  if (q && retenus.length === 0) {
+    return (
+      <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+        Aucun site ne porte ce nom.
+      </p>
+    )
+  }
+
   // Aucun site principal défini : on garde l'affichage simple d'avant.
-  if (principaux.length === 0) {
-    return <div className="space-y-2">{sites.map((s) => annexeItem(s, false))}</div>
+  // Une recherche en cours aplatit aussi la liste — on veut voir ce
+  // qu'on cherche, pas le replier sous son groupe.
+  if (principaux.length === 0 || q) {
+    return <div className="space-y-2">{retenus.map((s) => annexeItem(s, false))}</div>
   }
 
   const groupes = principaux
-    .map((p) => ({ principal: p, annexes: sites.filter((s) => s.site_principal_id === p.id) }))
+    .map((p) => ({ principal: p, annexes: retenus.filter((s) => s.site_principal_id === p.id) }))
     .filter((g) => g.annexes.length > 0)
 
-  const orphelines = sites.filter(
+  const orphelines = retenus.filter(
     (s) => !s.site_principal_id || !principaux.some((p) => p.id === s.site_principal_id),
   )
 

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { formatDateFr, jourDeReposLabel } from '../lib/dates'
+import { formatDateFr } from '../lib/dates'
 import { formatDH } from '../lib/paie'
 import { enteteDe } from '../lib/entetes'
 import { useFermerSurEchap, useImpression, useModeImpression } from '../lib/impression'
@@ -387,7 +387,6 @@ function FicheDetaillee({
         ['Qualification', ou(e.qualification)],
         ['Date d’embauche', date(e.date_embauche)],
         ['Horaire', horaire],
-        ['Jour de repos', jourDeReposLabel(e.jour_de_repos)],
         ['Heures par jour', e.heures_par_jour != null ? `${e.heures_par_jour} h` : '—'],
         ['Jours travaillés (cumul)', ou(e.jours_travailles)],
         ['Statut', e.actif ? 'En poste' : `Sorti${e.date_sortie ? ` le ${formatDateFr(e.date_sortie)}` : ''}`],

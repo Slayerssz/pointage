@@ -130,6 +130,7 @@ const VALEURS = [
   ['X15', 1.5, 'une garde et demie'],
   ['XX',  2,   'deux gardes'],
   ['RT',  2,   'repos travaillé : la journée, et celle en plus'],
+  ['R',   0,   'repos : ni travail, ni absence'],
   ['M',   1,   'malade, payé'],
   ['C',   1,   'congé payé'],
 ]
@@ -1492,6 +1493,57 @@ const brutSansSaisie = await ligneDuBulletin(null, null, '^SALAIRE BRUT$')
 ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) === 5200,
    String(brutSansSaisie.base))
 
+// ═══════ LE REPOS SE POSE AU JOUR LE JOUR ═══════
+// Le jour de repos n'est plus fixé sur la fiche : c'est une lettre du
+// pointage, R, posée sur le jour qu'on veut. Elle ne vaut aucune
+// journée de travail et n'est pas une absence — elle ne doit donc rien
+// retirer du salaire.
+
+section('Le repos au jour le jour')
+
+ok('R ne vaut aucune journée',
+   num((await q1(`select public.garde_valeur('R') v`)).v) === 0)
+
+await connecte(bureau)
+const eRepos7 = await employe('REPOS CHOISI', { cin: 'RP1', cnss: '960000001' })
+// Un mois plein : 26 journées, puis quatre repos posés à la main sur
+// des jours quelconques — ce que faisait le jour fixe, mais choisi.
+for (const j of joursAvril.slice(0, 26)) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`, [eRepos7, j])
+}
+for (const j of ['2026-04-05', '2026-04-12', '2026-04-19', '2026-04-26']) {
+  await q1(`select public.marquer_present($1,$2::date,'R')`, [eRepos7, j])
+}
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const avecRepos = await q1(
+  `select gardes_travaillees g, jours_payes jp, jours_repos jr, jours_absent ja,
+          salaire_brut b from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eRepos7])
+ok('les R du mois se comptent en jours de repos', num(avecRepos.jr) === 4,
+   String(avecRepos.jr))
+ok('… ils ne comptent pas comme travail', num(avecRepos.g) === 26, String(avecRepos.g))
+ok('… ni comme absence', num(avecRepos.ja) === 0, String(avecRepos.ja))
+ok('… et ne retirent rien du salaire', num(avecRepos.b) === 5200, String(avecRepos.b))
+ok('… le mois reste payé 26 jours', num(avecRepos.jp) === 26, String(avecRepos.jp))
+
+// Un R posé sur une journée déjà travaillée la remplace : c'est un
+// changement d'avis, pas un doublon.
+const unJour = joursAvril[0]
+await connecte(bureau)
+const pJour = (await q1(
+  `select id from public.pointages where employee_id=$1 and pointed_on=$2::date`,
+  [eRepos7, unJour])).id
+await q1(`select public.changer_type_garde($1,'R')`, [pJour])
+await connecte(admin)
+await q1(`select public.generer_lignes_paie($1)`, [periode])
+const apresBascule = await q1(
+  `select gardes_travaillees g, jours_repos jr from public.lignes_paie
+    where periode_id=$1 and employee_id=$2`, [periode, eRepos7])
+ok('passer une journée en R la retire du travail',
+   num(apresBascule.g) === 25 && num(apresBascule.jr) === 5,
+   `${apresBascule.g} gardes / ${apresBascule.jr} repos`)
+
 // ═══════ LE REPOS TRAVAILLÉ PAIE UNE JOURNÉE DE PLUS ═══════
 // Travailler son jour de repos ne rapportait rien : un RT comptait pour
 // une journée ordinaire, et le plafond des 26 la reprenait aussitôt que
@@ -1618,10 +1670,11 @@ const leMois = (await q1(
   `select to_char(date_trunc('month', (now() at time zone 'Africa/Casablanca')), 'YYYY-MM-DD') d`)).d
 const ceJour = (await q1(
   `select (now() at time zone 'Africa/Casablanca')::date::text d`)).d
-// Combien de jours du mois écoulés, dimanches exclus (repos = 7).
+// Combien de jours du mois écoulés. Tous : le repos ne se déduit plus
+// d'un jour fixe de la fiche, c'est un « R » que le bureau pose.
 const ouvresDuMois = num((await q1(
-  `select count(*) n from generate_series($1::date, $2::date, interval '1 day') d
-    where extract(isodow from d)::int <> 7`, [leMois, ceJour])).n)
+  `select count(*) n from generate_series($1::date, $2::date, interval '1 day') d`,
+  [leMois, ceJour])).n)
 
 // Embauché au premier du mois : ses journées remontent jusque-là.
 const eArrive = (await q1(
@@ -1631,9 +1684,11 @@ const poses = num((await q1(
   `select public.pointer_depuis_embauche($1) n`, [eArrive])).n)
 ok('ses journées du mois sont posées depuis l’embauche', poses === ouvresDuMois,
    `${poses} posées / ${ouvresDuMois} ouvrées`)
-ok('… son jour de repos est épargné',
+// Plus de jour épargné d'office : la semaine est posée en entier, et
+// le repos se marque ensuite, au jour choisi.
+ok('… la semaine entière est posée, repos compris',
    num((await q1(`select count(*) n from public.pointages
-                   where employee_id=$1 and extract(isodow from pointed_on)=7`, [eArrive])).n) === 0)
+                   where employee_id=$1 and extract(isodow from pointed_on)=7`, [eArrive])).n) > 0)
 ok('… et rien n’est pointé dans l’avenir',
    num((await q1(`select count(*) n from public.pointages
                    where employee_id=$1 and pointed_on > $2::date`, [eArrive, ceJour])).n) === 0)

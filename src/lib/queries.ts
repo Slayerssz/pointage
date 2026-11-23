@@ -104,6 +104,43 @@ export function useSiteEmployees(
   })
 }
 
+/**
+ * Tous les employés d'un site, d'un coup.
+ *
+ * La grille du mois ne pagine pas : on voit l'équipe entière, du
+ * premier au dernier jour. Un site compte quelques dizaines de
+ * personnes — les charger toutes coûte moins qu'un bouton « afficher
+ * plus » au milieu d'un tableau qu'on parcourt des yeux.
+ *
+ * La fiche entière est ramenée, et non trois colonnes : on l'ouvre
+ * d'un clic sur le nom, et on la modifie sans aller la chercher.
+ */
+export function useSiteEmployesTous(
+  siteId: string | undefined,
+  enabled: boolean,
+  opts?: { depuis?: string },
+) {
+  const depuis = opts?.depuis ?? null
+  return useQuery({
+    queryKey: ['site-employes-tous', siteId, depuis],
+    enabled: enabled && Boolean(siteId),
+    queryFn: async (): Promise<Employee[]> => {
+      let requete = supabase
+        .from('employees')
+        .select('*')
+        .eq('site_id', siteId!)
+        .is('archive_le', null)
+      requete = depuis
+        ? requete.or(`date_sortie.is.null,date_sortie.gte.${depuis}`)
+        : requete.eq('actif', true)
+      const { data, error } = await requete
+        .order('nom_prenom', { ascending: true })
+      if (error) throw error
+      return data as Employee[]
+    },
+  })
+}
+
 export type DayPointage = Pick<
   Pointage,
   | 'id' | 'employee_id' | 'status' | 'photo_path'

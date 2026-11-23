@@ -158,6 +158,7 @@ function BulletinsDuMois({
   const [unSeul, setUnSeul] = useState<Bulletin | null>(null)
   const etablir = useEtablirBulletin(companyId)
   const [recherche, setRecherche] = useState('')
+  const [siteFiltre, setSiteFiltre] = useState('')
 
   if (isLoading) return <Spinner label="Préparation des bulletins…" />
   if (error) {
@@ -193,12 +194,19 @@ function BulletinsDuMois({
   }
 
   const q = recherche.trim().toLowerCase()
-  const filtres = q
-    ? data.filter((b) =>
-        b.employe.nom_prenom.toLowerCase().includes(q) ||
-        String(b.employe.matricule ?? '').includes(q))
-    : data
-  const total = data.reduce((s, b) => s + Number(b.pied.net_a_payer), 0)
+  // Les sites du mois, tirés des bulletins eux-mêmes : on ne propose
+  // que des sites où il y a quelqu'un à payer.
+  const sitesDuMois = [...new Set(data.map((b) => b.employe.site_nom ?? '').filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, 'fr'))
+  // Le site et le nom se combinent : « les agents de DRISCOLL'S qui
+  // s'appellent Fatima ».
+  const filtres = data.filter((b) => {
+    if (siteFiltre && (b.employe.site_nom ?? '') !== siteFiltre) return false
+    if (!q) return true
+    return b.employe.nom_prenom.toLowerCase().includes(q)
+      || String(b.employe.matricule ?? '').includes(q)
+  })
+  const total = filtres.reduce((s, b) => s + Number(b.pied.net_a_payer), 0)
 
   return (
     <>
@@ -223,19 +231,37 @@ function BulletinsDuMois({
             Le bulletin d’une seule personne
           </h2>
           <span className="text-sm text-slate-500">
-            {data.length} employé(s) · {formatDH(total)}
+            {filtres.length}
+            {filtres.length !== data.length && ` sur ${data.length}`} employé(s) ·{' '}
+            {formatDH(total)}
           </span>
         </div>
-        <input
-          type="search"
-          value={recherche}
-          onChange={(e) => setRecherche(e.target.value)}
-          placeholder="Chercher un nom, un matricule…"
-          className="mb-3 w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
+        <div className="mb-3 flex flex-wrap gap-2">
+          <input
+            type="search"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Chercher un nom, un matricule…"
+            className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          />
+          {sitesDuMois.length > 1 && (
+            <select
+              value={siteFiltre}
+              onChange={(e) => setSiteFiltre(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Tous les sites</option>
+              {sitesDuMois.map((nom) => (
+                <option key={nom} value={nom}>{nom}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
         {filtres.length === 0 && (
-          <p className="text-sm text-slate-500">Personne ne correspond à cette recherche.</p>
+          <p className="text-sm text-slate-500">
+            Personne ne correspond{siteFiltre ? ' à ce site et à cette recherche.' : ' à cette recherche.'}
+          </p>
         )}
 
         <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">

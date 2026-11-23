@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { compressImage, randomId } from '../../lib/image'
-import { isoDayOfWeek, jourDeReposLabel, todayIso } from '../../lib/dates'
+import { todayIso } from '../../lib/dates'
 import {
   useSiteEmployees,
   useSitePointages,
@@ -98,7 +98,6 @@ function SiteEmployeeList({
 }) {
   const employees = useSiteEmployees(site.id, enabled)
   const pointages = useSitePointages(site.id, todayIso(), enabled)
-  const todayDow = isoDayOfWeek()
 
   if (employees.isLoading || pointages.isLoading) {
     return <Spinner label="Chargement des employés…" />
@@ -118,7 +117,6 @@ function SiteEmployeeList({
     <ul className="divide-y divide-slate-100">
       {rows.map((emp) => {
         const pointage = pointages.data?.get(emp.id)
-        const isRepos = emp.jour_de_repos === todayDow
         return (
           <li key={emp.id} className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
@@ -132,11 +130,7 @@ function SiteEmployeeList({
               {pointage?.status === 'validated' && <Chip tone="green">Validé</Chip>}
               {pointage?.status === 'pending' && <Chip tone="blue">En attente</Chip>}
               {pointage?.status === 'refused' && <Chip tone="red">Refusé</Chip>}
-              {!pointage && isRepos && (
-                <Chip tone="slate" title={`Jour de repos : ${jourDeReposLabel(emp.jour_de_repos)}`}>
-                  Jour de repos
-                </Chip>
-              )}
+              {pointage?.type_garde === 'R' && <Chip tone="slate">Repos</Chip>}
               {(!pointage || pointage.status === 'refused') && (
                 <button
                   onClick={() => onPointer(emp)}

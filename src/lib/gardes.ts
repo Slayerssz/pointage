@@ -1,6 +1,6 @@
 /** Types de garde et d'absence choisis par le validateur. */
 
-export type TypeGarde = 'X05' | 'X' | 'X15' | 'XX' | 'RT' | 'M' | 'C' | 'F' | 'XF'
+export type TypeGarde = 'X05' | 'X' | 'X15' | 'XX' | 'RT' | 'R' | 'M' | 'C' | 'F' | 'XF'
 
 export interface GardeInfo {
   code: TypeGarde
@@ -11,29 +11,41 @@ export interface GardeInfo {
   /** Absence approuvée (≠ travail effectif) : malade, congé… */
   absence: boolean
   /** Où la lettre s'affiche dans le choix du validateur. */
-  groupe: 'travail' | 'ferie' | 'absence'
+  groupe: 'travail' | 'repos' | 'ferie' | 'absence'
+  /**
+   * Lettre retirée du choix, mais pas du logiciel : des pointages la
+   * portent déjà, et un mois passé doit se relire comme il a été payé.
+   * On ne peut simplement plus en créer.
+   */
+  retiree?: boolean
   /** Classe de couleur de la case dans la grille de pointage. */
   couleur: string
 }
 
 export const TYPES_GARDE: GardeInfo[] = [
-  { code: 'X05', symbole: '½', label: 'Demi-garde', valeur: 0.5, absence: false, couleur: 'bg-emerald-400 text-white', groupe: 'travail' },
+  { code: 'X05', symbole: '½', label: 'Demi-garde', valeur: 0.5, absence: false, couleur: 'bg-emerald-400 text-white', groupe: 'travail', retiree: true },
   { code: 'X', symbole: 'X', label: 'Travaillé une garde', valeur: 1, absence: false, couleur: 'bg-emerald-500 text-white', groupe: 'travail' },
-  { code: 'X15', symbole: 'X̸', label: 'Travaillé une garde et demi', valeur: 1.5, absence: false, couleur: 'bg-emerald-600 text-white', groupe: 'travail' },
+  { code: 'X15', symbole: 'X̸', label: 'Travaillé une garde et demi', valeur: 1.5, absence: false, couleur: 'bg-emerald-600 text-white', groupe: 'travail', retiree: true },
   { code: 'XX', symbole: 'XX', label: 'Travaillé deux gardes', valeur: 2, absence: false, couleur: 'bg-emerald-700 text-white', groupe: 'travail' },
   { code: 'RT', symbole: 'RT', label: 'Repos travaillé (compte double)', valeur: 2, absence: false, couleur: 'bg-teal-600 text-white', groupe: 'travail' },
+  { code: 'R', symbole: 'R', label: 'Repos', valeur: 0, absence: false, couleur: 'bg-blue-400 text-white', groupe: 'repos' },
   { code: 'XF', symbole: 'XF', label: 'Férié travaillé (compte double)', valeur: 2, absence: false, couleur: 'bg-orange-600 text-white', groupe: 'ferie' },
   { code: 'F', symbole: 'F', label: 'Férié chômé (payé)', valeur: 1, absence: true, couleur: 'bg-orange-400 text-white', groupe: 'ferie' },
   { code: 'M', symbole: 'M', label: 'Malade (absence approuvée)', valeur: 1, absence: true, couleur: 'bg-violet-500 text-white', groupe: 'absence' },
   { code: 'C', symbole: 'C', label: 'Congé payé', valeur: 1, absence: true, couleur: 'bg-sky-500 text-white', groupe: 'absence' },
 ]
 
+/** Ce qu'on peut encore poser aujourd'hui : les lettres retirées non. */
+const PROPOSABLES = TYPES_GARDE.filter((t) => !t.retiree)
+
 /** Les types que le validateur propose pour un jour travaillé. */
-export const TYPES_TRAVAIL = TYPES_GARDE.filter((t) => t.groupe === 'travail')
+export const TYPES_TRAVAIL = PROPOSABLES.filter((t) => t.groupe === 'travail')
+/** Le repos, posé sur le jour qu'on veut. */
+export const TYPES_REPOS = PROPOSABLES.filter((t) => t.groupe === 'repos')
 /** Le jour férié : chômé et payé, ou travaillé et compté double. */
-export const TYPES_FERIE = TYPES_GARDE.filter((t) => t.groupe === 'ferie')
+export const TYPES_FERIE = PROPOSABLES.filter((t) => t.groupe === 'ferie')
 /** Les types d'absence approuvée. */
-export const TYPES_ABSENCE = TYPES_GARDE.filter((t) => t.groupe === 'absence')
+export const TYPES_ABSENCE = PROPOSABLES.filter((t) => t.groupe === 'absence')
 
 const BY_CODE = new Map(TYPES_GARDE.map((t) => [t.code, t]))
 

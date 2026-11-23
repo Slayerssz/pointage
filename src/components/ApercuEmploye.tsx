@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { usePhotoProfil } from '../lib/documents'
 import { useCongesEmploye, useContratsEmploye } from '../lib/paie'
 import { contratAffichage } from '../lib/contrats'
-import { computeAge, formatDateFr, jourDeReposLabel } from '../lib/dates'
+import { computeAge, formatDateFr } from '../lib/dates'
 import { formatDH } from '../lib/paie'
 import { formatGardes } from '../lib/gardes'
 import { useFermerSurEchap } from '../lib/impression'
@@ -135,7 +135,6 @@ export default function ApercuEmploye({
             <Champ label="Date d’embauche">
               {employee.date_embauche ? formatDateFr(employee.date_embauche) : '—'}
             </Champ>
-            <Champ label="Jour de repos">{jourDeReposLabel(employee.jour_de_repos)}</Champ>
             <Champ label="Horaire">
               {HORAIRES.find((h) => h.code === employee.horaire)?.label ?? '—'}
             </Champ>

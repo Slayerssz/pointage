@@ -90,6 +90,12 @@ export default function SortiesPage() {
   // Reprendre quelqu'un : il revient avec toute sa fiche, mais le jour
   // du retour et son annexe ne se devinent pas.
   const [aReprendre, setAReprendre] = useState<Employee | null>(null)
+  // Chercher et filtrer : passé une centaine de départs, la liste ne se
+  // parcourt plus des yeux.
+  const [recherche, setRecherche] = useState('')
+  const [siteFiltre, setSiteFiltre] = useState('')
+  const [depuis, setDepuis] = useState('')
+  const [statutFiltre, setStatutFiltre] = useState<'' | 'avec' | 'sans'>('')
   const qc = useQueryClient()
 
   /** Les écrans qui montrent du monde doivent tous se rafraîchir. */
@@ -129,6 +135,28 @@ export default function SortiesPage() {
 
   const enCours = (sorties ?? []).filter((s) => !s.valide)
   const validees = (sorties ?? []).filter((s) => s.valide)
+
+  // Les sites où l'on a réellement des partis : proposer les autres
+  // reviendrait à offrir des filtres qui ne trouvent rien.
+  const sitesDesPartis = (tousLesSites ?? [])
+    .filter((s) => (partis ?? []).some((e) => e.site_id === s.id))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+
+  // Un dossier de départ existe-t-il pour cette personne ? C'est ce qui
+  // distingue un départ réglé d'un simple statut passé à « Sorti ».
+  const aUnDossier = (id: string) => (sorties ?? []).some((s) => s.employee_id === id)
+
+  const qSortie = recherche.trim().toLowerCase()
+  const partisFiltres = (partis ?? []).filter((e) => {
+    if (qSortie
+        && !e.nom_prenom.toLowerCase().includes(qSortie)
+        && !String(e.matricule ?? '').includes(qSortie)) return false
+    if (siteFiltre && e.site_id !== siteFiltre) return false
+    if (depuis && (!e.date_sortie || e.date_sortie < depuis)) return false
+    if (statutFiltre === 'avec' && !aUnDossier(e.id)) return false
+    if (statutFiltre === 'sans' && aUnDossier(e.id)) return false
+    return true
+  })
   const employe = (employes ?? []).find((e) => e.id === choisi) ?? null
   const sortieDeLEmploye = enCours.find((s) => s.employee_id === choisi) ?? null
 
@@ -144,17 +172,75 @@ export default function SortiesPage() {
       <section>
         <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">
           Les personnes sorties
+          {(partis ?? []).length > 0 && (
+            <span className="ml-2 font-normal normal-case text-slate-400">
+              {partisFiltres.length}
+              {partisFiltres.length !== (partis ?? []).length && ` sur ${(partis ?? []).length}`}
+            </span>
+          )}
         </h2>
         <p className="mt-1 mb-2 text-sm text-slate-500">
           Tous ceux qui ont quitté le registre, quelle que soit la façon dont on
           les a sortis. Ils ne sont plus pointés. Touchez un nom pour revoir sa
           fiche : où il travaillait, son contrat, ses coordonnées.
         </p>
+        {(partis ?? []).length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <input
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Chercher un nom, un matricule…"
+              className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <select
+              value={siteFiltre}
+              onChange={(e) => setSiteFiltre(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Tous les sites</option>
+              {sitesDesPartis.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <select
+              value={statutFiltre}
+              onChange={(e) => setStatutFiltre(e.target.value as '' | 'avec' | 'sans')}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Tous les départs</option>
+              <option value="avec">Avec solde de tout compte</option>
+              <option value="sans">Sans solde de tout compte</option>
+            </select>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              Partis depuis le
+              <input
+                type="date"
+                value={depuis}
+                onChange={(e) => setDepuis(e.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+            {(recherche || siteFiltre || depuis || statutFiltre) && (
+              <button
+                onClick={() => {
+                  setRecherche(''); setSiteFiltre(''); setDepuis(''); setStatutFiltre('')
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Tout afficher
+              </button>
+            )}
+          </div>
+        )}
+
         {(partis ?? []).length === 0 ? (
           <EmptyState>Personne n’est sorti pour le moment.</EmptyState>
+        ) : partisFiltres.length === 0 ? (
+          <EmptyState>Aucun départ ne correspond à cette recherche.</EmptyState>
         ) : (
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {(partis ?? []).map((e) => (
+            {partisFiltres.map((e) => (
               <li key={e.id} className="flex flex-wrap items-center">
                 <button
                   onClick={() => setApercu(e)}
