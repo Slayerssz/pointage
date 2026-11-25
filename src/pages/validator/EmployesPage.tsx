@@ -27,6 +27,7 @@ import { ChampDecimal, Chip, DateInputFr, EmptyState, ErrorNote, Pagination, Spi
 import EmployeDetail from './EmployeDetail'
 import ContratRedaction from '../../components/ContratRedaction'
 import { estAdministrateur } from '../../lib/roles'
+import { champsManquants } from '../../lib/ficheIncomplete'
 import { lireNombre } from '../../lib/nombreSaisi'
 
 const PAGE_SIZE = 50
@@ -164,6 +165,8 @@ export default function EmployesPage() {
   const [qualifFilter, setQualifFilter] = useState('')
   const [statutFilter, setStatutFilter] = useState('actif')
   const [contratFilter, setContratFilter] = useState('')
+  // Ne montrer que les fiches à trous : on remplit la liste d'un coup.
+  const [incompletSeul, setIncompletSeul] = useState(false)
   const [principalFilter, setPrincipalFilter] = useState('')
 
   const [editing, setEditing] = useState<Employee | null>(null)
@@ -231,6 +234,7 @@ export default function EmployesPage() {
   // Le filtre « contrat » s'applique sur la page affichée (les statuts de
   // contrat sont calculés à partir de la vue contrats_courants).
   const lignes = (data?.rows ?? []).filter((emp) => {
+    if (incompletSeul && champsManquants(emp).length === 0) return false
     if (!contratFilter) return true
     const c = contrats?.get(emp.id)
     if (contratFilter === 'sans') return !c
@@ -290,10 +294,11 @@ export default function EmployesPage() {
                      qualifFilter, contratFilter].filter(Boolean).length
                     + (statutFilter === 'actif' ? 0 : 1)
                     + (toutesEntreprises ? 1 : 0)
+                    + (incompletSeul ? 1 : 0)
   const effacerFiltres = () => {
     setPrincipalFilter(''); setSiteFilter(''); setVilleFilter(''); setModeFilter('')
     setQualifFilter(''); setStatutFilter('actif'); setContratFilter('')
-    setToutesEntreprises(false); setPage(1)
+    setToutesEntreprises(false); setIncompletSeul(false); setPage(1)
   }
 
   const filterSelect = (
@@ -440,6 +445,19 @@ export default function EmployesPage() {
               </label>
             )}
           </div>
+
+          {/* Les fiches à trous : on les remplit d'une traite plutôt que
+              de tomber dessus un mois plus tard, au moment de déclarer. */}
+          <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={incompletSeul}
+              onChange={(e) => { setIncompletSeul(e.target.checked); setPage(1) }}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            Seulement les fiches incomplètes
+          </label>
+
           {nbFiltres > 0 && (
             <button
               onClick={effacerFiltres}
@@ -490,6 +508,7 @@ export default function EmployesPage() {
             const retirement = retirementStatus(emp.date_naissance)
             const isRetired = retirement?.kind === 'retired'
             const isGone = !emp.actif
+            const manquants = champsManquants(emp)
             const aff = contratAffichage(
               contrats?.get(emp.id)?.statut ?? null,
               contrats?.get(emp.id)?.jours_restants ?? null,
@@ -514,10 +533,17 @@ export default function EmployesPage() {
                   <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-slate-600">
                     {emp.matricule ?? '—'}
                   </span>
-                  <span className={`min-w-0 flex-1 truncate font-medium ${
-                    isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'
-                  }`}>
-                    {emp.nom_prenom}
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate font-medium ${
+                      isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'
+                    }`}>
+                      {emp.nom_prenom}
+                    </span>
+                    {manquants.length > 0 && (
+                      <span className="block truncate text-xs font-medium text-red-600">
+                        {manquants.length} information{manquants.length > 1 ? 's' : ''} à remplir
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 text-slate-300">›</span>
                 </button>
@@ -578,6 +604,7 @@ export default function EmployesPage() {
                 const retirement = retirementStatus(emp.date_naissance)
                 const isRetired = retirement?.kind === 'retired'
                 const isGone = !emp.actif
+            const manquants = champsManquants(emp)
                 const contrat = contrats?.get(emp.id)
                 const aff = contratAffichage(contrat?.statut ?? null, contrat?.jours_restants ?? null)
                 // Contrat bientôt fini → ligne BLEUE · contrat terminé → ligne JAUNE
@@ -616,6 +643,16 @@ export default function EmployesPage() {
                           <p className={`truncate font-medium ${isGone ? 'text-slate-500' : isRetired ? 'text-red-700' : 'text-slate-900'}`}>
                             {emp.nom_prenom}
                           </p>
+                          {/* Ce qui manque se lit au survol : le rouge dit
+                              qu'il y a un trou, l'infobulle dit lequel. */}
+                          {manquants.length > 0 && (
+                            <p
+                              className="truncate text-xs font-medium text-red-600"
+                              title={`À remplir : ${manquants.join(', ')}`}
+                            >
+                              {manquants.length} information{manquants.length > 1 ? 's' : ''} à remplir
+                            </p>
+                          )}
                           {emp.qualification && (
                             <p className="truncate text-xs text-slate-500">{emp.qualification}</p>
                           )}

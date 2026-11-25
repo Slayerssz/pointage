@@ -383,6 +383,51 @@ const longue = decouperEnPages(100000, 1000)
 ok('cent pages sortent bien toutes', longue.length === 100 && continu(longue, 100000),
    String(longue.length))
 
+// ── Ce qui manque sur une fiche ────────────────────────────────────────
+// Pour inscrire quelqu'un, son nom suffit : on ne bloque pas une
+// embauche parce que la C.N.S.S. n'est pas revenue. Mais une fiche à
+// trous finit par coûter — on ne déclare pas sans C.I.N., on ne vire
+// pas un salaire sans R.I.B. Le rouge ne refuse rien, il rappelle.
+const { code: codeFiche } = await transformWithOxc(
+  fs.readFileSync('src/lib/ficheIncomplete.ts', 'utf8'), 'fi.ts', { lang: 'ts' })
+const { champsManquants, ficheIncomplete, CHAMPS_ATTENDUS } = await import(
+  'data:text/javascript;base64,' + Buffer.from(codeFiche).toString('base64'))
+
+const complete = {
+  cin: 'GB250000', cnss: '120700000', date_naissance: '1990-01-01',
+  date_embauche: '2023-05-02', telephone: '06 61 00 00 00', salaire: 3000,
+  mode_reglement: 'Espece', rib: null,
+}
+ok('une fiche pleine ne manque de rien',
+   champsManquants(complete).length === 0, champsManquants(complete).join(', '))
+ok('… et n’est donc pas incomplète', ficheIncomplete(complete) === false)
+
+ok('un champ vide se nomme',
+   champsManquants({ ...complete, cin: null }).join('') === 'C.I.N.',
+   champsManquants({ ...complete, cin: null }).join(', '))
+ok('… des espaces valent du vide',
+   champsManquants({ ...complete, telephone: '   ' }).join('') === 'Téléphone')
+ok('… et plusieurs trous se nomment tous',
+   champsManquants({ ...complete, cin: null, cnss: '' }).length === 2)
+
+// Le R.I.B. : exigé de ceux qu'on vire, pas des autres. Sans cela, la
+// moitié du registre passerait au rouge sans rien à se reprocher.
+ok('payé en espèces, le R.I.B. ne manque pas',
+   !champsManquants({ ...complete, mode_reglement: 'Espece', rib: null }).includes('R.I.B.'))
+ok('payé par virement, il manque',
+   champsManquants({ ...complete, mode_reglement: 'Virement', rib: null }).includes('R.I.B.'))
+ok('… et ne manque plus une fois rempli',
+   !champsManquants({ ...complete, mode_reglement: 'Virement', rib: '011640' }).includes('R.I.B.'))
+
+// Le nom ne figure pas dans la liste : il est déjà obligatoire à la
+// saisie, et le rappeler mettrait du rouge sur toutes les fiches.
+ok('le nom n’est pas de la partie',
+   !CHAMPS_ATTENDUS.some((c) => c.champ === 'nom_prenom'))
+ok('une fiche absente ne manque de rien',
+   champsManquants(null).length === 0 && champsManquants(undefined).length === 0)
+ok('un salaire à zéro compte comme rempli',
+   !champsManquants({ ...complete, salaire: 0 }).includes('Salaire'))
+
 // ── Lire un nombre tapé à la main ──────────────────────────────────────
 // Un champ « number » n'accepte pas la virgule, et ne se contente pas de
 // la refuser : taper « 3000,50 » y laisse « 300050 ». Un bulletin de
