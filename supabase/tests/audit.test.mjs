@@ -1493,6 +1493,44 @@ const brutSansSaisie = await ligneDuBulletin(null, null, '^SALAIRE BRUT$')
 ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) === 5200,
    String(brutSansSaisie.base))
 
+// ═══════ LE RELEVÉ DES REMPLAÇANTS COMPTE JUSTE ═══════
+// Première version : employés ET pointages joints dans le même FROM.
+// Chacun multipliait l'autre, et trois personnes avec quarante-quatre
+// journées s'affichaient « 132 agents ». Le relevé décide de ce qu'on
+// transfère : il ne peut pas se tromper d'un facteur quinze.
+
+section('Le relevé compte juste')
+// Le piège qui a produit « 132 agents » pour troisJokers personnes : joindre
+// employés ET pointages dans un même FROM multiplie les uns par les
+// autres. On le reproduit, et l'on vérifie que le relevé n'y tombe plus.
+await connecte(bureau)
+const siteJoker = (await q1(`select public.creer_site($1,'JOKER ESSAI') as id`, [co])).id
+const troisJokers = []
+for (const nom of ['JOKER A', 'JOKER B', 'JOKER C']) {
+  troisJokers.push((await q1(
+    `insert into public.employees (company_id, site_id, nom_prenom, salaire, date_embauche)
+     values ($1,$2,$3,2600,'2024-01-01') returning id`, [co, siteJoker, nom])).id)
+}
+// Une quinzaine de journées chacun : de quoi gonfler un compte fautif.
+for (const e of troisJokers) {
+  for (let j = 1; j <= 15; j++) {
+    await q1(`select public.marquer_present($1,$2::date,'X')`,
+             [e, `2026-04-${String(j).padStart(2, '0')}`])
+  }
+}
+
+const releveFichier = fs.readFileSync(path.join(BLOCS, 'RELEVE_remplacants.sql'), 'utf8')
+const premiereRequete = releveFichier.split(/;\s*\n/).map((b) => b.replace(/^\s*--.*$/gm, '').trim())
+  .filter(Boolean)[0]
+const ligneReleve = (await rows(premiereRequete)).find((r) => r.site === 'JOKER ESSAI')
+console.log('    relevé :', JSON.stringify(ligneReleve))
+ok('le relevé compte trois agents, et non quarante-cinq',
+   num(ligneReleve.agents) === 3, String(ligneReleve.agents))
+ok('… et quarante-cinq pointages, pas trois', num(ligneReleve.pointages) === 45,
+   String(ligneReleve.pointages))
+ok('… il annonce que le site porte de l’historique',
+   /éteindre/.test(ligneReleve.ce_qu_il_porte), ligneReleve.ce_qu_il_porte)
+
 // ═══════ LES REMPLAÇANTS, HORS DES SOCIÉTÉS ═══════
 // Un remplaçant ne travaille pas pour une société : il va où l'on a
 // besoin de lui. Sa fiche et ses journées vivent donc hors du
