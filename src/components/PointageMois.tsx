@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useSiteWeekPointages, useSiteEmployesTous } from '../lib/queries'
+import { useEmployesDesAnnexes, usePointagesDesAnnexes } from '../lib/queries'
 import { JOURS_COURTS, formatDateFr, todayIso } from '../lib/dates'
 import type { Employee, Site } from '../lib/types'
 import { MOIS_FR } from '../lib/dates'
 import { CellModal, DayCell, type CellSelection } from './PointageCellule'
+import BandeAnnexes from './BandeAnnexes'
 import { EmptyState, ErrorNote, Spinner } from './ui'
 
 /**
@@ -21,18 +22,27 @@ import { EmptyState, ErrorNote, Spinner } from './ui'
  * On ne pointe pas l'avenir : les jours à venir sont éteints.
  */
 export default function PointageMois({
-  site,
+  titre,
+  principalId,
+  annexes,
   moisInitial,
   onClose,
   onOuvrirFiche,
 }: {
-  site: Site
+  /** Ce qu'on a ouvert : le site principal, ou l'annexe esseulée. */
+  titre: string
+  /** Nul quand on a ouvert une annexe sans site principal. */
+  principalId: string | null
+  /** Les annexes dont on montre le monde. Une seule, le plus souvent. */
+  annexes: Site[]
   /** Le mois ouvert au départ : { annee, mois } avec mois de 1 à 12. */
   moisInitial: { annee: number; mois: number }
   onClose: () => void
   /** Un clic sur un nom ouvre sa fiche, pour la lire et la corriger. */
   onOuvrirFiche: (employe: Employee) => void
 }) {
+  // L'annexe mise en avant ; nulle, on voit tout le site principal.
+  const [annexeChoisie, setAnnexeChoisie] = useState<string | null>(null)
   const [recherche, setRecherche] = useState('')
   const [selection, setSelection] = useState<CellSelection | null>(null)
   const [{ annee, mois }, setMois] = useState(moisInitial)
@@ -60,12 +70,16 @@ export default function PointageMois({
 
   // Le mois affiché décide de qui doit y figurer : quelqu'un parti
   // depuis reste sur le mois qu'il a travaillé.
-  const employes = useSiteEmployesTous(site.id, true, { depuis: premier })
-  const pointages = useSiteWeekPointages(site.id, premier, dernier, true)
+  const idsAnnexes = annexes.map((a) => a.id)
+  const employes = useEmployesDesAnnexes(idsAnnexes, true, { depuis: premier })
+  const pointages = usePointagesDesAnnexes(idsAnnexes, premier, dernier, true)
 
   const today = todayIso()
   const q = recherche.trim().toLowerCase()
-  const lignes = (employes.data ?? []).filter(
+  const surLAnnexe = (employes.data ?? []).filter(
+    (e) => !annexeChoisie || e.site_id === annexeChoisie,
+  )
+  const lignes = surLAnnexe.filter(
     (e) => !q
       || e.nom_prenom.toLowerCase().includes(q)
       || String(e.matricule ?? '').includes(q),
@@ -79,9 +93,11 @@ export default function PointageMois({
       {/* ── La barre : où l'on est, qui l'on cherche, comment on sort ── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-semibold text-slate-900">{site.name}</h1>
+          <h1 className="truncate text-base font-semibold text-slate-900">{titre}</h1>
           <p className="text-xs text-slate-500">
-            {lignes.length} employé(s){q && ` sur ${(employes.data ?? []).length}`}
+            {lignes.length} employé(s)
+            {lignes.length !== (employes.data ?? []).length
+              && ` sur ${(employes.data ?? []).length}`}
           </p>
         </div>
 
@@ -197,7 +213,9 @@ export default function PointageMois({
                             if (d > today) return
                             setSelection({
                               employee: emp,
-                              site,
+                              // La case appartient à l'annexe de la personne,
+                              // qui n'est pas forcément celle qu'on regarde.
+                              site: annexes.find((a) => a.id === emp.site_id) ?? annexes[0],
                               date: d,
                               pointage: empDays?.get(d) ?? null,
                             })
@@ -212,6 +230,14 @@ export default function PointageMois({
           </table>
         )}
       </div>
+
+      <BandeAnnexes
+        principalId={principalId}
+        annexes={annexes}
+        choisie={annexeChoisie}
+        onChoisir={setAnnexeChoisie}
+        employes={employes.data ?? []}
+      />
 
       <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
         Du {formatDateFr(premier)} au {formatDateFr(dernier)}. Les jours à venir ne se

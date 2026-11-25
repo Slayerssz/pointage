@@ -25,8 +25,11 @@ export default function ValidationPage() {
   const { data: peutPointer, isLoading: droitEnCours } = usePeutPointer(companyId)
   const { data: sites, isLoading, error } = useSites(companyId, { pointageOnly: true })
   const { data: principaux } = useSitesPrincipaux(companyId)
-  // Le site ouvert en plein écran, et la fiche qu'on y a demandée.
-  const [siteOuvert, setSiteOuvert] = useState<Site | null>(null)
+  // Ce qu'on a ouvert en plein écran : un site principal avec ses
+  // annexes, ou une annexe qui n'en a pas.
+  const [ouvert, setOuvert] = useState<
+    { titre: string; principalId: string | null; annexes: Site[] } | null
+  >(null)
   const [fiche, setFiche] = useState<Employee | null>(null)
   const [recherche, setRecherche] = useState('')
 
@@ -94,16 +97,24 @@ export default function ValidationPage() {
           sites={sites}
           principaux={principaux ?? []}
           recherche={recherche}
-          onSiteClick={setSiteOuvert}
+          // Les annexes ne s'ouvrent plus une par une : on ouvre le site
+          // principal et l'on voit tout son monde. Celles qui n'ont pas
+          // de rattachement s'ouvrent seules, comme avant.
+          onPrincipalClick={(principal, annexes) =>
+            setOuvert({ titre: principal.name, principalId: principal.id, annexes })}
+          onSiteClick={(site) =>
+            setOuvert({ titre: site.name, principalId: site.site_principal_id, annexes: [site] })}
         />
       )}
 
-      {siteOuvert && (
+      {ouvert && (
         <PointageMois
-          site={siteOuvert}
+          titre={ouvert.titre}
+          principalId={ouvert.principalId}
+          annexes={ouvert.annexes}
           moisInitial={moisCourant}
           onOuvrirFiche={setFiche}
-          onClose={() => setSiteOuvert(null)}
+          onClose={() => setOuvert(null)}
         />
       )}
 

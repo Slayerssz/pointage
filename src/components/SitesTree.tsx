@@ -38,6 +38,12 @@ interface Props {
    * un repli de la liste.
    */
   onSiteClick?: (site: Site) => void
+  /**
+   * Quand il est fourni, le site principal s'ouvre d'un clic avec
+   * toutes ses annexes : on pointe l'ensemble, et les annexes se
+   * tiennent sous la grille. Ses annexes ne se déplient plus ici.
+   */
+  onPrincipalClick?: (principal: SitePrincipal, annexes: Site[]) => void
   /** Filtre vivant sur le nom du site ou de son site principal. */
   recherche?: string
 }
@@ -51,7 +57,9 @@ interface Props {
  * directement, comme avant : l'écran reste utilisable.
  * Le contenu d'une annexe n'est monté (donc chargé) qu'à son ouverture.
  */
-export default function SitesTree({ sites, principaux, renderSite, onSiteClick, recherche }: Props) {
+export default function SitesTree({
+  sites, principaux, renderSite, onSiteClick, onPrincipalClick, recherche,
+}: Props) {
   const [ouvertsPrincipaux, setOuvertsPrincipaux] = useState<Set<string>>(new Set())
   const [ouvertesAnnexes, setOuvertesAnnexes] = useState<Set<string>>(new Set())
 
@@ -140,15 +148,17 @@ export default function SitesTree({ sites, principaux, renderSite, onSiteClick, 
   return (
     <div className="space-y-2">
       {groupes.map(({ principal, annexes }) => {
-        const ouvert = ouvertsPrincipaux.has(principal.id)
+        const ouvert = !onPrincipalClick && ouvertsPrincipaux.has(principal.id)
         return (
           <div
             key={principal.id}
             className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
           >
             <button
-              onClick={() => basculerPrincipal(principal.id)}
-              aria-expanded={ouvert}
+              onClick={() => (onPrincipalClick
+                ? onPrincipalClick(principal, annexes)
+                : basculerPrincipal(principal.id))}
+              aria-expanded={onPrincipalClick ? undefined : ouvert}
               className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
             >
               <span className="flex min-w-0 items-center gap-3">
@@ -162,7 +172,11 @@ export default function SitesTree({ sites, principaux, renderSite, onSiteClick, 
                   </span>
                 </span>
               </span>
-              <Chevron ouvert={ouvert} />
+              {onPrincipalClick ? (
+                <span className="shrink-0 text-slate-400">›</span>
+              ) : (
+                <Chevron ouvert={ouvert} />
+              )}
             </button>
             {ouvert && <div>{annexes.map((s) => annexeItem(s, true))}</div>}
           </div>

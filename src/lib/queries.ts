@@ -141,6 +141,71 @@ export function useSiteEmployesTous(
   })
 }
 
+/**
+ * Tous les employés d'un ENSEMBLE d'annexes, d'un coup.
+ *
+ * La grille s'ouvre désormais sur un site principal, et montre tout
+ * son monde — annexes confondues. On passe donc la liste des annexes
+ * plutôt qu'une seule : un site principal sans subdivision n'en a
+ * qu'une, et cela marche pareil.
+ */
+export function useEmployesDesAnnexes(
+  siteIds: string[],
+  enabled: boolean,
+  opts?: { depuis?: string },
+) {
+  const depuis = opts?.depuis ?? null
+  const cle = [...siteIds].sort().join(',')
+  return useQuery({
+    queryKey: ['employes-des-annexes', cle, depuis],
+    enabled: enabled && siteIds.length > 0,
+    queryFn: async (): Promise<Employee[]> => {
+      let requete = supabase
+        .from('employees')
+        .select('*')
+        .in('site_id', siteIds)
+        .is('archive_le', null)
+      requete = depuis
+        ? requete.or(`date_sortie.is.null,date_sortie.gte.${depuis}`)
+        : requete.eq('actif', true)
+      const { data, error } = await requete.order('nom_prenom', { ascending: true })
+      if (error) throw error
+      return data as Employee[]
+    },
+  })
+}
+
+/** Les pointages d'un ensemble d'annexes, sur une période. */
+export function usePointagesDesAnnexes(
+  siteIds: string[],
+  debut: string,
+  fin: string,
+  enabled: boolean,
+) {
+  const cle = [...siteIds].sort().join(',')
+  return useQuery({
+    queryKey: ['pointages-des-annexes', cle, debut, fin],
+    enabled: enabled && siteIds.length > 0,
+    queryFn: async (): Promise<Map<string, Map<string, DayPointage>>> => {
+      const { data, error } = await supabase
+        .from('pointages')
+        .select('id, employee_id, status, photo_path, pointed_at, pointed_on, type_garde, conge_id')
+        .in('site_id', siteIds)
+        .gte('pointed_on', debut)
+        .lte('pointed_on', fin)
+        .order('pointed_at', { ascending: false })
+      if (error) throw error
+      const map = new Map<string, Map<string, DayPointage>>()
+      for (const p of data) {
+        let days = map.get(p.employee_id)
+        if (!days) { days = new Map(); map.set(p.employee_id, days) }
+        if (!days.has(p.pointed_on)) days.set(p.pointed_on, p)
+      }
+      return map
+    },
+  })
+}
+
 export type DayPointage = Pick<
   Pointage,
   | 'id' | 'employee_id' | 'status' | 'photo_path'

@@ -175,7 +175,13 @@ with attendu (numero, bloc, objet, present) as (
                 where table_schema = 'public' and table_name = 'remplacants')
        and not exists (select 1 from information_schema.columns
                         where table_schema = 'public' and table_name = 'remplacants'
-                          and column_name = 'company_id'))
+                          and column_name = 'company_id')),
+  (53, 'Annexes au pointage',     'renommer et supprimer passent à l''administrateur',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'affecter_employe_annexe')
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'maj_site'
+                      and pg_get_functiondef(p.oid) like '%exiger_role(''admin'')%'))
 )
 select numero,
        bloc,

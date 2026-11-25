@@ -1493,6 +1493,57 @@ const brutSansSaisie = await ligneDuBulletin(null, null, '^SALAIRE BRUT$')
 ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) === 5200,
    String(brutSansSaisie.base))
 
+// ═══════ LES ANNEXES SE TIENNENT DEPUIS LE POINTAGE ═══════
+// Elles quittent la liste générale des sites : on les gère là où elles
+// servent, sous la grille. Ajouter et affecter restent au bureau ;
+// renommer et supprimer passent à l'administrateur, parce qu'ils
+// touchent l'historique de tout le monde.
+
+section('Les annexes se tiennent depuis le pointage')
+
+await connecte(admin)
+const principalPort = (await q1(`select public.creer_site_principal($1,'LE PORT') as id`, [co])).id
+await connecte(bureau)
+const annexeQuai = (await q1(`select public.creer_annexe($1,'QUAI NORD') as id`, [principalPort])).id
+ok('le bureau ajoute une annexe sous un site principal', Boolean(annexeQuai))
+ok('… elle naît rattachée',
+   (await q1(`select site_principal_id from public.sites where id=$1`, [annexeQuai])).site_principal_id === principalPort)
+
+const agentDuPort = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, salaire, date_embauche)
+   values ($1,$2,'AGENT DU PORT',2600,'2024-01-01') returning id`, [co, site])).id
+await q1(`select public.marquer_present($1,$2::date,'X')`,
+         [agentDuPort, (await q1(`select (now() at time zone 'Africa/Casablanca')::date::text d`)).d])
+
+ok('le bureau affecte quelqu’un à l’annexe',
+   await reussit(`select public.affecter_employe_annexe($1,$2)`, [agentDuPort, annexeQuai]))
+ok('… la fiche suit',
+   (await q1(`select site_id from public.employees where id=$1`, [agentDuPort])).site_id === annexeQuai)
+ok('… et ses journées du mois ouvert aussi',
+   num((await q1(`select count(*) n from public.pointages
+                   where employee_id=$1 and site_id=$2`, [agentDuPort, annexeQuai])).n) === 1)
+
+// Renommer et supprimer : administrateur seulement.
+await refuse('le bureau ne renomme pas une annexe',
+  `select public.maj_site($1,'AUTRE NOM')`, [annexeQuai], /admin/i)
+await refuse('… ni ne la supprime',
+  `select public.supprimer_site($1,$2)`, [annexeQuai, site], /admin/i)
+
+await connecte(admin)
+ok('l’administrateur la renomme', await reussit(`select public.maj_site($1,'QUAI SUD')`, [annexeQuai]))
+ok('… et la supprime en déplaçant son monde',
+   await reussit(`select public.supprimer_site($1,$2)`, [annexeQuai, site]))
+ok('… les employés ont suivi',
+   (await q1(`select site_id from public.employees where id=$1`, [agentDuPort])).site_id === site)
+
+await refuse('supprimer une annexe peuplée sans destination est refusé',
+  `select public.supprimer_site($1, null)`,
+  [(await (async () => { await connecte(bureau)
+     const x = (await q1(`select public.creer_annexe($1,'QUAI EST') as id`, [principalPort])).id
+     await db.query(`update public.employees set site_id=$2 where id=$1`, [agentDuPort, x])
+     await connecte(admin); return x })())],
+  /employé|destination/i)
+
 // ═══════ LE RELEVÉ DES REMPLAÇANTS COMPTE JUSTE ═══════
 // Première version : employés ET pointages joints dans le même FROM.
 // Chacun multipliait l'autre, et trois personnes avec quarante-quatre
