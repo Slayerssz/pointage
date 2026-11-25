@@ -1493,6 +1493,96 @@ const brutSansSaisie = await ligneDuBulletin(null, null, '^SALAIRE BRUT$')
 ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) === 5200,
    String(brutSansSaisie.base))
 
+// ═══════ LES REMPLAÇANTS, HORS DES SOCIÉTÉS ═══════
+// Un remplaçant ne travaille pas pour une société : il va où l'on a
+// besoin de lui. Sa fiche et ses journées vivent donc hors du
+// cloisonnement par société, et chaque journée retient qui a été
+// remplacé, dans quelle société, et pour combien — figé à la pose.
+
+section('Les remplaçants, hors des sociétés')
+
+// Un deuxième compte société : la liste doit être la même des jokerDeux côtés.
+await connecte(admin)
+const coDeux = (await q1(`select public.admin_creer_entreprise('REMPLACANTS SARL') as id`)).id
+await connecte(bureau)
+const siteDeux = (await q1(`select public.creer_site($1,'SITE DEUX') as id`, [coDeux])).id
+
+const eAbsent = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, matricule, salaire, date_embauche)
+   values ($1,$2,'AGENT ABSENT',900,2600,'2024-01-01') returning id`, [co, site])).id
+
+// 1. La fiche
+const joker1 = (await q1(
+  `select public.enregistrer_remplacant(null, $1::jsonb) as id`,
+  [JSON.stringify({ nom_prenom: 'JOKER UN', cin: 'GB1', mode_reglement: 'Espece' })])).id
+const joker2 = (await q1(
+  `select public.enregistrer_remplacant(null, $1::jsonb) as id`,
+  [JSON.stringify({ nom_prenom: 'JOKER DEUX', tarif_journalier: '150' })])).id
+ok('on enregistre un remplaçant sans société', Boolean(joker1) && Boolean(joker2))
+const ficheJoker = await q1(`select matricule, nom_prenom, actif from public.remplacants where id=$1`, [joker1])
+ok('… il reçoit son matricule', num(ficheJoker.matricule) > 0, String(ficheJoker.matricule))
+ok('… et un matricule par remplaçant',
+   num((await q1(`select matricule from public.remplacants where id=$1`, [joker2])).matricule)
+   !== num(ficheJoker.matricule))
+await refuse('un remplaçant sans nom est refusé',
+  `select public.enregistrer_remplacant(null, '{}'::jsonb)`, [], /nom est obligatoire/i)
+
+// 2. La table n'appartient à personne
+ok('la liste ne porte pas de société',
+   num((await q1(`select count(*) n from information_schema.columns
+                   where table_name='remplacants' and column_name='company_id'`)).n) === 0)
+
+// 3. Poser une journée
+const journee1 = (await q1(`select public.poser_remplacement($1,$2,'2026-04-03') as id`, [joker1, eAbsent])).id
+ok('on pose une journée de remplacement', Boolean(journee1))
+const detailJournee = await q1(
+  `select montant, company_id, employee_id from public.remplacant_journees where id=$1`, [journee1])
+// Sans tarif propre, c'est la journée de la personne remplacée : 2600 / 26
+ok('… sans tarif propre, c’est la journée du remplacé', num(detailJournee.montant) === 100,
+   String(detailJournee.montant))
+ok('… et la société qui doit la somme est retenue', detailJournee.company_id === co)
+
+const journee2 = (await q1(`select public.poser_remplacement($1,$2,'2026-04-04') as id`, [joker2, eAbsent])).id
+ok('… avec un tarif propre, c’est le sien',
+   num((await q1(`select montant from public.remplacant_journees where id=$1`, [journee2])).montant) === 150)
+
+// 4. Ce qui est interdit
+await refuse('un remplaçant ne tient pas deux postes le même jour',
+  `select public.poser_remplacement($1,$2,'2026-04-03')`,
+  [joker1, (await q1(`insert into public.employees (company_id, site_id, nom_prenom, salaire)
+                  values ($1,$2,'AUTRE ABSENT',2600) returning id`, [co, site])).id],
+  /duplicate|unique|déjà/i)
+
+// 5. Le tableau de paie
+const tableauRempl = await rows(`select * from public.paie_remplacants(2026, 4) order by nom_prenom`)
+ok('le tableau de paie du mois liste les remplaçants', tableauRempl.length === 2, String(tableauRempl.length))
+const jokerDeux = tableauRempl.find((p) => p.nom_prenom === 'JOKER DEUX')
+ok('… avec ses journées et son montant',
+   num(jokerDeux.jours) === 1 && num(jokerDeux.montant) === 150,
+   `${jokerDeux.jours} j / ${jokerDeux.montant}`)
+ok('… et le détail par société', JSON.parse(JSON.stringify(jokerDeux.par_societe)).length === 1)
+
+// 6. Un mois sans remplacement ne fabrique pas de dette
+const moisVide = await rows(`select * from public.paie_remplacants(2026, 7)`)
+ok('un mois sans remplacement ne doit rien',
+   moisVide.every((p) => num(p.jours) === 0 && num(p.montant) === 0))
+
+// 7. Retirer
+ok('on retire une journée',
+   num((await q1(`select public.retirer_remplacement($1,'2026-04-04') n`, [eAbsent])).n) === 1)
+
+void coDeux; void siteDeux
+// Le relevé : il ne change rien, mais il doit tourner sur le vrai schéma.
+const releveRempl = fs.readFileSync(path.join(BLOCS, 'RELEVE_remplacants.sql'), 'utf8')
+let nReleve = 0
+for (const bout of releveRempl.split(/;\s*\n/)) {
+  const q = bout.replace(/^\s*--.*$/gm, '').trim()
+  if (!q) continue
+  nReleve++
+  ok(`relevé : instruction ${nReleve} s'exécute`, await reussit(q))
+}
+ok('le relevé compte trois instructions', nReleve === 3, String(nReleve))
+
 // ═══════ LE REPOS SE POSE AU JOUR LE JOUR ═══════
 // Le jour de repos n'est plus fixé sur la fiche : c'est une lettre du
 // pointage, R, posée sur le jour qu'on veut. Elle ne vaut aucune

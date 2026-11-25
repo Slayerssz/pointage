@@ -169,7 +169,13 @@ with attendu (numero, bloc, objet, present) as (
        public.garde_valeur('R') = 0
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                     where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                      and pg_get_functiondef(p.oid) like '%type_garde = ''R''%'))
+                      and pg_get_functiondef(p.oid) like '%type_garde = ''R''%')),
+  (52, 'Remplaçants',             'la section partagée existe, sans société',
+       exists (select 1 from information_schema.tables
+                where table_schema = 'public' and table_name = 'remplacants')
+       and not exists (select 1 from information_schema.columns
+                        where table_schema = 'public' and table_name = 'remplacants'
+                          and column_name = 'company_id'))
 )
 select numero,
        bloc,
