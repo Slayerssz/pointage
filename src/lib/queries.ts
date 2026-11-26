@@ -206,6 +206,59 @@ export function usePointagesDesAnnexes(
   })
 }
 
+/** Les remplaçants du groupe : la même liste depuis n'importe quel compte. */
+export function useRemplacants(enabled = true) {
+  return useQuery({
+    queryKey: ['remplacants'],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('remplacants')
+        .select('id, matricule, nom_prenom, qualification, tarif_journalier, actif')
+        .is('archive_le', null)
+        .order('nom_prenom')
+      if (error) throw error
+      return data as {
+        id: string; matricule: number | null; nom_prenom: string
+        qualification: string | null; tarif_journalier: number | null; actif: boolean
+      }[]
+    },
+  })
+}
+
+/**
+ * Les journées remplacées du mois, rangées par absent et par jour :
+ * la grille y lit quelle case montrer comme couverte, et par qui.
+ */
+export function useRemplacementsDuMois(debut: string, fin: string, enabled = true) {
+  return useQuery({
+    queryKey: ['remplacements-du-mois', debut, fin],
+    enabled,
+    queryFn: async (): Promise<Map<string, Map<string, { nom: string; montant: number }>>> => {
+      const { data, error } = await supabase
+        .from('remplacant_journees')
+        .select('employee_id, date_jour, montant, remplacants(nom_prenom)')
+        .gte('date_jour', debut)
+        .lte('date_jour', fin)
+      if (error) throw error
+      const map = new Map<string, Map<string, { nom: string; montant: number }>>()
+      for (const j of data as unknown as {
+        employee_id: string | null; date_jour: string; montant: number
+        remplacants: { nom_prenom: string } | null
+      }[]) {
+        if (!j.employee_id) continue
+        let jours = map.get(j.employee_id)
+        if (!jours) { jours = new Map(); map.set(j.employee_id, jours) }
+        jours.set(j.date_jour, {
+          nom: j.remplacants?.nom_prenom ?? 'Remplaçant',
+          montant: Number(j.montant),
+        })
+      }
+      return map
+    },
+  })
+}
+
 export type DayPointage = Pick<
   Pointage,
   | 'id' | 'employee_id' | 'status' | 'photo_path'

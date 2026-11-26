@@ -43,6 +43,11 @@ const ICONS = {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
     </svg>
   ),
+  remplacants: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
   employes: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
       <path d="M17 20h5v-1a4 4 0 0 0-4-4h-1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 0a3 3 0 1 0-2-5.2M2 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1H2Z" />
@@ -117,6 +122,9 @@ export default function Layout() {
       ? [
           { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes, principal: true },
           { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
+          // Les remplaçants sont partagés par toutes les sociétés : la
+          // liste est la même d'où qu'on vienne.
+          { to: `/c/${companyId}/remplacants`, label: 'Remplaçants', icon: ICONS.remplacants },
           { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation, principal: true },
           { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie, principal: true },
           { to: `/c/${companyId}/bulletins`, label: 'Bulletins de paie', court: 'Bulletins',
@@ -135,6 +143,7 @@ export default function Layout() {
         ? [
             { to: `/c/${companyId}/employes`, label: 'Employés', icon: ICONS.employes, principal: true },
             { to: `/c/${companyId}/sorties`, label: 'Sorties', icon: ICONS.sorties },
+            { to: `/c/${companyId}/remplacants`, label: 'Remplaçants', icon: ICONS.remplacants },
             { to: `/c/${companyId}/validation`, label: 'Pointage', icon: ICONS.validation, principal: true },
             // Le bureau couvre la paie ; l'inverse n'est pas vrai.
             { to: `/c/${companyId}/paie`, label: 'Paie', icon: ICONS.paie, principal: true },

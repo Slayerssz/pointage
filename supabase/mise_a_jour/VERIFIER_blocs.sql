@@ -181,7 +181,14 @@ with attendu (numero, bloc, objet, present) as (
                 where n.nspname = 'public' and p.proname = 'affecter_employe_annexe')
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                     where n.nspname = 'public' and p.proname = 'maj_site'
-                      and pg_get_functiondef(p.oid) like '%exiger_role(''admin'')%'))
+                      and pg_get_functiondef(p.oid) like '%exiger_role(''admin'')%')),
+  (54, 'Sortie depuis la case',   'sortir quelqu''un en pointant',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'sortir_employe_depuis')),
+  (55, 'Poser la journée',        'une case se corrige au lieu de se refuser',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'marquer_present'
+                  and pg_get_functiondef(p.oid) not like '%déjà un pointage ce jour-là%'))
 )
 select numero,
        bloc,

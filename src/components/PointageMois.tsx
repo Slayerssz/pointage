@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
-import { useEmployesDesAnnexes, usePointagesDesAnnexes } from '../lib/queries'
+import {
+  useEmployesDesAnnexes, usePointagesDesAnnexes, useRemplacementsDuMois,
+} from '../lib/queries'
 import { JOURS_COURTS, formatDateFr, todayIso } from '../lib/dates'
 import type { Employee, Site } from '../lib/types'
 import { MOIS_FR } from '../lib/dates'
-import { CellModal, DayCell, type CellSelection } from './PointageCellule'
+import { DayCell, type CellSelection } from './PointageCellule'
+import MenuCase from './MenuCase'
 import BandeAnnexes from './BandeAnnexes'
 import { EmptyState, ErrorNote, Spinner } from './ui'
 
@@ -73,6 +76,8 @@ export default function PointageMois({
   const idsAnnexes = annexes.map((a) => a.id)
   const employes = useEmployesDesAnnexes(idsAnnexes, true, { depuis: premier })
   const pointages = usePointagesDesAnnexes(idsAnnexes, premier, dernier, true)
+  // Qui a été couvert, quel jour, et par qui.
+  const remplacements = useRemplacementsDuMois(premier, dernier, true)
 
   const today = todayIso()
   const q = recherche.trim().toLowerCase()
@@ -209,6 +214,8 @@ export default function PointageMois({
                         <DayCell
                           pointage={empDays?.get(d) ?? null}
                           isFuture={d > today}
+                          remplacant={remplacements.data?.get(emp.id)?.get(d) ?? null}
+                          sorti={Boolean(emp.date_sortie) && d > emp.date_sortie!}
                           onClick={() => {
                             if (d > today) return
                             setSelection({
@@ -244,7 +251,18 @@ export default function PointageMois({
         pointent pas.
       </footer>
 
-      {selection && <CellModal selection={selection} onClose={() => setSelection(null)} />}
+      {selection && (
+        <MenuCase
+          employee={selection.employee}
+          site={selection.site}
+          date={selection.date}
+          pointage={selection.pointage}
+          remplacant={
+            remplacements.data?.get(selection.employee.id)?.get(selection.date) ?? null
+          }
+          onFerme={() => setSelection(null)}
+        />
+      )}
     </div>
   )
 }

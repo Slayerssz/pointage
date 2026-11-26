@@ -190,14 +190,22 @@ ok('supprimer le « XX » retire bien 2 gardes, pas 1',
    num((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles) === 5,
    String((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles))
 
-// Repointer le même jour est refusé net : le compteur ne peut pas doubler.
-await refuse('repointer un jour déjà pointé est refusé',
-  `select public.marquer_present($1,'2026-02-02'::date,'X')`, [eGardes], /déjà un pointage/i)
-ok('… le compteur n’a pas bougé',
-   num((await q1(`select jours_travailles from public.employees where id=$1`, [eGardes])).jours_travailles) === 5)
+// Repointer le même jour le CORRIGE : on remplace la lettre, on ne
+// double pas la journée. Le 2 février portait une garde (1) ; passé en
+// XX (2), le compteur va de 5 à 6 — et non à 7.
+const compteurGardes = async () => num((await q1(
+  `select jours_travailles j from public.employees where id=$1`, [eGardes])).j)
+ok('repointer un jour déjà pointé le corrige',
+   await reussit(`select public.marquer_present($1,'2026-02-02'::date,'XX')`, [eGardes]))
+ok('… le compteur échange l’ancienne valeur contre la nouvelle',
+   (await compteurGardes()) === 6, String(await compteurGardes()))
 ok('… et il n’y a toujours qu’un pointage ce jour-là',
    num((await q1(`select count(*) as c from public.pointages
                    where employee_id=$1 and pointed_on='2026-02-02'`, [eGardes])).c) === 1)
+// On remet la garde simple : la suite compte sur les 5 gardes d'avant.
+await q1(`select public.marquer_present($1,'2026-02-02'::date,'X')`, [eGardes])
+ok('… remis en garde simple, le compteur revient à 5',
+   (await compteurGardes()) === 5, String(await compteurGardes()))
 await refuse('pointer un jour à venir est refusé',
   `select public.marquer_present(
      $1, ((now() at time zone 'Africa/Casablanca')::date + 1), 'X')`,
@@ -1493,6 +1501,114 @@ const brutSansSaisie = await ligneDuBulletin(null, null, '^SALAIRE BRUT$')
 ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) === 5200,
    String(brutSansSaisie.base))
 
+// ═══════ SORTIR QUELQU'UN DEPUIS SA CASE ═══════
+// Un départ se constate en pointant. « Sortie » sur une case pose la
+// date à la VEILLE — la case cliquée est le premier jour d'absence —
+// retire les journées d'après, qui seraient payées, et ouvre le départ
+// dans la section Sorties.
+
+section('Sortir quelqu’un depuis sa case')
+await connecte(bureau)
+const ePartant = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, salaire, date_embauche)
+   values ($1,$2,'PART EN COURS',2600,'2024-01-01') returning id`, [co, site])).id
+for (let j = 1; j <= 20; j++) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`,
+           [ePartant, `2026-04-${String(j).padStart(2, '0')}`])
+}
+ok('vingt journées posées',
+   num((await q1(`select count(*) n from public.pointages where employee_id=$1`,
+                 [ePartant])).n) === 20)
+
+const idDepart = (await q1(
+  `select public.sortir_employe_depuis($1,'2026-04-11') as id`, [ePartant])).id
+const ficheSortie = await q1(
+  `select actif, date_sortie::text ds from public.employees where id=$1`, [ePartant])
+ok('son dernier jour est la veille de la case', ficheSortie.ds === '2026-04-10',
+   String(ficheSortie.ds))
+ok('… il n’est plus en poste', ficheSortie.actif === false)
+ok('… les journées d’après sont retirées',
+   num((await q1(`select count(*) n from public.pointages
+                   where employee_id=$1 and pointed_on > '2026-04-10'`, [ePartant])).n) === 0)
+ok('… celles d’avant sont intactes',
+   num((await q1(`select count(*) n from public.pointages where employee_id=$1`,
+                 [ePartant])).n) === 10)
+
+const departOuvert = await q1(
+  `select date_sortie::text ds, valide from public.sorties where id=$1`, [idDepart])
+ok('un départ est ouvert dans la section Sorties', Boolean(idDepart))
+ok('… à la même date', departOuvert.ds === '2026-04-10', String(departOuvert.ds))
+ok('… et pas encore validé', departOuvert.valide === false)
+
+await q1(`select public.sortir_employe_depuis($1,'2026-04-06')`, [ePartant])
+ok('recommencer corrige au lieu de doubler',
+   num((await q1(`select count(*) n from public.sorties where employee_id=$1`,
+                 [ePartant])).n) === 1)
+await refuse('on ne sort pas quelqu’un avant son embauche',
+  `select public.sortir_employe_depuis($1,'2023-01-01')`, [ePartant], /pas encore commencé/i)
+
+// ═══════ TRANSFÉRER LES REMPLAÇANTS ═══════
+// Ils sont COPIÉS dans la section partagée — une seule fois, même
+// présents dans trois sociétés. Rien n'est supprimé : les fiches, les
+// pointages et les lignes de paie portent des mois déjà payés. Les
+// anciens sites sont éteints, et une sauvegarde est prise avant tout.
+
+section('Transférer les remplaçants')
+await connecte(admin)
+const coSecond = (await q1(`select public.admin_creer_entreprise('DEUXIEME SARL') as id`)).id
+await connecte(bureau)
+const siteRemplA = (await q1(`select public.creer_site($1,'REMPLACEMENT') as id`, [co])).id
+const siteRemplB = (await q1(`select public.creer_site($1,'JOKER CONGE 1') as id`, [coSecond])).id
+const siteVrai = (await q1(`select public.creer_site($1,'LE VRAI SITE') as id`, [co])).id
+
+// La même personne dans deux sociétés : une fiche complète, une pauvre.
+await db.query(
+  `insert into public.employees (company_id, site_id, nom_prenom, cin, cnss, telephone, salaire, date_embauche)
+   values ($1,$2,'JOKER PARTAGE','GB1','111','0600',2600,'2024-01-01')`, [co, siteRemplA])
+await db.query(
+  `insert into public.employees (company_id, site_id, nom_prenom, date_embauche)
+   values ($1,$2,'JOKER PARTAGE','2025-01-01')`, [coSecond, siteRemplB])
+await db.query(
+  `insert into public.employees (company_id, site_id, nom_prenom, cin) values ($1,$2,'JOKER SEUL','GB2')`,
+  [co, siteRemplA])
+// Quelqu'un d'un vrai site : il ne doit pas bouger.
+await db.query(
+  `insert into public.employees (company_id, site_id, nom_prenom) values ($1,$2,'AGENT ORDINAIRE')`,
+  [co, siteVrai])
+
+const scriptTransfert = fs.readFileSync(path.join(BLOCS, 'TRANSFERER_remplacants.sql'), 'utf8')
+await db.exec(scriptTransfert)
+
+const jokersCrees = await rows(`select nom_prenom, cin, cnss from public.remplacants order by nom_prenom`)
+ok('les jokers sont dans la section partagée', jokersCrees.length === 2,
+   jokersCrees.map((r) => r.nom_prenom).join(', '))
+ok('… la personne des deux sociétés n’y entre qu’une fois',
+   jokersCrees.filter((r) => r.nom_prenom === 'JOKER PARTAGE').length === 1)
+ok('… et c’est la fiche la plus renseignée qui a gagné',
+   jokersCrees.find((r) => r.nom_prenom === 'JOKER PARTAGE').cin === 'GB1',
+   String(jokersCrees.find((r) => r.nom_prenom === 'JOKER PARTAGE').cin))
+ok('… l’agent d’un vrai site n’a pas bougé',
+   !jokersCrees.some((r) => r.nom_prenom === 'AGENT ORDINAIRE'))
+
+ok('rien n’est supprimé : les fiches d’origine sont là',
+   num((await q1(`select count(*) n from public.employees
+                   where site_id in ($1,$2)`, [siteRemplA, siteRemplB])).n) === 3)
+ok('les anciens sites sont éteints, pas supprimés',
+   num((await q1(`select count(*) n from public.sites
+                   where id in ($1,$2) and not pointage_actif`, [siteRemplA, siteRemplB])).n) === 2)
+ok('… le vrai site reste allumé',
+   (await q1(`select pointage_actif a from public.sites where id=$1`, [siteVrai])).a === true)
+ok('une sauvegarde a été prise',
+   num((await q1(`select count(*) n from public.sauvegarde_sites_remplacants`)).n) === 2)
+ok('… avec le monde qu’ils portaient',
+   num((await q1(`select jsonb_array_length(employes) n
+                    from public.sauvegarde_sites_remplacants where id=$1`, [siteRemplA])).n) === 2)
+
+// Relancer : rien en double.
+await db.exec(scriptTransfert)
+ok('relancer ne crée pas de doublon',
+   num((await q1(`select count(*) n from public.remplacants`)).n) === 2)
+
 // ═══════ LES ANNEXES SE TIENNENT DEPUIS LE POINTAGE ═══════
 // Elles quittent la liste générale des sites : on les gère là où elles
 // servent, sous la grille. Ajouter et affecter restent au bureau ;
@@ -1644,7 +1760,9 @@ await refuse('un remplaçant ne tient pas deux postes le même jour',
 
 // 5. Le tableau de paie
 const tableauRempl = await rows(`select * from public.paie_remplacants(2026, 4) order by nom_prenom`)
-ok('le tableau de paie du mois liste les remplaçants', tableauRempl.length === 2, String(tableauRempl.length))
+ok('le tableau de paie du mois liste les remplaçants',
+   tableauRempl.filter((p) => ['JOKER UN', 'JOKER DEUX'].includes(p.nom_prenom)).length === 2,
+   String(tableauRempl.length))
 const jokerDeux = tableauRempl.find((p) => p.nom_prenom === 'JOKER DEUX')
 ok('… avec ses journées et son montant',
    num(jokerDeux.jours) === 1 && num(jokerDeux.montant) === 150,
@@ -2092,6 +2210,119 @@ ok('déposer un scan reste au bureau et à l’administrateur',
    elargies.length === 0, elargies.map((r) => r.policyname).join(' · '))
 
 await connecte(bureau)
+
+// ═══════ CORRIGER UNE CASE DÉJÀ POINTÉE ═══════
+// « Cet employé a déjà un pointage ce jour-là » : le bureau cliquait sur
+// une case pour la corriger et se faisait renvoyer. Poser une lettre
+// doit poser cette lettre, que la case soit vide, déjà remplie, ou
+// portant la photo qu'un agent a envoyée le matin.
+
+section('Corriger une case déjà pointée')
+await connecte(bureau)
+const eCase = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, salaire, date_embauche)
+   values ($1,$2,'CASE A CORRIGER',2800,'2024-01-01') returning id`, [co, site])).id
+
+const lettre = async (jour) => (await q1(
+  `select type_garde from public.pointages
+    where employee_id=$1 and pointed_on=$2 and status <> 'refused'`, [eCase, jour]))?.type_garde
+const compteurCase = async () => num((await q1(
+  `select jours_travailles j from public.employees where id=$1`, [eCase])).j)
+const combien = async (jour) => num((await q1(
+  `select count(*) n from public.pointages where employee_id=$1 and pointed_on=$2`,
+  [eCase, jour])).n)
+
+await q1(`select public.marquer_present($1,'2026-10-04','X')`, [eCase])
+ok('une case vide se pointe', (await lettre('2026-10-04')) === 'X')
+ok('… et la journée est comptée', (await compteurCase()) === 1)
+
+ok('reposer une autre lettre ne se refuse plus',
+   await reussit(`select public.marquer_present($1,'2026-10-04','R')`, [eCase]))
+ok('… la case porte la nouvelle lettre', (await lettre('2026-10-04')) === 'R')
+ok('… et il n’y a toujours qu’une journée en base', (await combien('2026-10-04')) === 1)
+// X valait 1, R ne vaut rien : le compteur revient à zéro.
+ok('… le compteur suit la correction', (await compteurCase()) === 0,
+   String(await compteurCase()))
+
+// La photo envoyée par l'agent le matin : la journée existe, en attente,
+// et l'écran du bureau ne la montre pas forcément. Elle doit se corriger
+// sans rien perdre.
+await db.exec(`select set_config('app.pointage_manuel','on',false);`)
+await db.query(
+  `insert into public.pointages (company_id, site_id, employee_id, agent_id, photo_path,
+                                 pointed_on, status, type_garde)
+   values ($1,$2,$3,$4,'photos/preuve.jpg','2026-10-05','pending','X')`,
+  [co, site, eCase, agent])
+await db.exec(`select set_config('app.pointage_manuel','off',false);`)
+
+ok('une journée en attente se corrige',
+   await reussit(`select public.marquer_present($1,'2026-10-05','AJ')`, [eCase]))
+const corrigee = await q1(
+  `select type_garde, status::text st, photo_path from public.pointages
+    where employee_id=$1 and pointed_on='2026-10-05'`, [eCase])
+ok('… elle porte la lettre du bureau', corrigee.type_garde === 'AJ')
+ok('… elle est désormais validée', corrigee.st === 'validated')
+ok('… la photo de l’agent reste attachée',
+   corrigee.photo_path === 'photos/preuve.jpg')
+// Une journée en attente n'avait jamais été comptée : rien à retirer,
+// et AJ ne vaut rien non plus.
+ok('… le compteur ne compte pas deux fois', (await compteurCase()) === 0,
+   String(await compteurCase()))
+await q1(`select public.marquer_present($1,'2026-10-05','X')`, [eCase])
+ok('… et la repasser en présent ajoute bien une journée',
+   (await compteurCase()) === 1, String(await compteurCase()))
+
+// Un congé enregistré garde la main : le modifier depuis la case
+// laisserait le solde de l'agent et son pointage se contredire.
+// Le congé ne s'inscrit au pointage qu'au dépôt de l'engagement signé
+// (BLOC 24) : on pose donc la journée telle qu'elle existe après ce
+// dépôt — une journée rattachée à un congé.
+const congePose = (await q1(
+  `select public.creer_conge($1,'2026-10-12'::date,'2026-10-13'::date,'C',null) as id`,
+  [eCase])).id
+await q1(`select public.marquer_present($1,'2026-10-12','C')`, [eCase])
+await db.query(`update public.pointages set conge_id=$1
+                 where employee_id=$2 and pointed_on='2026-10-12'`, [congePose, eCase])
+await refuse('un jour de congé renvoie toujours au congé',
+  `select public.marquer_present($1,'2026-10-12','X')`, [eCase], /congé/i)
+await refuse('… y compris en changeant le type depuis la ligne',
+  `select public.changer_type_garde(
+     (select id from public.pointages where employee_id=$1 and pointed_on='2026-10-12'),'X')`,
+  [eCase], /congé/i)
+
+// Un pointage refusé ne tient pas la place : la journée est libre.
+await db.exec(`select set_config('app.pointage_manuel','on',false);`)
+await db.query(
+  `insert into public.pointages (company_id, site_id, employee_id, agent_id, photo_path,
+                                 pointed_on, status, type_garde)
+   values ($1,$2,$3,$4,'photos/refuse.jpg','2026-10-18','refused','X')`,
+  [co, site, eCase, agent])
+await db.exec(`select set_config('app.pointage_manuel','off',false);`)
+ok('une journée refusée ne bloque pas la case',
+   await reussit(`select public.marquer_present($1,'2026-10-18','X')`, [eCase]))
+ok('… le refus reste en archive à côté', (await combien('2026-10-18')) === 2)
+
+await refuse('le futur ne se pointe toujours pas',
+  `select public.marquer_present($1,'2030-01-01','X')`, [eCase], /futur/i)
+await refuse('une lettre inconnue est toujours refusée',
+  `select public.marquer_present($1,'2026-10-19','ZZ')`, [eCase], /invalide/i)
+
+// Changer le type depuis la ligne (la liste des pointages à valider)
+// accepte désormais une journée en attente, au lieu de renvoyer
+// « seuls les pointages validés peuvent changer de type ».
+await db.exec(`select set_config('app.pointage_manuel','on',false);`)
+const enAttente = (await q1(
+  `insert into public.pointages (company_id, site_id, employee_id, agent_id, photo_path,
+                                 pointed_on, status, type_garde)
+   values ($1,$2,$3,$4,'photos/matin.jpg','2026-10-20','pending','X') returning id`,
+  [co, site, eCase, agent])).id
+await db.exec(`select set_config('app.pointage_manuel','off',false);`)
+ok('changer le type d’une journée en attente passe',
+   await reussit(`select public.changer_type_garde($1,'R')`, [enAttente]))
+const apresType = await q1(
+  `select type_garde, status::text st from public.pointages where id=$1`, [enAttente])
+ok('… elle porte la lettre demandée', apresType.type_garde === 'R')
+ok('… et elle est validée', apresType.st === 'validated')
 
 section('Le contrôle des blocs dit-il vrai ?')
 
