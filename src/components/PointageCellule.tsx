@@ -6,7 +6,8 @@ import { gardeCouleur, gardeLabel, gardeSymbole } from '../lib/gardes'
  * UNE CASE DU POINTAGE.
  *
  * Elle se lit d'un coup d'œil : sa lettre et sa couleur disent ce qu'a
- * été la journée. Un liseré ambre dit qu'un remplaçant l'a tenue, et
+ * été la journée. Une case vide ne dit rien d'autre que « pas encore
+ * saisi » — elle ne vaut pas absence. Un liseré ambre dit qu'un remplaçant l'a tenue, et
  * son nom paraît au survol. Au-delà d'une date de sortie, la case est
  * barrée : ce jour-là n'est plus à cette personne.
  *
@@ -39,9 +40,12 @@ export function DayCell({
   /** Dans une carte de téléphone, la case prend toute sa colonne. */
   large?: boolean
 }) {
+  // UNE CASE VIDE N'EST PAS UNE ABSENCE : elle dit que la journée n'est
+  // pas encore saisie. L'absence a sa lettre, « A », et c'est la seule
+  // qui compte comme telle — ici comme à la paie.
   let cls = 'bg-slate-100 text-slate-400'
-  let label = '–'
-  let title = 'Absent — cliquer pour marquer présent ou justifier'
+  let label = '·'
+  let title = 'Pas encore pointé — cliquer pour saisir la journée'
 
   // Parti : le reste du mois n'est pas à lui. Rien n'est écrit dans ces
   // cases, c'est la date de sortie qui parle.

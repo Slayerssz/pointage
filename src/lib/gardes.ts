@@ -1,6 +1,7 @@
 /** Types de garde et d'absence choisis par le validateur. */
 
-export type TypeGarde = 'X05' | 'X' | 'X15' | 'XX' | 'RT' | 'R' | 'M' | 'C' | 'F' | 'XF'
+export type TypeGarde =
+  | 'X05' | 'X' | 'X15' | 'XX' | 'RT' | 'R' | 'M' | 'C' | 'AJ' | 'CS' | 'F' | 'XF'
 
 export interface GardeInfo {
   code: TypeGarde
@@ -33,6 +34,8 @@ export const TYPES_GARDE: GardeInfo[] = [
   { code: 'F', symbole: 'F', label: 'Férié chômé (payé)', valeur: 1, absence: true, couleur: 'bg-orange-400 text-white', groupe: 'ferie' },
   { code: 'M', symbole: 'M', label: 'Malade (absence approuvée)', valeur: 1, absence: true, couleur: 'bg-violet-500 text-white', groupe: 'absence' },
   { code: 'C', symbole: 'C', label: 'Congé payé', valeur: 1, absence: true, couleur: 'bg-sky-500 text-white', groupe: 'absence' },
+  { code: 'AJ', symbole: 'A', label: 'Absent (non payé)', valeur: 0, absence: true, couleur: 'bg-rose-600 text-white', groupe: 'absence' },
+  { code: 'CS', symbole: 'CS', label: 'Congé sans solde', valeur: 0, absence: true, couleur: 'bg-slate-500 text-white', groupe: 'absence', retiree: true },
 ]
 
 /** Ce qu'on peut encore poser aujourd'hui : les lettres retirées non. */
@@ -53,16 +56,25 @@ export function gardeInfo(code: string | null | undefined): GardeInfo | null {
   return code ? (BY_CODE.get(code as TypeGarde) ?? null) : null
 }
 
+/**
+ * La lettre de la case. Une lettre inconnue s'affiche « ? », et non pas
+ * la lettre d'à côté : c'est ainsi qu'un AJ absent de cette liste s'est
+ * affiché en X vert pendant des semaines — la base enregistrait bien une
+ * absence, l'écran montrait une présence.
+ */
 export function gardeSymbole(code: string | null | undefined): string {
-  return gardeInfo(code)?.symbole ?? 'X'
+  return gardeInfo(code)?.symbole ?? '?'
 }
 
 export function gardeLabel(code: string | null | undefined): string {
-  return gardeInfo(code)?.label ?? '—'
+  const info = gardeInfo(code)
+  if (info) return info.label
+  return code ? `Lettre inconnue (${code})` : '—'
 }
 
+/** Gris pour l'inconnu : le vert dirait « présent », ce qu'on ne sait pas. */
 export function gardeCouleur(code: string | null | undefined): string {
-  return gardeInfo(code)?.couleur ?? 'bg-emerald-500 text-white'
+  return gardeInfo(code)?.couleur ?? 'bg-slate-400 text-white'
 }
 
 /** Formatte un nombre de gardes (1, 1,5, 2…) à la française. */

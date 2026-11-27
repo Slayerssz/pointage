@@ -188,7 +188,14 @@ with attendu (numero, bloc, objet, present) as (
   (55, 'Poser la journée',        'une case se corrige au lieu de se refuser',
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'marquer_present'
-                  and pg_get_functiondef(p.oid) not like '%déjà un pointage ce jour-là%'))
+                  and pg_get_functiondef(p.oid) not like '%déjà un pointage ce jour-là%')),
+  (56, 'L''absence est une lettre', 'le vide ne compte plus comme absence, et le matricule du remplaçant passe',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'remplacants_assign_matricule'
+                  and pg_get_functiondef(p.oid) like '%where id%')
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                      and pg_get_functiondef(p.oid) like '%as jours_absents%'))
 )
 select numero,
        bloc,

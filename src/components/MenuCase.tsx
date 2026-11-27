@@ -25,13 +25,23 @@ import { ErrorNote } from './ui'
  * dans la section Sorties.
  */
 
-/** Ce qu'une case peut devenir d'un seul clic. */
+/**
+ * Ce qu'une case peut devenir d'un seul clic, dans l'ordre où le bureau
+ * s'en sert. « Deux gardes » et « Repos travaillé » sont les deux
+ * journées qui comptent double à la paie — elles avaient disparu du
+ * menu, leur calcul n'a jamais bougé.
+ *
+ * La demi-garde et la garde et demie restent hors du choix : les
+ * pointages qui les portent gardent leur valeur, on n'en crée plus.
+ */
 const CHOIX = [
   { code: 'X', libelle: 'Présent', couleur: 'text-emerald-700', fond: 'hover:bg-emerald-50' },
+  { code: 'XX', libelle: 'Deux gardes', couleur: 'text-emerald-800', fond: 'hover:bg-emerald-50' },
+  { code: 'RT', libelle: 'Repos travaillé', couleur: 'text-teal-700', fond: 'hover:bg-teal-50' },
   { code: 'R', libelle: 'Repos', couleur: 'text-blue-700', fond: 'hover:bg-blue-50' },
   { code: 'M', libelle: 'Malade', couleur: 'text-violet-700', fond: 'hover:bg-violet-50' },
   { code: 'C', libelle: 'Congé', couleur: 'text-sky-700', fond: 'hover:bg-sky-50' },
-  { code: 'AJ', libelle: 'Absent', couleur: 'text-slate-600', fond: 'hover:bg-slate-100' },
+  { code: 'AJ', libelle: 'Absent', couleur: 'text-rose-700', fond: 'hover:bg-rose-50' },
 ] as const
 
 /** Un remplacement ne se pose que sur une absence — pas sur un présent. */
@@ -121,7 +131,10 @@ export default function MenuCase({
 
   const erreur = poser.error ?? effacer.error ?? remplacer.error
     ?? retirerRemplacement.error ?? sortir.error
-  const actuel = pointage?.status === 'validated' ? pointage.type_garde : null
+  // Ce que la case porte déjà : une journée en attente de validation
+  // porte elle aussi une lettre, et la pastille doit la montrer —
+  // sinon le bureau repose la même lettre en croyant la case vide.
+  const actuel = pointage && pointage.status !== 'refused' ? pointage.type_garde : null
   const estConge = Boolean(pointage?.conge_id)
   const remplacable = REMPLACABLES.includes(String(actuel))
 

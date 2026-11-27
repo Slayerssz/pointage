@@ -75,7 +75,7 @@ export default function ValidationPage() {
         ))}
         <LegendItem cls="bg-amber-400 text-white" sym="!">Photo à valider</LegendItem>
         <LegendItem cls="bg-red-500 text-white" sym="✕">Refusé</LegendItem>
-        <LegendItem cls="bg-slate-200 text-slate-500" sym="–">Absent</LegendItem>
+        <LegendItem cls="bg-slate-100 text-slate-400" sym="·">Pas encore pointé</LegendItem>
       </div>
 
       {isLoading && <Spinner label="Chargement des sites…" />}

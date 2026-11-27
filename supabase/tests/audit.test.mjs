@@ -133,6 +133,8 @@ const VALEURS = [
   ['R',   0,   'repos : ni travail, ni absence'],
   ['M',   1,   'malade, payé'],
   ['C',   1,   'congé payé'],
+  ['AJ',  0,   'absent : la lettre A, non payée'],
+  ['CS',  0,   'congé sans solde'],
 ]
 for (const [code, attendu, quoi] of VALEURS) {
   const v = num((await q1(`select public.garde_valeur($1) as v`, [code])).v)
@@ -149,6 +151,39 @@ for (const [code, attendu] of VALEURS) {
   if (!m || Number(m[1]) !== attendu) { accord = false; console.log(`      ${code}: écran ${m?.[1]}`) }
 }
 ok('l’écran donne exactement les mêmes valeurs que la base', accord)
+
+// … et il doit CONNAÎTRE chaque lettre que la base accepte. « AJ »
+// manquait : la case tombait sur la valeur de repli et s'affichait en X
+// vert. La base enregistrait une absence, l'écran montrait une présence.
+const contrainte = (await q1(`
+  select pg_get_constraintdef(c.oid) as def from pg_constraint c
+   where c.conname = 'pointages_type_garde_check'`)).def
+const lettresBase = [...contrainte.matchAll(/'([A-Z0-9]+)'/g)].map((m) => m[1])
+const inconnues = lettresBase.filter((l) => !new RegExp(`code: '${l}'`).test(gardesTs))
+ok(`l’écran connaît les ${lettresBase.length} lettres de la base`,
+   inconnues.length === 0, 'absentes de gardes.ts : ' + inconnues.join(' '))
+
+// La lettre affichée pour une absence est « A » — pas « X ».
+const symboleAbsent = /code: 'AJ', symbole: '([^']*)'/.exec(gardesTs)?.[1]
+ok('l’absence s’affiche « A »', symboleAbsent === 'A', String(symboleAbsent))
+// Et l'inconnu ne se déguise plus en présence.
+ok('une lettre inconnue ne s’affiche plus comme un présent',
+   /symbole \?\? '\?'/.test(gardesTs) && !/symbole \?\? 'X'/.test(gardesTs))
+
+// Le menu de pointage propose les deux journées qui comptent double.
+const menuTs = fs.readFileSync(
+  path.join(ICI, '..', '..', 'src', 'components', 'MenuCase.tsx'), 'utf8')
+const menu = [...menuTs.matchAll(/\{ code: '([^']+)', libelle:/g)].map((m) => m[1])
+for (const [code, libelle] of [['XX', 'deux gardes'], ['RT', 'repos travaillé'],
+                               ['AJ', 'absent'], ['R', 'repos'], ['X', 'présent']]) {
+  ok(`le menu propose ${libelle}`, menu.includes(code), menu.join(' '))
+}
+ok('… et plus la demi-garde ni la garde et demie',
+   !menu.includes('X05') && !menu.includes('X15'), menu.join(' '))
+// Toute lettre du menu doit exister en base, sinon le clic lève une erreur.
+const horsBase = menu.filter((c) => !lettresBase.includes(c))
+ok('… chaque lettre du menu est acceptée par la base',
+   horsBase.length === 0, horsBase.join(' '))
 
 // ═══════════════════════════ 2. LE POINTAGE ÉCRIT-IL LE BON COMPTE ? ═══
 
@@ -2323,6 +2358,98 @@ const apresType = await q1(
   `select type_garde, status::text st from public.pointages where id=$1`, [enAttente])
 ok('… elle porte la lettre demandée', apresType.type_garde === 'R')
 ok('… et elle est validée', apresType.st === 'validated')
+
+// ═══════ L'ABSENCE EST UNE LETTRE, LE VIDE N'EN EST PAS UNE ═══════
+
+section('Une case vide n’est pas une absence')
+await connecte(bureau)
+const eVide2 = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, salaire, date_embauche)
+   values ($1,$2,'MOIS A MOITIE',2600,'2024-01-01') returning id`, [co, site])).id
+// Dix journées travaillées, deux absences marquées « A », le reste du
+// mois jamais saisi : l'absence vaut 2, et non 19.
+for (let j = 1; j <= 10; j++) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`,
+           [eVide2, `2026-10-${String(j).padStart(2, '0')}`])
+}
+await q1(`select public.marquer_present($1,'2026-10-15','AJ')`, [eVide2])
+await q1(`select public.marquer_present($1,'2026-10-16','AJ')`, [eVide2])
+
+const perVide = (await q1(
+  `select public.valider_pointage_mois($1,2026,10) as id`, [co])).id
+await connecte(paie)
+await q1(`select public.generer_lignes_paie($1)`, [perVide])
+const ligneVide = await q1(
+  `select gardes_travaillees g, jours_absent a, jours_payes jp
+     from public.lignes_paie where periode_id=$1 and employee_id=$2`, [perVide, eVide2])
+ok('les dix journées pointées comptent', num(ligneVide.g) === 10, String(ligneVide.g))
+ok('les absences sont les deux « A », pas les jours non saisis',
+   num(ligneVide.a) === 2, String(ligneVide.a))
+ok('… et le salaire suit les journées pointées', num(ligneVide.jp) === 10,
+   String(ligneVide.jp))
+await connecte(bureau)
+
+// ═══════ LE MATRICULE DU REMPLAÇANT ═══════
+// « UPDATE requires a WHERE clause » : le garde-fou de Supabase refuse
+// toute mise à jour sans condition, même au fond d'un déclencheur. Le
+// compteur de matricules des remplaçants n'en avait pas.
+
+section('Aucune mise à jour sans condition')
+
+const sansWhere = []
+for (const f of await rows(`
+  select p.proname, pg_get_functiondef(p.oid) as def
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f'`)) {
+  for (const stmt of f.def.split(';')) {
+    const m = /\bupdate\s+(?:public\.)?(\w+)\s+set\b/i.exec(stmt)
+    if (!m) continue
+    if (/\bwhere\b/i.test(stmt)) continue
+    if (/\bon conflict\b/i.test(stmt)) continue
+    sansWhere.push(`${f.proname} → update ${m[1]}`)
+  }
+}
+ok('aucune fonction ne met à jour une table sans WHERE',
+   sansWhere.length === 0, sansWhere.join(' · '))
+
+// Et l'ajout d'un remplaçant passe, matricule compris.
+const jokerNeuf = (await q1(
+  `select public.enregistrer_remplacant(null, $1::jsonb) as id`,
+  [JSON.stringify({ nom_prenom: 'JOKER TOUT NEUF', tarif_journalier: '140' })])).id
+const ficheNeuve = await q1(
+  `select matricule, nom_prenom, tarif_journalier from public.remplacants where id=$1`,
+  [jokerNeuf])
+ok('un remplaçant s’ajoute', Boolean(jokerNeuf))
+ok('… et reçoit un matricule', num(ficheNeuve.matricule) > 0, String(ficheNeuve.matricule))
+const jokerSuivant = (await q1(
+  `select public.enregistrer_remplacant(null, $1::jsonb) as id`,
+  [JSON.stringify({ nom_prenom: 'JOKER SUIVANT' })])).id
+ok('… le suivant prend le numéro d’après',
+   num((await q1(`select matricule from public.remplacants where id=$1`,
+                 [jokerSuivant])).matricule) === num(ficheNeuve.matricule) + 1)
+// Modifier et archiver ne demandent aucune société.
+await q1(`select public.enregistrer_remplacant($1, $2::jsonb)`,
+         [jokerNeuf, JSON.stringify({ nom_prenom: 'JOKER RENOMME', tarif_journalier: '160' })])
+ok('… il se modifie sans société',
+   (await q1(`select nom_prenom from public.remplacants where id=$1`, [jokerNeuf]))
+     .nom_prenom === 'JOKER RENOMME')
+ok('… la table des remplaçants n’a pas de colonne société',
+   (await rows(`select 1 from information_schema.columns
+                 where table_schema='public' and table_name='remplacants'
+                   and column_name='company_id'`)).length === 0)
+
+// Le relevé que le bureau lance dans Supabase doit se lire sans erreur :
+// un relevé qui plante ne dit rien de ce qu'on cherchait.
+section('Le relevé du pointage douteux se lit')
+const releve = fs.readFileSync(path.join(BLOCS, 'RELEVE_pointage_douteux.sql'), 'utf8')
+const requetes = releve.split(/;\s*\n/)
+  .map((r) => r.split('\n').filter((l) => !l.trimStart().startsWith('--')).join('\n').trim())
+  .filter((r) => r.length > 0)
+ok(`le relevé porte ses ${requetes.length} requêtes`, requetes.length === 7,
+   String(requetes.length))
+for (const [i, r] of requetes.entries()) {
+  ok(`requête ${i + 1} du relevé`, await reussit(r))
+}
 
 section('Le contrôle des blocs dit-il vrai ?')
 
