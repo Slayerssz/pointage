@@ -1412,11 +1412,18 @@ await connecte(rh)
 await refuse('le rattachement retiré, la porte se referme',
   `select public.marquer_present($1,$2::date,'X')`, [eIci, hier], /autorisé/i)
 
-// Seul un compte « personnel » se rattache : les autres voient déjà tout.
+// N'importe quel compte se rattache désormais — le bureau comme le
+// personnel : la liste décide de ce qu'on VOIT, et non plus seulement de
+// ce qu'on pointe. Seul l'administrateur ne se restreint pas.
 await connecte(admin)
-await refuse('on ne rattache pas un compte du bureau',
-  `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [bureau, co],
-  /personnel|voit déjà/i)
+ok('on rattache aussi un compte du bureau',
+   await reussit(`select public.admin_definir_acces_societes($1, array[$2]::uuid[])`,
+                 [bureau, co]))
+await refuse('un administrateur ne se restreint pas',
+  `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [admin, co],
+  /groupe entier|ne se restreint/i)
+// On le relâche : la suite de l'audit pointe partout avec ce compte.
+await q1(`select public.admin_definir_acces_societes($1, array[]::uuid[])`, [bureau])
 await connecte(rh)
 await refuse('le personnel ne se rattache pas lui-même',
   `select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [rh, co],
@@ -1537,10 +1544,10 @@ ok('sans brut saisi, la base reste celle du contrat', num(brutSansSaisie.base) =
    String(brutSansSaisie.base))
 
 // ═══════ SORTIR QUELQU'UN DEPUIS SA CASE ═══════
-// Un départ se constate en pointant. « Sortie » sur une case pose la
-// date à la VEILLE — la case cliquée est le premier jour d'absence —
-// retire les journées d'après, qui seraient payées, et ouvre le départ
-// dans la section Sorties.
+// Un départ se constate en pointant. La case cliquée EST la date de
+// sortie — son dernier jour, celui que la section Sorties affichera.
+// Les journées d'APRÈS sont retirées, qui seraient payées, mais gardées
+// en archive : la sortie s'annule.
 
 section('Sortir quelqu’un depuis sa case')
 await connecte(bureau)
@@ -1559,20 +1566,25 @@ const idDepart = (await q1(
   `select public.sortir_employe_depuis($1,'2026-04-11') as id`, [ePartant])).id
 const ficheSortie = await q1(
   `select actif, date_sortie::text ds from public.employees where id=$1`, [ePartant])
-ok('son dernier jour est la veille de la case', ficheSortie.ds === '2026-04-10',
-   String(ficheSortie.ds))
+ok('son dernier jour est la case cliquée, sans décalage',
+   ficheSortie.ds === '2026-04-11', String(ficheSortie.ds))
 ok('… il n’est plus en poste', ficheSortie.actif === false)
 ok('… les journées d’après sont retirées',
    num((await q1(`select count(*) n from public.pointages
-                   where employee_id=$1 and pointed_on > '2026-04-10'`, [ePartant])).n) === 0)
-ok('… celles d’avant sont intactes',
+                   where employee_id=$1 and pointed_on > '2026-04-11'`, [ePartant])).n) === 0)
+ok('… son dernier jour et ceux d’avant sont intacts',
    num((await q1(`select count(*) n from public.pointages where employee_id=$1`,
-                 [ePartant])).n) === 10)
+                 [ePartant])).n) === 11)
+ok('… et les neuf journées retirées sont gardées en archive',
+   num((await q1(`select count(*) n from public.pointages_retires
+                   where employee_id=$1 and restaure_le is null`, [ePartant])).n) === 9,
+   String((await q1(`select count(*) n from public.pointages_retires where employee_id=$1`,
+                    [ePartant])).n))
 
 const departOuvert = await q1(
   `select date_sortie::text ds, valide from public.sorties where id=$1`, [idDepart])
 ok('un départ est ouvert dans la section Sorties', Boolean(idDepart))
-ok('… à la même date', departOuvert.ds === '2026-04-10', String(departOuvert.ds))
+ok('… à la date qu’on a cliquée', departOuvert.ds === '2026-04-11', String(departOuvert.ds))
 ok('… et pas encore validé', departOuvert.valide === false)
 
 await q1(`select public.sortir_employe_depuis($1,'2026-04-06')`, [ePartant])
@@ -1581,6 +1593,50 @@ ok('recommencer corrige au lieu de doubler',
                  [ePartant])).n) === 1)
 await refuse('on ne sort pas quelqu’un avant son embauche',
   `select public.sortir_employe_depuis($1,'2023-01-01')`, [ePartant], /pas encore commencé/i)
+
+// Annuler la sortie : il revient en poste, ses journées reviennent, et
+// la ligne de la section Sorties s'en va. On a cliqué le 6 à l'instant,
+// donc les journées du 7 au 20 doivent revenir — quatorze.
+const rendues = num((await q1(
+  `select public.annuler_sortie_employe($1) as n`, [ePartant])).n)
+const ficheRevenue = await q1(
+  `select actif, date_sortie from public.employees where id=$1`, [ePartant])
+ok('annuler la sortie le remet en poste', ficheRevenue.actif === true)
+ok('… sa date de sortie s’effface', ficheRevenue.date_sortie === null)
+ok('… la ligne de la section Sorties s’en va',
+   num((await q1(`select count(*) n from public.sorties where employee_id=$1`,
+                 [ePartant])).n) === 0)
+ok('… ses journées reviennent', rendues === 14, String(rendues))
+ok('… et le mois est de nouveau complet',
+   num((await q1(`select count(*) n from public.pointages where employee_id=$1`,
+                 [ePartant])).n) === 20)
+ok('… l’archive est marquée rendue',
+   num((await q1(`select count(*) n from public.pointages_retires
+                   where employee_id=$1 and restaure_le is null`, [ePartant])).n) === 0)
+
+// Une journée repointée entre-temps n'est pas écrasée par le retour.
+await q1(`select public.sortir_employe_depuis($1,'2026-04-05')`, [ePartant])
+await q1(`select public.marquer_present($1,'2026-04-08','R')`, [ePartant])
+await q1(`select public.annuler_sortie_employe($1)`, [ePartant])
+ok('une case repointée depuis garde sa lettre',
+   (await q1(`select type_garde from public.pointages
+               where employee_id=$1 and pointed_on='2026-04-08'`, [ePartant])).type_garde === 'R')
+
+// Une sortie validée ne s'annule plus : le solde a été réglé.
+const departValide = (await q1(
+  `select public.sortir_employe_depuis($1,'2026-04-15') as id`, [ePartant])).id
+// Valider demande le reçu signé (BLOC 46) : ce n'est pas le sujet ici,
+// on pose l'état validé directement.
+await db.query(`update public.sorties set valide = true, valide_le = now()
+                 where id = $1`, [departValide])
+await refuse('une sortie validée ne s’annule pas',
+  `select public.annuler_sortie_employe($1)`, [ePartant], /validée/i)
+// On remet la personne d'aplomb pour la suite de l'audit (geste
+// d'administrateur : il efface une sortie, même validée).
+await connecte(admin)
+await q1(`select public.reintegrer_employe($1)`, [ePartant])
+await db.query(`update public.employees set actif = true where id = $1`, [ePartant])
+await connecte(bureau)
 
 // ═══════ TRANSFÉRER LES REMPLAÇANTS ═══════
 // Ils sont COPIÉS dans la section partagée — une seule fois, même
@@ -2440,6 +2496,136 @@ ok('… la table des remplaçants n’a pas de colonne société',
 
 // Le relevé que le bureau lance dans Supabase doit se lire sans erreur :
 // un relevé qui plante ne dit rien de ce qu'on cherchait.
+// ═══════ UN EMPLOYÉ DEVIENT REMPLAÇANT ═══════
+// Le remplaçant est le plus souvent un agent du groupe. On le reprend
+// tel quel : rien à retaper, et il reste dans son site.
+
+section('Reprendre un employé comme remplaçant')
+await connecte(bureau)
+const eJoker = (await q1(
+  `insert into public.employees
+     (company_id, site_id, nom_prenom, cin, cnss, telephone, mode_reglement, banque,
+      rib, qualification, salaire, date_embauche)
+   values ($1,$2,'AGENT POLYVALENT','JK9','998877','0611','Virement','CIH',
+           '0116400000172','AGENT',2800,'2024-02-01') returning id`, [co, site])).id
+
+const repris = await q1(
+  `select public.remplacant_depuis_employe(array[$1]::uuid[]) as r`, [eJoker])
+ok('la réponse dit ce qui a été fait', Array.isArray(repris.r) && repris.r.length === 1,
+   JSON.stringify(repris.r))
+ok('… une fiche de remplaçant est créée', repris.r[0].etat === 'cree', repris.r[0].etat)
+const ficheReprise = await q1(
+  `select nom_prenom, cin, cnss, rib, banque, qualification, tarif_journalier, matricule
+     from public.remplacants where id = $1`, [repris.r[0].remplacant_id])
+ok('… son nom, sa C.I.N. et sa C.N.S.S. suivent',
+   ficheReprise.nom_prenom === 'AGENT POLYVALENT' && ficheReprise.cin === 'JK9'
+     && ficheReprise.cnss === '998877')
+ok('… son R.I.B. et sa banque suivent',
+   ficheReprise.rib === '0116400000172' && ficheReprise.banque === 'CIH')
+ok('… son tarif reste vide : il sera payé au tarif de la personne remplacée',
+   ficheReprise.tarif_journalier === null, String(ficheReprise.tarif_journalier))
+ok('… et il a son matricule de remplaçant', num(ficheReprise.matricule) > 0)
+
+// Il reste dans son site : une seconde casquette, pas un transfert.
+const resteEnPoste = await q1(
+  `select site_id, actif from public.employees where id=$1`, [eJoker])
+ok('il reste affecté à son site', resteEnPoste.site_id === site && resteEnPoste.actif === true)
+
+// Deuxième passage : pas de doublon, et on le dit.
+const deuxiemePassage = await q1(
+  `select public.remplacant_depuis_employe(array[$1]::uuid[]) as r`, [eJoker])
+ok('le reprendre une seconde fois ne crée pas de doublon',
+   deuxiemePassage.r[0].etat === 'deja', deuxiemePassage.r[0].etat)
+ok('… et c’est bien la même fiche qu’on désigne',
+   deuxiemePassage.r[0].remplacant_id === repris.r[0].remplacant_id)
+ok('… une seule fiche porte ce nom',
+   num((await q1(`select count(*) n from public.remplacants
+                   where upper(trim(nom_prenom)) = 'AGENT POLYVALENT'`)).n) === 1)
+
+// La recherche voit tout le groupe, et signale ceux qui sont déjà pris.
+const candidats = await rows(
+  `select * from public.employes_pour_remplacant('POLYVALENT', 20)`)
+ok('la recherche le trouve', candidats.length === 1, String(candidats.length))
+ok('… avec sa société et son site',
+   candidats[0]?.societe === 'AUDIT SARL' && typeof candidats[0]?.site === 'string')
+ok('… et dit qu’il est déjà remplaçant', candidats[0]?.deja_remplacant === true)
+const tousCandidats = await rows(`select * from public.employes_pour_remplacant(null, 5)`)
+ok('la recherche vide rend les premiers noms, sans tout charger',
+   tousCandidats.length <= 5 && tousCandidats.length > 0, String(tousCandidats.length))
+
+// La paie ne demande aucune société : la paie de ses journées se lit
+// depuis n'importe quel compte du groupe.
+await refuse('reprendre personne est refusé',
+  `select public.remplacant_depuis_employe(null)`, [], /au moins une personne/i)
+
+// ═══════ UN COMPTE NE LIT QUE SES SOCIÉTÉS ═══════
+// La restriction doit mordre EN BASE : refuser un onglet ne protège
+// rien, l'adresse suffit à passer outre. On rallume donc la sécurité au
+// niveau ligne sur les employés, et l'on interroge en tant que compte
+// connecté — pas en tant que superutilisateur, qui passe partout.
+
+section('La lecture s’arrête aux sociétés confiées')
+
+// La règle, d'abord : elle décide de tout le reste.
+await connecte(admin)
+ok('l’administrateur voit toutes les sociétés',
+   (await q1(`select public.peut_voir_societe($1) as v`, [coSecond])).v === true)
+await connecte(bureau)
+ok('un compte sans liste voit tout — l’état d’avant la règle',
+   (await q1(`select public.peut_voir_societe($1) as v`, [coSecond])).v === true)
+
+await connecte(admin)
+await q1(`select public.admin_definir_acces_societes($1, array[$2]::uuid[])`, [bureau, co])
+await connecte(bureau)
+ok('une société confiée reste visible',
+   (await q1(`select public.peut_voir_societe($1) as v`, [co])).v === true)
+ok('… et celle qu’on ne lui a pas confiée ne l’est plus',
+   (await q1(`select public.peut_voir_societe($1) as v`, [coSecond])).v === false)
+ok('… il ne pointe plus la seconde non plus',
+   (await q1(`select public.peut_pointer($1) as v`, [coSecond])).v === false)
+
+// Et maintenant pour de vrai, règles de lecture allumées. En production
+// Supabase accorde la lecture au rôle « authenticated » ; ici il faut le
+// faire à la main, sinon on mesurerait un refus de droits, pas la règle.
+await db.exec(`grant select on public.employees, public.companies to authenticated;
+               grant usage on schema public to authenticated;
+               alter table public.employees enable row level security;
+               alter table public.companies enable row level security;`)
+const combienVus = async () => {
+  await db.exec(`set role authenticated;`)
+  const n = num((await q1(`select count(*) n from public.employees`)).n)
+  const soc = num((await q1(`select count(*) n from public.companies`)).n)
+  await db.exec(`reset role;`)
+  return { employes: n, societes: soc }
+}
+const vuParBureau = await combienVus()
+const toutesSocietes = num((await q1(`select count(*) n from public.companies`)).n)
+ok('le compte restreint ne lit qu’une société',
+   vuParBureau.societes === 1, `${vuParBureau.societes} / ${toutesSocietes}`)
+const employesAilleurs = num((await q1(
+  `select count(*) n from public.employees where company_id <> $1`, [co])).n)
+ok('… et aucun employé des autres sociétés',
+   employesAilleurs > 0
+     && vuParBureau.employes === num((await q1(
+          `select count(*) n from public.employees where company_id = $1`, [co])).n),
+   `${vuParBureau.employes} vus, ${employesAilleurs} ailleurs`)
+
+// L'administrateur, lui, continue de tout voir.
+await connecte(admin)
+const vuParAdmin = await combienVus()
+ok('l’administrateur lit tout le groupe',
+   vuParAdmin.societes === toutesSocietes, `${vuParAdmin.societes} / ${toutesSocietes}`)
+
+// On relâche la liste : le compte du bureau retrouve tout, et l'audit
+// continue comme avant.
+await q1(`select public.admin_definir_acces_societes($1, array[]::uuid[])`, [bureau])
+await connecte(bureau)
+const relache = await combienVus()
+ok('la liste vidée, il revoit tout',
+   relache.societes === toutesSocietes, `${relache.societes} / ${toutesSocietes}`)
+await db.exec(`alter table public.employees disable row level security;`)
+await db.exec(`alter table public.companies disable row level security;`)
+
 section('Le relevé du pointage douteux se lit')
 const releve = fs.readFileSync(path.join(BLOCS, 'RELEVE_pointage_douteux.sql'), 'utf8')
 const requetes = releve.split(/;\s*\n/)
@@ -2449,6 +2635,88 @@ ok(`le relevé porte ses ${requetes.length} requêtes`, requetes.length === 7,
    String(requetes.length))
 for (const [i, r] of requetes.entries()) {
   ok(`requête ${i + 1} du relevé`, await reussit(r))
+}
+
+// ═══════ LE POINTAGE ET LA PAIE, UN SEUL COMPTE ═══════
+// La paie écrit ses lignes depuis compte_pointage_mois ; le relevé de
+// contrôle lit la même fonction. Un écart ne peut donc venir que d'une
+// paie générée avant que le pointage ne change — et le relevé le dit.
+
+section('Le pointage et la paie comptent au même endroit')
+await connecte(bureau)
+const eAccord = (await q1(
+  `insert into public.employees (company_id, site_id, nom_prenom, salaire, date_embauche)
+   values ($1,$2,'ACCORD PARFAIT',3120,'2024-01-01') returning id`, [co, site])).id
+for (let j = 1; j <= 12; j++) {
+  await q1(`select public.marquer_present($1,$2::date,'X')`,
+           [eAccord, `2026-09-${String(j).padStart(2, '0')}`])
+}
+await q1(`select public.marquer_present($1,'2026-09-20','R')`, [eAccord])
+await q1(`select public.marquer_present($1,'2026-09-21','AJ')`, [eAccord])
+
+const compteMois = await q1(
+  `select * from public.compte_pointage_mois($1,'2026-09-01','2026-09-30')
+    where employee_id = $2`, [co, eAccord])
+ok('le compte du mois lit douze journées', num(compteMois.gardes_travaillees) === 12,
+   String(compteMois.gardes_travaillees))
+ok('… un repos et une absence', num(compteMois.jours_repos) === 1
+   && num(compteMois.jours_absents) === 1)
+
+// La période du mois, SANS clôturer : on veut pouvoir repointer après
+// le calcul, puisque c'est exactement le cas qu'on vérifie.
+const perAccord = (await q1(
+  `select public.periode_du_mois($1,2026,9) as id`, [co])).id
+await connecte(paie)
+await q1(`select public.generer_lignes_paie($1)`, [perAccord])
+
+// Le relevé de contrôle : aucun écart juste après le calcul.
+const ecarts = async () => num((await q1(`
+  select count(*) n
+    from public.lignes_paie lp
+    join public.periodes_paie pp on pp.id = lp.periode_id
+    left join public.compte_pointage_mois(
+           pp.company_id, make_date(pp.annee, pp.mois, 1),
+           (make_date(pp.annee, pp.mois, 1) + interval '1 month - 1 day')::date) t
+      on t.employee_id = lp.employee_id
+   where pp.id = $1
+     and (lp.gardes_travaillees is distinct from coalesce(t.gardes_travaillees, 0)
+       or lp.jours_conge   is distinct from coalesce(t.jours_conge, 0)
+       or lp.jours_maladie is distinct from coalesce(t.jours_maladie, 0)
+       or lp.jours_absent  is distinct from coalesce(t.jours_absents, 0)
+       or lp.jours_repos   is distinct from coalesce(t.jours_repos, 0))`, [perAccord])).n)
+ok('juste après le calcul, pointage et paie sont d’accord', (await ecarts()) === 0,
+   String(await ecarts()))
+
+// On change le pointage après coup : le relevé doit le voir.
+await connecte(bureau)
+await q1(`select public.marquer_present($1,'2026-09-22','X')`, [eAccord])
+ok('une journée ajoutée après le calcul apparaît comme un écart',
+   (await ecarts()) === 1, String(await ecarts()))
+
+// Et relancer le calcul remet tout d'accord.
+await connecte(paie)
+await q1(`select public.generer_lignes_paie($1)`, [perAccord])
+ok('… recalculer la période referme l’écart', (await ecarts()) === 0,
+   String(await ecarts()))
+const ligneAccord = await q1(
+  `select gardes_travaillees g, jours_absent a, jours_repos r
+     from public.lignes_paie where periode_id=$1 and employee_id=$2`, [perAccord, eAccord])
+ok('… la paie porte les treize journées pointées', num(ligneAccord.g) === 13,
+   String(ligneAccord.g))
+ok('… l’absence saisie, et une seule', num(ligneAccord.a) === 1, String(ligneAccord.a))
+ok('… et le repos posé', num(ligneAccord.r) === 1, String(ligneAccord.r))
+await connecte(bureau)
+
+// Le relevé que le bureau lance dans Supabase doit se lire sans erreur.
+const releveComparaison = fs.readFileSync(
+  path.join(BLOCS, 'RELEVE_pointage_vs_paie.sql'), 'utf8')
+const requetesComparaison = releveComparaison.split(/;\s*\n/)
+  .map((r) => r.split('\n').filter((l) => !l.trimStart().startsWith('--')).join('\n').trim())
+  .filter((r) => r.length > 0)
+ok('le relevé de comparaison porte ses trois requêtes',
+   requetesComparaison.length === 3, String(requetesComparaison.length))
+for (const [i, r] of requetesComparaison.entries()) {
+  ok(`requête ${i + 1} du relevé de comparaison`, await reussit(r))
 }
 
 section('Le contrôle des blocs dit-il vrai ?')

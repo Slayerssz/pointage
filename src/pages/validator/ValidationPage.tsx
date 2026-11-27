@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePeutPointer } from '../../lib/queries'
 import { useParams } from 'react-router-dom'
@@ -35,6 +35,25 @@ export default function ValidationPage() {
 
   const maintenant = new Date()
   const moisCourant = { annee: maintenant.getFullYear(), mois: maintenant.getMonth() + 1 }
+
+  // Tout ce qui s'ouvre, dans l'ordre de l'écran : chaque site principal
+  // avec ses annexes, puis les annexes sans rattachement. C'est la même
+  // liste que l'arbre ci-dessous et que le sélecteur de la grille — on
+  // ne veut pas deux façons de nommer les mêmes lieux.
+  const ouvrables = useMemo(() => {
+    const parPrincipal = (principaux ?? []).map((p) => ({
+      cle: p.id,
+      titre: p.name,
+      principalId: p.id as string | null,
+      annexes: (sites ?? []).filter((s) => s.site_principal_id === p.id),
+    }))
+    const seules = (sites ?? [])
+      .filter((s) => !s.site_principal_id)
+      .map((s) => ({
+        cle: s.id, titre: s.name, principalId: null as string | null, annexes: [s],
+      }))
+    return [...parPrincipal, ...seules].sort((a, b) => a.titre.localeCompare(b.titre, 'fr'))
+  }, [sites, principaux])
 
   if (droitEnCours) return <Spinner label="Ouverture du pointage…" />
   if (peutPointer === false) {
@@ -113,6 +132,10 @@ export default function ValidationPage() {
           principalId={ouvert.principalId}
           annexes={ouvert.annexes}
           moisInitial={moisCourant}
+          // Changer de site sans quitter la grille : le mois reste, seule
+          // la grille se recharge.
+          ouvrables={ouvrables}
+          onChangerSite={setOuvert}
           onOuvrirFiche={setFiche}
           onClose={() => setOuvert(null)}
         />

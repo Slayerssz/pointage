@@ -164,6 +164,18 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
   const [nouveauMdp, setNouveauMdp] = useState('')
   const [confirmeSuppression, setConfirmeSuppression] = useState(false)
   const [creeAvec, setCreeAvec] = useState<string | null>(null)
+  // À la création, on choisit déjà ce que le compte pourra ouvrir.
+  const [societesChoisies, setSocietesChoisies] = useState<string[]>([])
+
+  const { data: societes } = useQuery({
+    queryKey: ['societes-toutes'],
+    enabled: !user,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('companies').select('id, name').order('name')
+      if (error) throw error
+      return data as { id: string; name: string }[]
+    },
+  })
 
   const soiMeme = user?.user_id === profile?.user_id
   const invalider = () => queryClient.invalidateQueries({ queryKey: ['admin-users'] })
@@ -181,11 +193,15 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
       } else {
         if (!username.trim()) throw new Error("Le nom d'utilisateur est obligatoire.")
         if (password.length < 6) throw new Error('Mot de passe : 6 caractères minimum.')
-        const { error } = await supabase.rpc('admin_creer_utilisateur', {
+        // Le compte et ses sociétés dans le même geste : créer d'abord
+        // et rattacher ensuite laissait un instant où il voyait tout.
+        const { error } = await supabase.rpc('admin_creer_utilisateur_avec_acces', {
           p_username: username,
           p_password: password,
           p_full_name: fullName,
           p_role: role,
+          p_companies: role === 'admin' || societesChoisies.length === 0
+            ? null : societesChoisies,
         })
         if (error) throw error
         setCreeAvec(password)
@@ -306,6 +322,42 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
         {auDessus && <option value="owner">Propriétaire (tout + journal)</option>}
       </select>
 
+      {/* Ce que le compte pourra ouvrir. Modifiable ensuite, par un
+          administrateur, depuis cette même fenêtre. */}
+      {!user && role !== 'admin' && role !== 'dev' && role !== 'owner' && (
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Sociétés accessibles
+          </label>
+          <p className="mb-2 text-xs text-slate-500">
+            Ce compte n’ouvrira que les sociétés cochées. Aucune case cochée veut dire
+            toutes les sociétés.
+          </p>
+          <div className="grid max-h-48 gap-1.5 overflow-y-auto rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
+            {(societes ?? []).map((c) => (
+              <label key={c.id} className="flex items-center gap-2.5 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={societesChoisies.includes(c.id)}
+                  onChange={() => setSocietesChoisies((l) =>
+                    l.includes(c.id) ? l.filter((x) => x !== c.id) : [...l, c.id])}
+                  className="size-4 shrink-0 rounded border-slate-300"
+                />
+                <span className="min-w-0 truncate">{c.name}</span>
+              </label>
+            ))}
+            {(societes ?? []).length === 0 && (
+              <span className="text-sm text-slate-400">Aucune société enregistrée.</span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {societesChoisies.length === 0
+              ? 'Toutes les sociétés.'
+              : `${societesChoisies.length} société(s) sur ${(societes ?? []).length}.`}
+          </p>
+        </div>
+      )}
+
       {!user && (
         <>
           <label className="mb-1 block text-sm font-medium text-slate-700">Mot de passe</label>
@@ -371,8 +423,9 @@ function UserFormModal({ user, onClose }: { user: AdminUser | null; onClose: () 
             )}
           </div>
 
-          {/* Le personnel ne pointe que les sociétés qu'on lui confie. */}
-          {user.role === 'rh' && <AccesSocietes userId={user.user_id} />}
+          {/* Un compte n'ouvre que les sociétés qu'on lui confie. Sauf
+              l'administrateur, qui tient le groupe entier. */}
+          {user.role !== 'admin' && <AccesSocietes userId={user.user_id} />}
 
           {!soiMeme && (
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">

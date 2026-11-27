@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   useEmployesDesAnnexes, usePointagesDesAnnexes, useRemplacementsDuMois,
 } from '../lib/queries'
@@ -24,11 +24,21 @@ import { EmptyState, ErrorNote, Spinner } from './ui'
  *
  * On ne pointe pas l'avenir : les jours à venir sont éteints.
  */
+/** Un lieu qu'on peut ouvrir : un site principal, ou une annexe seule. */
+export interface SiteOuvrable {
+  cle: string
+  titre: string
+  principalId: string | null
+  annexes: Site[]
+}
+
 export default function PointageMois({
   titre,
   principalId,
   annexes,
   moisInitial,
+  ouvrables,
+  onChangerSite,
   onClose,
   onOuvrirFiche,
 }: {
@@ -40,12 +50,19 @@ export default function PointageMois({
   annexes: Site[]
   /** Le mois ouvert au départ : { annee, mois } avec mois de 1 à 12. */
   moisInitial: { annee: number; mois: number }
+  /** Tous les lieux de la société : de quoi passer de l'un à l'autre. */
+  ouvrables?: SiteOuvrable[]
+  /** Changer de site sans quitter la grille. */
+  onChangerSite?: (s: SiteOuvrable) => void
   onClose: () => void
   /** Un clic sur un nom ouvre sa fiche, pour la lire et la corriger. */
   onOuvrirFiche: (employe: Employee) => void
 }) {
   // L'annexe mise en avant ; nulle, on voit tout le site principal.
   const [annexeChoisie, setAnnexeChoisie] = useState<string | null>(null)
+  // On change de site : la bande d'annexes repart sur « Toutes », sinon
+  // la grille s'ouvrirait filtrée sur une annexe d'un autre lieu.
+  useEffect(() => { setAnnexeChoisie(null) }, [principalId, annexes[0]?.id])
   const [recherche, setRecherche] = useState('')
   const [selection, setSelection] = useState<CellSelection | null>(null)
   const [{ annee, mois }, setMois] = useState(moisInitial)
@@ -126,6 +143,14 @@ export default function PointageMois({
             ›
           </button>
         </div>
+
+        {ouvrables && ouvrables.length > 1 && onChangerSite && (
+          <SelecteurSite
+            ouvrables={ouvrables}
+            titre={titre}
+            onChoisir={onChangerSite}
+          />
+        )}
 
         <input
           type="search"
@@ -218,6 +243,8 @@ export default function PointageMois({
                           sorti={Boolean(emp.date_sortie) && d > emp.date_sortie!}
                           onClick={() => {
                             if (d > today) return
+                            // Une case de quelqu'un de parti s'ouvre aussi :
+                            // remplacement, ou annulation de la sortie.
                             setSelection({
                               employee: emp,
                               // La case appartient à l'annexe de la personne,
@@ -257,11 +284,108 @@ export default function PointageMois({
           site={selection.site}
           date={selection.date}
           pointage={selection.pointage}
+          sorti={Boolean(selection.employee.date_sortie)
+            && selection.date > selection.employee.date_sortie!}
           remplacant={
             remplacements.data?.get(selection.employee.id)?.get(selection.date) ?? null
           }
           onFerme={() => setSelection(null)}
         />
+      )}
+    </div>
+  )
+}
+
+/**
+ * CHANGER DE SITE SANS QUITTER LA GRILLE.
+ *
+ * Le bureau pointe un site, puis le suivant, puis le suivant : refermer
+ * la grille et rouvrir l'arbre à chaque fois faisait trois gestes de
+ * trop. Le mois affiché ne bouge pas — on change de lieu, pas de date.
+ *
+ * Rien n'est à enregistrer avant de partir : chaque clic sur une case
+ * est écrit en base aussitôt. Il n'y a pas de brouillon à perdre.
+ */
+function SelecteurSite({
+  ouvrables,
+  titre,
+  onChoisir,
+}: {
+  ouvrables: SiteOuvrable[]
+  titre: string
+  onChoisir: (s: SiteOuvrable) => void
+}) {
+  const [ouvert, setOuvert] = useState(false)
+  const [q, setQ] = useState('')
+  const boite = useRef<HTMLDivElement>(null)
+
+  // Un clic ailleurs, ou Échap, referme la liste.
+  useEffect(() => {
+    if (!ouvert) return
+    const dehors = (e: MouseEvent) => {
+      if (!boite.current?.contains(e.target as Node)) setOuvert(false)
+    }
+    const touche = (e: KeyboardEvent) => { if (e.key === 'Escape') setOuvert(false) }
+    document.addEventListener('mousedown', dehors)
+    document.addEventListener('keydown', touche)
+    return () => {
+      document.removeEventListener('mousedown', dehors)
+      document.removeEventListener('keydown', touche)
+    }
+  }, [ouvert])
+
+  const cherche = q.trim().toLowerCase()
+  const liste = cherche
+    ? ouvrables.filter((o) => o.titre.toLowerCase().includes(cherche)
+        || o.annexes.some((a) => a.name.toLowerCase().includes(cherche)))
+    : ouvrables
+
+  return (
+    <div ref={boite} className="relative shrink-0">
+      <button
+        onClick={() => { setOuvert((v) => !v); setQ('') }}
+        title="Changer de site"
+        className="flex max-w-56 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        <span className="truncate">{titre}</span>
+        <span className="shrink-0 text-xs text-slate-400">▾</span>
+      </button>
+
+      {ouvert && (
+        <div className="absolute right-0 z-50 mt-1 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="border-b border-slate-100 p-2">
+            <input
+              autoFocus
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Chercher un site…"
+              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <ul className="max-h-72 overflow-y-auto py-1">
+            {liste.length === 0 && (
+              <li className="px-3 py-2 text-sm text-slate-500">Aucun site de ce nom.</li>
+            )}
+            {liste.map((o) => (
+              <li key={o.cle}>
+                <button
+                  onClick={() => { onChoisir(o); setOuvert(false) }}
+                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                    o.titre === titre ? 'font-semibold text-emerald-700' : 'text-slate-700'
+                  }`}
+                >
+                  <span className="block truncate">{o.titre}</span>
+                  {o.annexes.length > 1 && (
+                    <span className="block text-xs text-slate-400">
+                      {o.annexes.length} annexes
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )

@@ -62,6 +62,9 @@ export function useTousLesSites(enabled: boolean) {
 export type SiteEmployee = Pick<
   Employee,
   'id' | 'nom_prenom' | 'matricule' | 'qualification' | 'jour_de_repos'
+  // La date de sortie fait partie de la case : au-delà, le jour n'est
+  // plus à cette personne, et le menu propose d'annuler sa sortie.
+  | 'date_sortie' | 'site_id'
 >
 
 /** Employés d'un site, chargés par pages de 100 (à l'ouverture de l'accordéon). */
@@ -87,7 +90,7 @@ export function useSiteEmployees(
       const from = pageParam * SITE_EMPLOYEES_PAGE
       let requete = supabase
         .from('employees')
-        .select('id, nom_prenom, matricule, qualification, jour_de_repos')
+        .select('id, nom_prenom, matricule, qualification, jour_de_repos, date_sortie, site_id')
         .eq('site_id', siteId)
         .is('archive_le', null)
       requete = depuis

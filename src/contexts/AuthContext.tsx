@@ -1,12 +1,16 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { EVENEMENT_SESSION_PERDUE, supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
 
 interface AuthState {
   session: Session | null
   profile: Profile | null
   loading: boolean
+  /** La session n'a pas pu être renouvelée : on prévient sans fermer. */
+  sessionPerdue: boolean
+  /** Réessayer de renouveler, depuis le bandeau. */
+  reprendreSession: () => Promise<boolean>
   signOut: () => Promise<void>
 }
 
@@ -14,6 +18,8 @@ const AuthContext = createContext<AuthState>({
   session: null,
   profile: null,
   loading: true,
+  sessionPerdue: false,
+  reprendreSession: async () => false,
   signOut: async () => {},
 })
 
@@ -21,6 +27,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sessionPerdue, setSessionPerdue] = useState(false)
+
+  // La session perdue ne ferme plus la page : un bandeau le dit, et ce
+  // qui est saisi reste à l'écran le temps de reprendre la main.
+  useEffect(() => {
+    const perdue = () => setSessionPerdue(true)
+    window.addEventListener(EVENEMENT_SESSION_PERDUE, perdue)
+    return () => window.removeEventListener(EVENEMENT_SESSION_PERDUE, perdue)
+  }, [])
+
+  const reprendreSession = async () => {
+    const { data, error } = await supabase.auth.refreshSession()
+    if (!error && data.session) {
+      setSession(data.session)
+      setSessionPerdue(false)
+      return true
+    }
+    return false
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -29,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
+      if (s) setSessionPerdue(false)
       if (!s) {
         setProfile(null)
         setLoading(false)
@@ -80,7 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signOut }}>
+    <AuthContext.Provider
+      value={{ session, profile, loading, sessionPerdue, reprendreSession, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   )

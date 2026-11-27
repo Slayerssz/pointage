@@ -48,17 +48,22 @@ export function DayCell({
   let title = 'Pas encore pointé — cliquer pour saisir la journée'
 
   // Parti : le reste du mois n'est pas à lui. Rien n'est écrit dans ces
-  // cases, c'est la date de sortie qui parle.
+  // cases, c'est la date de sortie qui parle. Elles restent cliquables :
+  // on y pose un remplaçant — le poste, lui, doit être tenu — et c'est
+  // de là qu'on annule une sortie posée par erreur.
   if (sorti) {
     return (
-      <span
-        title="Sorti — il ne travaille plus à cette date"
-        className={`inline-flex items-center justify-center rounded-lg bg-slate-200 text-[9px] font-bold text-slate-500 ${
+      <button
+        onClick={onClick}
+        title={remplacant
+          ? `Sorti — poste tenu par ${remplacant.nom}`
+          : 'Sorti — cliquer pour poser un remplaçant ou annuler la sortie'}
+        className={`inline-flex items-center justify-center rounded-lg bg-slate-200 text-[9px] font-bold text-slate-500 transition hover:scale-110 ${
           large ? 'h-10 w-full' : 'h-7 w-8'
-        }`}
+        } ${remplacant ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
       >
         ⊘
-      </span>
+      </button>
     )
   }
 

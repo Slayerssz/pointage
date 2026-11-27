@@ -27,6 +27,7 @@ export default function ApercuEmploye({
   contratCourant,
   onModifier,
   onFiche,
+  onSolde,
   onClose,
 }: {
   employee: Employee
@@ -37,6 +38,8 @@ export default function ApercuEmploye({
   contratCourant?: ContratCourant | null
   onModifier?: () => void
   onFiche?: () => void
+  /** Imprimer son reçu pour solde de tout compte — pour un départ. */
+  onSolde?: () => void
   onClose: () => void
 }) {
   useFermerSurEchap(onClose)
@@ -248,6 +251,14 @@ export default function ApercuEmploye({
           >
             Fermer
           </button>
+          {onSolde && (
+            <button
+              onClick={onSolde}
+              className="rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Imprimer le solde de tout compte
+            </button>
+          )}
           {onFiche && (
             <button
               onClick={onFiche}

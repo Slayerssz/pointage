@@ -63,11 +63,12 @@ export default function AccesSocietes({ userId }: { userId: string }) {
 
   return (
     <div className="border-t border-slate-100 pt-4">
-      <h4 className="text-sm font-semibold text-slate-800">Pointage : sociétés confiées</h4>
+      <h4 className="text-sm font-semibold text-slate-800">Sociétés accessibles</h4>
       <p className="mt-1 text-xs text-slate-500">
-        Ce compte voit déjà toutes les sociétés et leurs dossiers. Les cases
-        ci-dessous ne décident que du pointage : là où c’est coché, l’onglet
-        Pointage s’ouvre et la saisie est permise, comme pour le bureau.
+        Ce compte n’ouvre que les sociétés cochées — employés, pointage et paie
+        comprises. La règle est tenue par la base, et non par l’écran : changer
+        l’adresse ne donne rien de plus. <strong>Aucune case cochée</strong> veut dire{' '}
+        <strong>toutes les sociétés</strong>, l’état d’avant cette règle.
       </p>
 
       <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
@@ -97,8 +98,8 @@ export default function AccesSocietes({ userId }: { userId: string }) {
         {inchange ? (
           <span className="text-xs text-slate-500">
             {choisies.length === 0
-              ? 'Aucune société confiée : ce compte ne voit l’onglet Pointage nulle part.'
-              : `${choisies.length} société(s) confiée(s).`}
+              ? 'Aucune société cochée : ce compte voit tout le groupe.'
+              : `${choisies.length} société(s) sur ${(societes ?? []).length}.`}
           </span>
         ) : (
           <button

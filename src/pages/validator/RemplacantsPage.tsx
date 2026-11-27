@@ -36,7 +36,6 @@ interface Remplacant {
   banque: string | null
   rib: string | null
   tarif_journalier: number | null
-  notes: string | null
   actif: boolean
 }
 
@@ -58,6 +57,7 @@ export default function RemplacantsPage() {
   const [annee, setAnnee] = useState(maintenant.getFullYear())
   const [mois, setMois] = useState(maintenant.getMonth() + 1)
   const [recherche, setRecherche] = useState('')
+  const [depuisEmploye, setDepuisEmploye] = useState(false)
   const [fiche, setFiche] = useState<Remplacant | null | 'nouveau'>(null)
   const [deplie, setDeplie] = useState<string | null>(null)
 
@@ -139,6 +139,12 @@ export default function RemplacantsPage() {
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
         >
           + Remplaçant
+        </button>
+        <button
+          onClick={() => setDepuisEmploye(true)}
+          className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+        >
+          Ajouter un employé existant
         </button>
         <span className="ml-auto text-sm text-slate-500">
           {joursMois} journée{joursMois > 1 ? 's' : ''} · {formatDH(totalMois)}
@@ -249,6 +255,180 @@ export default function RemplacantsPage() {
           }}
         />
       )}
+
+      {depuisEmploye && (
+        <DepuisEmploye
+          onClose={() => setDepuisEmploye(false)}
+          onRepris={() => {
+            qc.invalidateQueries({ queryKey: ['remplacants-fiches'] })
+            qc.invalidateQueries({ queryKey: ['remplacants'] })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * REPRENDRE DES EMPLOYÉS COMME REMPLAÇANTS.
+ *
+ * Un remplaçant est le plus souvent quelqu'un du groupe. Sa fiche
+ * existe déjà, avec sa C.I.N., sa C.N.S.S. et son R.I.B. : on la
+ * reprend telle quelle, au lieu de la retaper.
+ *
+ * La recherche porte sur TOUT le groupe, toutes sociétés, et dit qui
+ * est déjà remplaçant. La personne reste affectée à son site : c'est
+ * une seconde casquette, pas une mutation.
+ */
+function DepuisEmploye({
+  onClose,
+  onRepris,
+}: {
+  onClose: () => void
+  onRepris: () => void
+}) {
+  const [q, setQ] = useState('')
+  const [choisis, setChoisis] = useState<Set<string>>(new Set())
+  const [bilan, setBilan] = useState<
+    { nom: string; etat: string }[] | null
+  >(null)
+
+  const candidats = useQuery({
+    queryKey: ['employes-pour-remplacant', q],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('employes_pour_remplacant', {
+        p_recherche: q.trim() || null, p_limite: 60,
+      })
+      if (error) throw error
+      return data as {
+        employee_id: string; nom_prenom: string; matricule: number | null
+        qualification: string | null; societe: string; site: string | null
+        deja_remplacant: boolean
+      }[]
+    },
+  })
+
+  const reprendre = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('remplacant_depuis_employe', {
+        p_employees: [...choisis],
+      })
+      if (error) throw error
+      return data as { nom: string; etat: string }[]
+    },
+    onSuccess: (r) => { setBilan(r); setChoisis(new Set()); onRepris() },
+  })
+
+  const basculer = (id: string) => setChoisis((p) => {
+    const n = new Set(p)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
+
+  return (
+    <div className="modale fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+         onClick={onClose}>
+      <div
+        className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-slate-100 p-5">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Ajouter un employé existant comme remplaçant
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Toutes les sociétés. Ses informations sont reprises telles quelles, et il
+            reste affecté à son site.
+          </p>
+          <input
+            autoFocus
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Chercher par nom, matricule ou C.I.N.…"
+            className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {candidats.isLoading && <Spinner label="Chargement…" />}
+          {candidats.error && (
+            <div className="p-4"><ErrorNote>{(candidats.error as Error).message}</ErrorNote></div>
+          )}
+          {candidats.data?.length === 0 && (
+            <EmptyState>Personne de ce nom.</EmptyState>
+          )}
+          <ul className="divide-y divide-slate-100">
+            {(candidats.data ?? []).map((c) => (
+              <li key={c.employee_id}>
+                <label
+                  className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-slate-50 ${
+                    c.deja_remplacant ? 'opacity-60' : ''
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={c.deja_remplacant}
+                    checked={choisis.has(c.employee_id)}
+                    onChange={() => basculer(c.employee_id)}
+                    className="size-4 shrink-0"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-900">
+                      {c.nom_prenom}
+                      {c.deja_remplacant && (
+                        <span className="ml-2 text-xs font-normal text-amber-700">
+                          déjà remplaçant
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">
+                      {c.matricule != null ? `Mat. ${c.matricule} · ` : ''}
+                      {c.societe}
+                      {c.site ? ` · ${c.site}` : ''}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {bilan && (
+          <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 text-sm">
+            {bilan.map((b) => (
+              <p key={b.nom} className={b.etat === 'cree' ? 'text-emerald-700' : 'text-amber-700'}>
+                {b.nom} — {b.etat === 'cree' ? 'ajouté aux remplaçants' : 'était déjà remplaçant'}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {reprendre.error && (
+          <div className="px-4 pt-3">
+            <ErrorNote>{(reprendre.error as Error).message}</ErrorNote>
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 p-4">
+          <span className="mr-auto text-sm text-slate-500">
+            {choisis.size} sélectionné(s)
+          </span>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Fermer
+          </button>
+          <button
+            onClick={() => reprendre.mutate()}
+            disabled={choisis.size === 0 || reprendre.isPending}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+          >
+            {reprendre.isPending ? '…' : 'Les ajouter'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -275,7 +455,6 @@ function FicheRemplacant({
     banque: remplacant?.banque ?? '',
     rib: remplacant?.rib ?? '',
     tarif_journalier: remplacant?.tarif_journalier?.toString() ?? '',
-    notes: remplacant?.notes ?? '',
     actif: remplacant?.actif ?? true,
   })
   const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }))
@@ -380,11 +559,6 @@ function FicheRemplacant({
             {champ('R.I.B.', (
               <input value={f.rib} onChange={(e) => set('rib')(e.target.value)}
                      className={cls} placeholder="24 chiffres" />
-            ))}
-          </div>
-          <div className="sm:col-span-2">
-            {champ('Notes', (
-              <input value={f.notes} onChange={(e) => set('notes')(e.target.value)} className={cls} />
             ))}
           </div>
           {remplacant && (

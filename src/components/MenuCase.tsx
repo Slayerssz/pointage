@@ -53,6 +53,7 @@ export default function MenuCase({
   date,
   pointage,
   remplacant,
+  sorti = false,
   onFerme,
 }: {
   employee: SiteEmployee
@@ -61,17 +62,39 @@ export default function MenuCase({
   pointage: DayPointage | null
   /** Le remplaçant déjà posé sur cette case, s'il y en a un. */
   remplacant: { nom: string; montant: number } | null
+  /** La personne était déjà partie ce jour-là. */
+  sorti?: boolean
   onFerme: () => void
 }) {
   const qc = useQueryClient()
-  const [vue, setVue] = useState<'menu' | 'remplacement' | 'sortie'>('menu')
+  const [vue, setVue] = useState<'menu' | 'remplacement' | 'sortie' | 'annulation'>('menu')
   const [recherche, setRecherche] = useState('')
   const remplacants = useRemplacants(vue === 'remplacement')
 
-  const rafraichir = () => {
-    for (const cle of ['pointages-des-annexes', 'site-week-pointages', 'site-pointages',
-                       'remplacements-du-mois', 'employees', 'employes-des-annexes',
-                       'employees-sortis', 'lignes-paie']) {
+  /**
+   * Poser une lettre ne change QUE le pointage : ni la fiche, ni la
+   * liste des sorties, ni la paie. On ne rechargeait pourtant les dix
+   * listes à chaque clic — et l'on clique trois cents fois par mois.
+   */
+  const rafraichirPointage = () => {
+    for (const cle of ['pointages-des-annexes', 'site-week-pointages', 'site-pointages']) {
+      qc.invalidateQueries({ queryKey: [cle] })
+    }
+  }
+
+  /** Un remplacement touche en plus le tableau de paie du remplaçant. */
+  const rafraichirRemplacement = () => {
+    rafraichirPointage()
+    for (const cle of ['remplacements-du-mois', 'paie-remplacants']) {
+      qc.invalidateQueries({ queryKey: [cle] })
+    }
+  }
+
+  /** Une sortie, ou son annulation, remue tout le reste. */
+  const rafraichirTout = () => {
+    rafraichirRemplacement()
+    for (const cle of ['employees', 'employes-des-annexes', 'employees-sortis',
+                       'sorties', 'sorties-archive', 'lignes-paie']) {
       qc.invalidateQueries({ queryKey: [cle] })
     }
   }
@@ -88,7 +111,7 @@ export default function MenuCase({
       })
       if (error) throw error
     },
-    onSuccess: () => { rafraichir(); onFerme() },
+    onSuccess: () => { rafraichirPointage(); onFerme() },
   })
 
   const effacer = useMutation({
@@ -96,7 +119,7 @@ export default function MenuCase({
       const { error } = await supabase.rpc('supprimer_pointage', { p_pointage_id: pointage!.id })
       if (error) throw error
     },
-    onSuccess: () => { rafraichir(); onFerme() },
+    onSuccess: () => { rafraichirPointage(); onFerme() },
   })
 
   const remplacer = useMutation({
@@ -106,7 +129,7 @@ export default function MenuCase({
       })
       if (error) throw error
     },
-    onSuccess: () => { rafraichir(); onFerme() },
+    onSuccess: () => { rafraichirRemplacement(); onFerme() },
   })
 
   const retirerRemplacement = useMutation({
@@ -116,7 +139,17 @@ export default function MenuCase({
       })
       if (error) throw error
     },
-    onSuccess: () => { rafraichir(); onFerme() },
+    onSuccess: () => { rafraichirRemplacement(); onFerme() },
+  })
+
+  const annulerSortie = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('annuler_sortie_employe', {
+        p_employee: employee.id,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => { rafraichirTout(); onFerme() },
   })
 
   const sortir = useMutation({
@@ -126,17 +159,19 @@ export default function MenuCase({
       })
       if (error) throw error
     },
-    onSuccess: () => { rafraichir(); onFerme() },
+    onSuccess: () => { rafraichirTout(); onFerme() },
   })
 
   const erreur = poser.error ?? effacer.error ?? remplacer.error
-    ?? retirerRemplacement.error ?? sortir.error
+    ?? retirerRemplacement.error ?? sortir.error ?? annulerSortie.error
   // Ce que la case porte déjà : une journée en attente de validation
   // porte elle aussi une lettre, et la pastille doit la montrer —
   // sinon le bureau repose la même lettre en croyant la case vide.
   const actuel = pointage && pointage.status !== 'refused' ? pointage.type_garde : null
   const estConge = Boolean(pointage?.conge_id)
-  const remplacable = REMPLACABLES.includes(String(actuel))
+  // Le poste d'un parti doit être tenu : on y pose un remplaçant comme
+  // sur un repos. C'est même le cas le plus fréquent.
+  const remplacable = sorti || REMPLACABLES.includes(String(actuel))
 
   const q = recherche.trim().toLowerCase()
   const liste = (remplacants.data ?? []).filter(
@@ -169,10 +204,17 @@ export default function MenuCase({
         )}
 
         {/* ── Le menu ────────────────────────────────────────────── */}
+        {sorti && vue === 'menu' && (
+          <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+            Parti le {employee.date_sortie ? formatDateFr(employee.date_sortie) : '—'} : ce
+            jour n’est plus à lui. On peut y poser un remplaçant, ou annuler la sortie.
+          </p>
+        )}
+
         {vue === 'menu' && (
           <>
             <ul className="py-1">
-              {CHOIX.map((c) => (
+              {!sorti && CHOIX.map((c) => (
                 <li key={c.code}>
                   <button
                     disabled={estConge || poser.isPending}
@@ -215,7 +257,8 @@ export default function MenuCase({
                 )}
               </li>
 
-              {pointage?.status === 'validated' && !estConge && !pointage.photo_path && (
+              {!sorti && pointage?.status === 'validated' && !estConge
+                && !pointage.photo_path && (
                 <li>
                   <button
                     onClick={() => effacer.mutate()}
@@ -228,14 +271,25 @@ export default function MenuCase({
               )}
 
               <li className="my-1 border-t border-slate-100" />
-              <li>
-                <button
-                  onClick={() => setVue('sortie')}
-                  className="w-full px-4 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
-                >
-                  Sortie…
-                </button>
-              </li>
+              {employee.date_sortie ? (
+                <li>
+                  <button
+                    onClick={() => setVue('annulation')}
+                    className="w-full px-4 py-2 text-left text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                  >
+                    Annuler la sortie…
+                  </button>
+                </li>
+              ) : (
+                <li>
+                  <button
+                    onClick={() => setVue('sortie')}
+                    className="w-full px-4 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Sortie…
+                  </button>
+                </li>
+              )}
             </ul>
           </>
         )}
@@ -289,16 +343,51 @@ export default function MenuCase({
           </div>
         )}
 
+        {/* ── Annuler la sortie ──────────────────────────────────── */}
+        {vue === 'annulation' && (
+          <div className="p-4">
+            <p className="text-sm text-slate-700">
+              Remettre <strong>{employee.nom_prenom}</strong> en poste, et effacer sa
+              sortie du{' '}
+              <strong>
+                {employee.date_sortie ? formatDateFr(employee.date_sortie) : '—'}
+              </strong>{' '}
+              ?
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Les journées retirées au moment de la sortie reviennent telles qu’elles
+              étaient, sauf celles repointées depuis. Son départ quitte la section
+              Sorties. Une sortie déjà validée, elle, ne s’annule plus.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setVue('menu')}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => annulerSortie.mutate()}
+                disabled={annulerSortie.isPending}
+                className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
+              >
+                {annulerSortie.isPending ? '…' : 'Le remettre en poste'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Confirmer la sortie ────────────────────────────────── */}
         {vue === 'sortie' && (
           <div className="p-4">
             <p className="text-sm text-slate-700">
-              <strong>{employee.nom_prenom}</strong> ne travaille plus à partir du{' '}
+              Dernier jour de <strong>{employee.nom_prenom}</strong> :{' '}
               <strong>{formatDateFr(date)}</strong>.
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              Son dernier jour sera la veille. Les journées déjà posées après seront
-              retirées, et son départ s’ouvrira dans la section Sorties, à compléter.
+              C’est cette date qui paraîtra dans la section Sorties. Les journées posées
+              après seront retirées — gardées de côté, l’annulation les rend — et son
+              départ s’ouvrira dans Sorties, à compléter.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button

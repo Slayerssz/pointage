@@ -105,7 +105,7 @@ const ICONS = {
 
 export default function Layout() {
   const { companyId } = useParams()
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, sessionPerdue, reprendreSession } = useAuth()
   const { pathname } = useLocation()
   const [menu, setMenu] = useState(false)
 
@@ -305,8 +305,46 @@ export default function Layout() {
       )}
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-18 md:ml-60 md:px-8 md:pb-10 md:pt-8">
+        {sessionPerdue && <BandeauSession onReprendre={reprendreSession} />}
         <Outlet />
       </main>
+    </div>
+  )
+}
+
+/**
+ * LA SESSION A LÂCHÉ, LA PAGE RESTE.
+ *
+ * Avant, un renouvellement manqué déconnectait : l'écran de paie se
+ * refermait au milieu d'une saisie et le travail était perdu. Ce bandeau
+ * dit ce qui se passe et laisse reprendre la main, sans rien effacer.
+ */
+function BandeauSession({ onReprendre }: { onReprendre: () => Promise<boolean> }) {
+  const [enCours, setEnCours] = useState(false)
+  const [echoue, setEchoue] = useState(false)
+
+  const reprendre = async () => {
+    setEnCours(true)
+    setEchoue(false)
+    const ok = await onReprendre()
+    setEnCours(false)
+    if (!ok) setEchoue(true)
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+      <span className="min-w-0 flex-1 text-sm text-amber-900">
+        <strong>Connexion interrompue.</strong> Ce qui est à l’écran n’est pas perdu :
+        reprenez la main, puis enregistrez de nouveau.
+        {echoue && ' Toujours rien — vérifiez le réseau, puis réessayez.'}
+      </span>
+      <button
+        onClick={reprendre}
+        disabled={enCours}
+        className="shrink-0 rounded-lg bg-amber-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+      >
+        {enCours ? '…' : 'Reprendre la main'}
+      </button>
     </div>
   )
 }

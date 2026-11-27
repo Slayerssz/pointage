@@ -971,6 +971,7 @@ function EmployeeFormModal({
   onClose: () => void
 }) {
   const { data: sites } = useSites(companyId)
+  const { data: principaux } = useSitesPrincipaux(companyId)
   const queryClient = useQueryClient()
   // « Fiche » = les informations de l'employé ; « Dossier » = contrats,
   // congés et dettes (uniquement pour un employé déjà enregistré).
@@ -979,6 +980,10 @@ function EmployeeFormModal({
 
   // La question posée quand on passe quelqu'un à « Sorti ».
   const [dateSortieADemander, setDateSortieADemander] = useState(false)
+  // Le site d'abord, l'annexe ensuite. En base, l'employé est rattaché à
+  // une ANNEXE (employees.site_id) ; le site principal se déduit d'elle.
+  // On s'en souvient ici pour que les deux listes se suivent.
+  const [principalChoisi, setPrincipalChoisi] = useState<string>('')
   const [form, setForm] = useState({
     site_id: employee?.site_id ?? '',
     matricule: employee?.matricule?.toString() ?? '',
@@ -1008,6 +1013,38 @@ function EmployeeFormModal({
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((f) => ({ ...f, [key]: value }))
 
+  // Les sites arrivent après le premier rendu : on retrouve alors le
+  // site principal de l'annexe déjà enregistrée.
+  useEffect(() => {
+    if (principalChoisi || !form.site_id || !sites) return
+    const annexe = sites.find((s) => s.id === form.site_id)
+    if (annexe?.site_principal_id) setPrincipalChoisi(annexe.site_principal_id)
+    else if (annexe) setPrincipalChoisi(`seule:${annexe.id}`)
+  }, [sites, form.site_id, principalChoisi])
+
+  // Les annexes du site choisi, et rien d'autre.
+  const annexesDuSite = (sites ?? []).filter((s) =>
+    principalChoisi.startsWith('seule:')
+      ? s.id === principalChoisi.slice(6)
+      : s.site_principal_id === principalChoisi)
+
+  // Les lieux qu'on peut choisir comme « site » : les sites principaux,
+  // et les annexes qui n'en ont pas — elles se pointent seules.
+  const lieux = [
+    ...(principaux ?? []).map((p) => ({ valeur: p.id, nom: p.name })),
+    ...(sites ?? []).filter((s) => !s.site_principal_id)
+      .map((s) => ({ valeur: `seule:${s.id}`, nom: s.name })),
+  ].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+
+  // Changer de site remet l'annexe à zéro — sauf quand le site n'en a
+  // qu'une : on la pose alors d'office, il n'y a rien à choisir.
+  const choisirPrincipal = (valeur: string) => {
+    setPrincipalChoisi(valeur)
+    const dessous = (sites ?? []).filter((s) =>
+      valeur.startsWith('seule:') ? s.id === valeur.slice(6) : s.site_principal_id === valeur)
+    setForm((f) => ({ ...f, site_id: dessous.length === 1 ? dessous[0].id : '' }))
+  }
+
   const save = useMutation({
     mutationFn: async () => {
       // Un champ manquant peut être sur un autre onglet que celui qu'on
@@ -1018,7 +1055,8 @@ function EmployeeFormModal({
         throw new Error(message)
       }
       if (!form.nom_prenom.trim()) refuser('identite', 'Le nom est obligatoire.')
-      if (!form.site_id) refuser('poste', 'Choisissez un site.')
+      if (!principalChoisi) refuser('poste', 'Choisissez un site.')
+      if (!form.site_id) refuser('poste', 'Choisissez l’annexe de ce site.')
       if (form.statut === 'sorti' && !form.date_sortie) {
         refuser('poste', 'Indiquez le dernier jour travaillé avant de marquer la sortie.')
       }
@@ -1232,13 +1270,31 @@ function EmployeeFormModal({
           {onglet === 'poste' && (
             <>
 {field('Site *', (
-            <select value={form.site_id} onChange={(e) => set('site_id')(e.target.value)} className={inputCls}>
+            <select value={principalChoisi} onChange={(e) => choisirPrincipal(e.target.value)}
+                    className={inputCls}>
               <option value="">— Choisir un site —</option>
-              {sites?.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {lieux.map((l) => (
+                <option key={l.valeur} value={l.valeur}>{l.nom}</option>
               ))}
             </select>
-          ))}
+          ), 'Le lieu, tel qu’il figure dans la liste des sites.')}
+
+{field('Annexe', (
+            <select
+              value={form.site_id}
+              onChange={(e) => set('site_id')(e.target.value)}
+              disabled={!principalChoisi || annexesDuSite.length <= 1}
+              className={`${inputCls} disabled:bg-slate-50 disabled:text-slate-500`}
+            >
+              {annexesDuSite.length === 0 && <option value="">— Choisir d’abord un site —</option>}
+              {annexesDuSite.length > 1 && <option value="">— Choisir une annexe —</option>}
+              {annexesDuSite.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          ), annexesDuSite.length === 1
+            ? 'Ce site n’a pas de subdivision : la personne y est affectée directement.'
+            : 'Les annexes de ce site. C’est elle qui porte le pointage.')}
           
 {field(employee ? 'Matricule' : 'Matricule (vide = automatique)', (
             <input type="number" value={form.matricule} onChange={(e) => set('matricule')(e.target.value)} className={inputCls} placeholder="automatique" />

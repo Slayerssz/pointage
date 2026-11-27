@@ -143,9 +143,13 @@ with attendu (numero, bloc, objet, present) as (
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                 where n.nspname = 'public' and p.proname = 'pointer_depuis_embauche')),
   (46, 'Départ et journées',       'la paie borne au contrat',
+       -- Depuis le BLOC 60, le compte du mois vit dans
+       -- compte_pointage_mois : c'est là que les bornes du contrat se
+       -- lisent, et la paie n'a plus d'autre compte.
        exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                  and pg_get_functiondef(p.oid) like '%p.pointed_on <= e.date_sortie%')),
+                where n.nspname = 'public'
+                  and p.proname in ('compte_pointage_mois', 'generer_lignes_paie')
+                  and pg_get_functiondef(p.oid) like '%pointed_on <= e.date_sortie%')),
   (47, 'Repos travaillé',          'le RT vaut deux journées',
        public.garde_valeur('RT') = 2
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -168,7 +172,8 @@ with attendu (numero, bloc, objet, present) as (
   (51, 'Repos au jour le jour',   'la lettre R existe et ne vaut rien',
        public.garde_valeur('R') = 0
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                    where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                    where n.nspname = 'public'
+                      and p.proname in ('compte_pointage_mois', 'generer_lignes_paie')
                       and pg_get_functiondef(p.oid) like '%type_garde = ''R''%')),
   (52, 'Remplaçants',             'la section partagée existe, sans société',
        exists (select 1 from information_schema.tables
@@ -195,7 +200,31 @@ with attendu (numero, bloc, objet, present) as (
                   and pg_get_functiondef(p.oid) like '%where id%')
        and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                     where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
-                      and pg_get_functiondef(p.oid) like '%as jours_absents%'))
+                      and pg_get_functiondef(p.oid) like '%jours_absents%')),
+  (57, 'Annuler la sortie',       'la date cliquée est la date de sortie, et les journées retirées sont gardées',
+       exists (select 1 from information_schema.tables
+                where table_schema = 'public' and table_name = 'pointages_retires')
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'annuler_sortie_employe')),
+  (58, 'Remplaçant depuis un employé', 'on reprend un agent du groupe sans le retaper',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'remplacant_depuis_employe')
+       and not exists (select 1 from information_schema.columns
+                        where table_schema = 'public' and table_name = 'remplacants'
+                          and column_name = 'notes')),
+  (59, 'Accès par société',      'un compte ne lit que les sociétés qu''on lui confie',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'peut_voir_societe')
+       and exists (select 1 from pg_policies
+                    where schemaname = 'public' and tablename = 'employees'
+                      and policyname = 'employees_select'
+                      and coalesce(qual, '') like '%peut_voir_societe%')),
+  (60, 'Un seul compte',         'le pointage et la paie comptent au même endroit',
+       exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname = 'compte_pointage_mois')
+       and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'generer_lignes_paie'
+                      and pg_get_functiondef(p.oid) like '%compte_pointage_mois%'))
 )
 select numero,
        bloc,

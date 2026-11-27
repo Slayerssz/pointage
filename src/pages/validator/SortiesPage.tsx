@@ -21,6 +21,7 @@ import { ChampDecimal, Chip, EmptyState, ErrorNote, Spinner } from '../../compon
 import type { Employee } from '../../lib/types'
 import { useSites, useSitesPrincipaux, useSociete } from '../../lib/queries'
 import ApercuEmploye from '../../components/ApercuEmploye'
+import SoldeImpression from '../../components/SoldeImpression'
 import DemanderDateSortie from '../../components/DemanderDateSortie'
 import ReprendreEmploye from '../../components/ReprendreEmploye'
 import { estAdministrateur } from '../../lib/roles'
@@ -84,6 +85,8 @@ export default function SortiesPage() {
   const { data: tousLesSites } = useSites(companyId)
   const { data: principaux } = useSitesPrincipaux(companyId)
   const [apercu, setApercu] = useState<Employee | null>(null)
+  // Le reçu, sorti d'un clic depuis la fiche de la personne.
+  const [solde, setSolde] = useState<Employee | null>(null)
   // Corriger une date de sortie : ceux qu'on a marqués avant la mise à
   // jour portent la date du jour, et non celle de leur vrai départ.
   const [aCorriger, setACorriger] = useState<Employee | null>(null)
@@ -378,7 +381,17 @@ export default function SortiesPage() {
             const sp = tousLesSites?.find((s) => s.id === apercu.site_id)?.site_principal_id
             return sp ? (principaux?.find((p) => p.id === sp)?.name ?? null) : null
           })()}
+          onSolde={() => { setSolde(apercu); setApercu(null) }}
           onClose={() => setApercu(null)}
+        />
+      )}
+
+      {solde && (
+        <SoldeImpression
+          employee={solde}
+          entreprise={company?.name ?? ''}
+          sortie={(sorties ?? []).find((s) => s.employee_id === solde.id) ?? null}
+          onClose={() => setSolde(null)}
         />
       )}
 

@@ -75,11 +75,9 @@ begin
   )
   insert into public.remplacants
     (nom_prenom, cin, cnss, date_naissance, telephone, adresse, ville,
-     qualification, departement, mode_reglement, banque, rib, notes)
+     qualification, departement, mode_reglement, banque, rib)
   select c.nom_prenom, c.cin, c.cnss, c.date_naissance, c.telephone, c.adresse,
-         c.ville, c.qualification, c.departement, c.mode_reglement, c.banque, c.rib,
-         'Repris du site « ' || (select s2.name from public.sites s2 where s2.id = c.site_id)
-           || ' » le ' || to_char(now(), 'DD/MM/YYYY')
+         c.ville, c.qualification, c.departement, c.mode_reglement, c.banque, c.rib
     from candidats c
    where c.rang = 1
      -- Déjà présent ? On n'en fait pas un second.
@@ -104,8 +102,7 @@ end $transfert$;
 -- Ce qu'il y a maintenant dans la section partagée.
 select matricule, nom_prenom, qualification, mode_reglement,
        coalesce(cin, '⚠ manquant')  as cin,
-       coalesce(cnss, '⚠ manquant') as cnss,
-       notes
+       coalesce(cnss, '⚠ manquant') as cnss
   from public.remplacants
  where archive_le is null
  order by nom_prenom;
